@@ -37,6 +37,7 @@ _UTM_GRID_SIZE = 250
 
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
+_GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 
 
 def _make_task(func, args, expected_output_path_list, dependant_task_list):
@@ -78,13 +79,13 @@ def main():
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
-    global_feature_index_path = os.path.join(
+    global_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
     build_feature_bounding_box_rtree_task = _make_task(
         _build_feature_bounding_box_rtree, (
-            _GLOBAL_POLYGON_PATH, global_feature_index_path),
-        [global_feature_index_path], [])
+            _GLOBAL_POLYGON_PATH, global_rtree_path),
+        [global_rtree_path], [])
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
@@ -92,11 +93,41 @@ def main():
     grid_edges_of_vector_task = _make_task(
         _grid_edges_of_vector, (
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
-            global_feature_index_path, global_grid_vector_path,
+            global_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE),
         [global_grid_vector_path], [build_feature_bounding_box_rtree_task])
 
     grid_edges_of_vector_task()
+
+    LOGGER.info("Find shore points in clipped polygon.")
+    grid_id = 0
+    grid_point_path = os.path.join(
+        _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
+    _create_shore_points(
+        global_grid_vector_path, grid_id, global_rtree_path,
+        _GLOBAL_POLYGON_PATH, grid_point_path)
+
+
+def _create_shore_points(
+        grid_vector_path, grid_id, rtree_path, base_vector_path,
+        target_sample_point_vector_path):
+    """Create points that lie on the coast line.
+
+    Parameters:
+        grid_vector_path (string): path to vector containing grids
+        grid_id (integer): feature ID in `grid_vector_path`'s layer to operate
+            on.
+        rtree_path (string): path to an rtree index that has bounding box
+            indexes of polygons that might intersect a grid in question.
+        base_vector_path (string): path to polygon vector that we're analyzing
+            over.
+        target_sample_point_vector_path (string): path to a point vector that
+            samples the edges of the polygon
+
+    Returns:
+        None.
+    """
+    pass
 
 
 def _grid_edges_of_vector(
@@ -256,7 +287,6 @@ def _build_feature_bounding_box_rtree(
     # cutting off the extension.
     global_feature_index_base = os.path.splitext(
         target_rtree_path)[0]
-    LOGGER.debug(global_feature_index_base)
     global_feature_index = rtree.index.Index(global_feature_index_base)
 
     global_vector = ogr.Open(vector_path)
