@@ -19,7 +19,7 @@ _GLOBAL_BOUNDING_BOX_WGS84 = [-180, -60, 180, 60]
 
 # This is the lat/lng grid size to slice the runs into, annoying since it's
 # lat/lng, but if you have a better idea lets hear it.
-_WGS84_GRID_SIZE = 0.5
+_WGS84_GRID_SIZE = 2.5
 
 # Once global grid is cut, it is reprojected into UTM with this underlying
 # square grid cell size
@@ -128,11 +128,15 @@ def main():
                 prepared_geometry[fid] = shapely.wkt.loads(
                     feature_geometry.ExportToWkt())
             prepared_shapely_feature = prepared_geometry[fid]
-            if prepared_shapely_feature.intersects(cell_geometry_shapely):
+            if (prepared_shapely_feature.intersects(
+                    cell_geometry_shapely) and
+                    not prepared_shapely_feature.contains(
+                        cell_geometry_shapely)):
                 # add new geom to layer
                 grid_feature = ogr.Feature(global_grid_defn)
                 grid_feature.SetGeometry(cell_geometry)
                 global_grid_layer.CreateFeature(grid_feature)
+                global_grid_layer.SyncToDisk()
                 grid_feature = None
                 break
 
