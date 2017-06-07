@@ -4,6 +4,7 @@ import math
 
 from osgeo import osr
 from osgeo import ogr
+import rtree
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
@@ -12,7 +13,7 @@ _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\
 # The global bounding box to do the entire analysis
 # This range was roughly picked to avoid the poles
 # [min_lat, min_lng, max_lat, max_lng]
-_GLOBAL_BOUNDING_BOX_WGS84 = [-60, -180, 60, 180]
+_GLOBAL_BOUNDING_BOX_WGS84 = [-180, -60, 180, 60]
 
 # This is the lat/lng grid size to slice the runs into, annoying since it's
 # lat/lng, but if you have a better idea lets hear it.
@@ -27,6 +28,26 @@ _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 
 def main():
     """Entry point."""
+    global_vector = ogr.Open(_GLOBAL_POLYGON_PATH)
+    global_layer = global_vector.GetLayer()
+
+    print 'building global index'
+    global_feature_index = rtree.index.Index()
+    for global_feature in global_layer:
+        feature_geometry = global_feature.GetGeometryRef()
+        # minx maxx miny maxy
+        feature_envelope = feature_geometry.GetEnvelope()
+        # left, bottom, right, top
+        global_feature_index.insert(
+            global_feature.GetFID(), (
+                feature_envelope[0], feature_envelope[2],
+                feature_envelope[1], feature_envelope[3]))
+    print global_layer.GetFeatureCount()
+
+    sys.exit()
+
+
+
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
@@ -42,6 +63,7 @@ def main():
 
     if os.path.exists(global_grid_vector_path):
         os.remove(global_grid_vector_path)
+
 
     # set up the shapefile driver
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -65,9 +87,9 @@ def main():
         col_index = cell_index % n_cols
         local_bounding_box_wgs84 = [
             _GLOBAL_BOUNDING_BOX_WGS84[0]+col_index*_WGS84_GRID_SIZE,
-            _GLOBAL_BOUNDING_BOX_WGS84[1]-row_index*_WGS84_GRID_SIZE,
+            _GLOBAL_BOUNDING_BOX_WGS84[1]+row_index*_WGS84_GRID_SIZE,
             _GLOBAL_BOUNDING_BOX_WGS84[0]+(col_index+1)*_WGS84_GRID_SIZE,
-            _GLOBAL_BOUNDING_BOX_WGS84[1]-(row_index+1)*_WGS84_GRID_SIZE]
+            _GLOBAL_BOUNDING_BOX_WGS84[1]+(row_index+1)*_WGS84_GRID_SIZE]
 
         ring = ogr.Geometry(ogr.wkbLinearRing)
         ring.AddPoint(
