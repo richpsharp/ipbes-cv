@@ -29,7 +29,7 @@ _GLOBAL_BOUNDING_BOX_WGS84 = [-180, -60, 180, 60]
 # lat/lng, but if you have a better idea lets hear it.
 # The 3.0 degrees comes from the fact that UTM zones are 6 degrees wide so
 # half of that plus some buffer should be good enough
-_WGS84_GRID_SIZE = 10.0
+_WGS84_GRID_SIZE = 3.0
 
 # Once global grid is cut, it is reprojected into UTM with this underlying
 # square grid cell size
@@ -127,7 +127,48 @@ def _create_shore_points(
     Returns:
         None.
     """
-    pass
+    if os.path.exists(target_sample_point_vector_path):
+        os.remove(target_sample_point_vector_path)
+    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+    target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
+        target_sample_point_vector_path)
+
+    # create the spatial reference from the base vector
+    spatial_reference = osr.SpatialReference()
+    spatial_reference.ImportFromWkt(
+        pygeoprocessing.get_vector_info(base_vector_path)['projection'])
+
+    target_sample_point_layer = target_sample_point_vector.CreateLayer(
+        os.path.splitext(target_sample_point_vector_path)[0],
+        spatial_reference, ogr.wkbPoint)
+
+    target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
+
+    grid_vector = ogr.Open(grid_vector_path)
+    grid_layer = grid_vector.GetLayer()
+    grid_feature = grid_layer.GetFeature(grid_id)
+    grid_shapely = shapely.wkb.loads(
+        grid_feature.GetGeometryRef().ExportToWkb())
+
+    base_vector = ogr.Open(base_vector_path)
+    base_layer = base_vector.GetLayer()
+
+    # the input path has a .dat extension, but the `rtree` package only uses
+    # the basename.  It's a quirk of the library, so we'll deal with it by
+    # cutting off the extension.
+    base_vector_rtree = rtree.index.Index(
+        os.path.splitext(rtree_path)[0])
+    LOGGER.debug("test %s", grid_shapely.bounds)
+    for feature_id in base_vector_rtree.intersection(grid_shapely.bounds):
+        base_feature = base_layer.GetFeature(feature_id)
+        base_shapely = shapely.wkb.loads(
+            base_feature.GetGeometryRef().ExportToWkb())
+
+        intersection_shapely = grid_shapely.intersection(base_shapely)
+        intersection_lines = intersection_shapely.boundary
+        intersection_points = intersection_lines.boundary
+        LOGGER.debug(intersection_points)
+    LOGGER.debug("Done with testing fid %d", grid_id)
 
 
 def _grid_edges_of_vector(
