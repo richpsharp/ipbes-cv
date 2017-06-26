@@ -114,6 +114,71 @@ def main():
         _GLOBAL_POLYGON_PATH, smallest_feature_size, temp_workspace,
         grid_point_path)
 
+    LOGGER.info("Calculate wind exposure.")
+    temp_workspace = os.path.join(
+        _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
+    _calculate_wind_exposure(
+        grid_point_path, landmass_bounding_rtree_path,
+        global_grid_vector_path, temp_workspace, grid_point_path)
+
+
+def _calculate_wind_exposure(
+        base_shore_point_vector_path,
+        landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
+        target_fetch_point_vector_path):
+    """Calculate wind exposure for each shore point.
+
+    Parameters:
+        base_shore_point_vector_path (string): path to a point shapefile
+            representing shore points that should be sampled for wind
+            exposure.
+        landmass_bounding_rtree_path (string): path to an rtree bounding box
+            for the landmass polygons.
+        landmass_vector_path (string): path to landmass polygon vetor.
+        temp_workspace (string): path to a directory that can be created for
+            temporary workspace files
+        target_fetch_point_vector_path (string): path to target point file,
+            will be a copy of `base_shore_point_vector_path`'s geometry with
+            an 'REI' (relative exposure index) field added.
+    """
+
+    if os.path.exists(temp_workspace):
+        shutil.rmtree(temp_workspace)
+    os.makedirs(temp_workspace)
+
+    utm_shore_point_vector_path = os.path.join(
+        temp_workspace, 'utm_shore_points.shp')
+
+    # reproject base_shore_point_vector_path to utm coordinates
+    base_shore_info = pygeoprocessing.get_vector_info(
+        base_shore_point_vector_path)
+
+    utm_spatial_reference = _get_utm_spatial_reference(
+        base_shore_info['bounding_box'])
+    base_spatial_reference = osr.SpatialReference()
+    base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
+
+    pygeoprocessing.reproject_vector(
+        base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
+        utm_shore_point_vector_path)
+
+    utm_bounding_box = pygeoprocessing.get_vector_info(
+        utm_shore_point_vector_path)['bounding_box']
+
+    LOGGER.debug(utm_bounding_box)
+
+    # get lat/lng bounding box of utm projected coordinates
+
+    # get global polygon clip of that utm box
+
+    # project global clipped polygons to UTM
+
+    # rasterize UTM clipped polygons to raster
+
+    # rasterize WWIII fields to a raster (there are many)
+
+    # raytrace all the rays for fetch
+
 
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
