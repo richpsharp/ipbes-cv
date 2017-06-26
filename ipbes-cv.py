@@ -155,22 +155,12 @@ def _create_shore_points(
 
     for grid_feature in grid_layer:
     #grid_feature = grid_layer.GetFeature(grid_id)
+        LOGGER.debug(grid_feature.GetFID())
         grid_shapely = shapely.wkb.loads(
             grid_feature.GetGeometryRef().ExportToWkb())
 
-        # transform lat/lng box to utm -> local box
-        utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
-        utm_bounding_box = pygeoprocessing.transform_bounding_box(
-            grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
-            utm_spatial_reference.ExportToWkt(), edge_samples=11)
-
-        # transform local box back to lat/lng -> global clipping box
-        base_bounding_box = pygeoprocessing.transform_bounding_box(
-            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
-            base_spatial_reference.ExportToWkt(), edge_samples=11)
-
         # clip global polygon to global clipping box
-        for feature_id in base_vector_rtree.intersection(base_bounding_box):
+        for feature_id in base_vector_rtree.intersection(grid_shapely.bounds):
             base_feature = base_layer.GetFeature(feature_id)
             base_shapely = shapely.wkb.loads(
                 base_feature.GetGeometryRef().ExportToWkb())
@@ -181,15 +171,39 @@ def _create_shore_points(
                 target_feature.SetGeometry(target_geometry)
                 target_sample_point_layer.CreateFeature(target_feature)
                 target_feature = None
-            except shapely.geos.ReadingError:
+            except IllegalArgumentException:
                 LOGGER.warn(
-                    "Couldn't process this intersection %s", intersection_shapely)
+                    "Couldn't process this intersection %s",
+                    intersection_shapely)
 
-        print utm_bounding_box
-        print base_bounding_box
+        # project clipped geometry into UTM
+        if os.path.exists(target_sample_point_vector_path):
+            os.remove(target_sample_point_vector_path)
+        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
+            target_sample_point_vector_path)
+        target_sample_point_layer = target_sample_point_vector.CreateLayer(
+            os.path.splitext(target_sample_point_vector_path)[0],
+            #base_spatial_reference, ogr.wkbPoint)
+            base_spatial_reference, ogr.wkbPolygon)
+
+        target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
 
     return
     # project global polygon clip to UTM
+    # transform lat/lng box to utm -> local box
+    utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
+    utm_bounding_box = pygeoprocessing.transform_bounding_box(
+        grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
+        utm_spatial_reference.ExportToWkt(), edge_samples=11)
+
+    # transform local box back to lat/lng -> global clipping box
+    base_bounding_box = pygeoprocessing.transform_bounding_box(
+        utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+        base_spatial_reference.ExportToWkt(), edge_samples=11)
+
+
+
     # create grid for underlying local utm box
     # rasterize utm global clip to grid
     # grid shoreline from raster
