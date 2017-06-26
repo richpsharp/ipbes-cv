@@ -144,40 +144,51 @@ def _create_shore_points(
 
     target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
 
+    base_vector = ogr.Open(base_vector_path)
+    base_layer = base_vector.GetLayer()
 
-
-    # transform lat/lng box to utm -> local box
     grid_vector = ogr.Open(grid_vector_path)
     grid_layer = grid_vector.GetLayer()
-    grid_feature = grid_layer.GetFeature(grid_id)
-    grid_shapely = shapely.wkb.loads(
-        grid_feature.GetGeometryRef().ExportToWkb())
 
-    utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
-    utm_bounding_box = pygeoprocessing.transform_bounding_box(
-        grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
-        utm_spatial_reference.ExportToWkt(), edge_samples=11)
+    base_vector_rtree = rtree.index.Index(
+        os.path.splitext(rtree_path)[0])
 
-    base_bounding_box = pygeoprocessing.transform_bounding_box(
-        utm_bounding_box, utm_spatial_reference.ExportToWkt(),
-        base_spatial_reference.ExportToWkt(), edge_samples=11)
+    for grid_feature in grid_layer:
+    #grid_feature = grid_layer.GetFeature(grid_id)
+        grid_shapely = shapely.wkb.loads(
+            grid_feature.GetGeometryRef().ExportToWkb())
 
-    ring = ogr.Geometry(ogr.wkbLinearRing)
-    for i, j in [(0, 1), (2, 1), (2, 3), (0, 3), (0, 1)]:
-        ring.AddPoint(base_bounding_box[i], base_bounding_box[j])
-    cell_geometry = ogr.Geometry(ogr.wkbPolygon)
-    cell_geometry.AddGeometry(ring)
-    target_feature = ogr.Feature(target_sample_point_defn)
-    target_feature.SetGeometry(cell_geometry)
-    target_sample_point_layer.CreateFeature(target_feature)
-    target_feature = None
+        # transform lat/lng box to utm -> local box
+        utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
+        utm_bounding_box = pygeoprocessing.transform_bounding_box(
+            grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
+            utm_spatial_reference.ExportToWkt(), edge_samples=11)
 
-    print utm_bounding_box
-    print base_bounding_box
+        # transform local box back to lat/lng -> global clipping box
+        base_bounding_box = pygeoprocessing.transform_bounding_box(
+            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+            base_spatial_reference.ExportToWkt(), edge_samples=11)
+
+        # clip global polygon to global clipping box
+        for feature_id in base_vector_rtree.intersection(base_bounding_box):
+            base_feature = base_layer.GetFeature(feature_id)
+            base_shapely = shapely.wkb.loads(
+                base_feature.GetGeometryRef().ExportToWkb())
+            intersection_shapely = grid_shapely.intersection(base_shapely)
+            try:
+                target_geometry = ogr.CreateGeometryFromWkt(intersection_shapely.wkt)
+                target_feature = ogr.Feature(target_sample_point_defn)
+                target_feature.SetGeometry(target_geometry)
+                target_sample_point_layer.CreateFeature(target_feature)
+                target_feature = None
+            except shapely.geos.ReadingError:
+                LOGGER.warn(
+                    "Couldn't process this intersection %s", intersection_shapely)
+
+        print utm_bounding_box
+        print base_bounding_box
 
     return
-    # transform local box back to lat/lng -> global clipping box
-    # clip global polygon to global clipping box
     # project global polygon clip to UTM
     # create grid for underlying local utm box
     # rasterize utm global clip to grid
@@ -192,8 +203,7 @@ def _create_shore_points(
 
 
 
-    base_vector = ogr.Open(base_vector_path)
-    base_layer = base_vector.GetLayer()
+
 
     # the input path has a .dat extension, but the `rtree` package only uses
     # the basename.  It's a quirk of the library, so we'll deal with it by
