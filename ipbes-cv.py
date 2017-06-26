@@ -117,14 +117,17 @@ def main():
     LOGGER.info("Calculate wind exposure.")
     temp_workspace = os.path.join(
         _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
+    max_fetch_distance = 60000
     _calculate_wind_exposure(
         grid_point_path, landmass_bounding_rtree_path,
-        global_grid_vector_path, temp_workspace, grid_point_path)
+        _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
+        max_fetch_distance, grid_point_path)
 
 
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
+        smallest_feature_size, max_fetch_distance,
         target_fetch_point_vector_path):
     """Calculate wind exposure for each shore point.
 
@@ -137,6 +140,10 @@ def _calculate_wind_exposure(
         landmass_vector_path (string): path to landmass polygon vetor.
         temp_workspace (string): path to a directory that can be created for
             temporary workspace files
+        smallest_feature_size (float): smallest feature size to detect in
+            meters.
+        max_fetch_distance (float): maximum fetch distance for a ray in
+            meters.
         target_fetch_point_vector_path (string): path to target point file,
             will be a copy of `base_shore_point_vector_path`'s geometry with
             an 'REI' (relative exposure index) field added.
@@ -148,6 +155,10 @@ def _calculate_wind_exposure(
 
     utm_shore_point_vector_path = os.path.join(
         temp_workspace, 'utm_shore_points.shp')
+    temp_utm_clipped_vector_path = os.path.join(
+        temp_workspace, 'utm_clipped_landmass.shp')
+    temp_grid_raster_path = os.path.join(
+        temp_workspace, 'landmass_mask.tif')
 
     # reproject base_shore_point_vector_path to utm coordinates
     base_shore_info = pygeoprocessing.get_vector_info(
@@ -170,10 +181,82 @@ def _calculate_wind_exposure(
     # get lat/lng bounding box of utm projected coordinates
 
     # get global polygon clip of that utm box
+    # transform local box back to lat/lng -> global clipping box
+    base_clipping_box = pygeoprocessing.transform_bounding_box(
+        utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+        base_spatial_reference.ExportToWkt(), edge_samples=11)
+    base_clipping_shapely = shapely.geometry.box(*base_clipping_box)
+
+    landmass_vector_rtree = rtree.index.Index(
+        os.path.splitext(landmass_bounding_rtree_path)[0])
+
+    landmass_vector = ogr.Open(landmass_vector_path)
+    landmass_layer = landmass_vector.GetLayer()
+
+    # this will hold the clipped landmass geometry
+    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+    temp_clipped_vector_path = os.path.join(
+        temp_workspace, 'clipped_geometry_vector.shp')
+    temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
+        temp_clipped_vector_path)
+    temp_clipped_layer = (
+        temp_clipped_vector.CreateLayer(
+            os.path.splitext(temp_clipped_vector_path)[0],
+            base_spatial_reference, ogr.wkbPolygon))
+    temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
+
+    # clip global polygon to global clipping box
+    for feature_id in landmass_vector_rtree.intersection(base_clipping_box):
+        landmass_feature = landmass_layer.GetFeature(feature_id)
+        landmass_shapely = shapely.wkb.loads(
+            landmass_feature.GetGeometryRef().ExportToWkb())
+        intersection_shapely = base_clipping_shapely.intersection(
+            landmass_shapely)
+        try:
+            clipped_geometry = ogr.CreateGeometryFromWkt(
+                intersection_shapely.wkt)
+            clipped_feature = ogr.Feature(temp_clipped_defn)
+            clipped_feature.SetGeometry(clipped_geometry)
+            temp_clipped_layer.CreateFeature(clipped_feature)
+            clipped_feature = None
+        except Exception:
+            LOGGER.warn(
+                "Couldn't process this intersection %s", intersection_shapely)
+    temp_clipped_layer.SyncToDisk()
+    temp_clipped_layer = None
+    temp_clipped_vector = None
 
     # project global clipped polygons to UTM
+    pygeoprocessing.reproject_vector(
+        temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
+        temp_utm_clipped_vector_path)
 
-    # rasterize UTM clipped polygons to raster
+    driver = gdal.GetDriverByName('GTiff')
+    landmass_geotransform = [
+        utm_bounding_box[0] - max_fetch_distance,
+        smallest_feature_size[0] / 2.0,
+        0.0,
+        utm_bounding_box[3] + max_fetch_distance,
+        0.0,
+        smallest_feature_size[1] / 2.0]
+    landmass_n_cols = (
+        utm_bounding_box[2] - landmass_geotransform[0] +
+        max_fetch_distance) / (smallest_feature_size[0] / 2.0)
+    landmass_n_rows = (
+        utm_bounding_box[1] - landmass_geotransform[3] -
+        max_fetch_distance) / (smallest_feature_size[1] / 2.0)
+    LOGGER.debug("%s", landmass_geotransform)
+    LOGGER.debug("%d, %d", landmass_n_cols, landmass_n_rows)
+    landmass_raster = driver.Create(
+        temp_grid_raster_path, int(landmass_n_cols),
+        int(landmass_n_rows), 1, gdal.GDT_Byte,
+        options=['TILED=YES', 'BLOCKXSIZE=64', 'BLOCKYSIZE=64'])
+    landmass_raster.SetProjection(utm_spatial_reference.ExportToWkt())
+    landmass_raster.SetGeoTransform(landmass_geotransform)
+    landmass_raster = None
+
+    pygeoprocessing.rasterize(
+        temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
 
     # rasterize WWIII fields to a raster (there are many)
 
@@ -243,6 +326,7 @@ def _create_shore_points(
         temp_clipped_vector.CreateLayer(
             os.path.splitext(temp_clipped_vector_path)[0],
             landmass_spatial_reference, ogr.wkbPolygon))
+    temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
 
     # this will hold the output sample points on the shore
     target_shore_point_vector = esri_shapefile_driver.CreateDataSource(
@@ -287,7 +371,7 @@ def _create_shore_points(
         try:
             target_geometry = ogr.CreateGeometryFromWkt(
                 intersection_shapely.wkt)
-            target_feature = ogr.Feature(target_shore_point_defn)
+            target_feature = ogr.Feature(temp_clipped_defn)
             target_feature.SetGeometry(target_geometry)
             temp_clipped_layer.CreateFeature(target_feature)
             target_feature = None
