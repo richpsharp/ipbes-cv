@@ -106,7 +106,7 @@ def main():
     grid_id = 122
     grid_point_path = os.path.join(
         _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
-    smallest_feature_size = [250, -250]
+    smallest_feature_size = 250
     temp_workspace = os.path.join(
         _TARGET_WORKSPACE, 'grid_%d' % grid_id)
     _create_shore_points(
@@ -159,6 +159,8 @@ def _calculate_wind_exposure(
         temp_workspace, 'utm_clipped_landmass.shp')
     temp_grid_raster_path = os.path.join(
         temp_workspace, 'landmass_mask.tif')
+    temp_fetch_rays_path = os.path.join(
+        temp_workspace, 'fetch_rays.shp')
 
     # reproject base_shore_point_vector_path to utm coordinates
     base_shore_info = pygeoprocessing.get_vector_info(
@@ -239,11 +241,55 @@ def _calculate_wind_exposure(
     byte_nodata = 255
     pygeoprocessing.create_raster_from_vector_extents(
         temp_utm_clipped_vector_path, temp_grid_raster_path,
-        [i / 2.0 for i in smallest_feature_size],
+        (smallest_feature_size, -smallest_feature_size),
         gdal.GDT_Byte, byte_nodata, fill_value=0)
 
     pygeoprocessing.rasterize(
         temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
+
+    # create fetch rays
+    temp_fetch_rays_vector = esri_shapefile_driver.CreateDataSource(
+        temp_fetch_rays_path)
+    temp_fetch_rays_layer = (
+        temp_fetch_rays_vector.CreateLayer(
+            os.path.splitext(temp_clipped_vector_path)[0],
+            utm_spatial_reference, ogr.wkbLineString))
+    temp_fetch_rays_defn = temp_fetch_rays_layer.GetLayerDefn()
+
+    utm_shore_point_vector = ogr.Open(utm_shore_point_vector_path)
+    utm_shore_point_layer = utm_shore_point_vector.GetLayer()
+
+    n_fetch_rays = 16
+    for shore_point_feature in utm_shore_point_layer:
+        for sample_index in xrange(n_fetch_rays):
+            compass_theta = float(sample_index) / n_fetch_rays * 360
+            cartesian_theta = -(compass_theta - 90)
+            delta_x = math.cos(cartesian_theta * math.pi / 180)
+            delta_y = math.sin(cartesian_theta * math.pi / 180)
+
+            shore_point_geometry = shore_point_feature.GetGeometryRef()
+            point_a_x = (
+                shore_point_geometry.GetX() + delta_x * smallest_feature_size)
+            point_a_y = (
+                shore_point_geometry.GetY() + delta_y * smallest_feature_size)
+            point_b_x = point_a_x + delta_x * (
+                max_fetch_distance - smallest_feature_size)
+            point_b_y = point_a_y + delta_y * (
+                max_fetch_distance - smallest_feature_size)
+
+            shore_point_geometry = None
+
+            ray = ogr.Geometry(ogr.wkbLineString)
+            ray.AddPoint(point_a_x, point_a_y)
+            ray.AddPoint(point_b_x, point_b_y)
+
+            ray_feature = ogr.Feature(temp_fetch_rays_defn)
+            ray_feature.SetGeometry(ray)
+            temp_fetch_rays_layer.CreateFeature(ray_feature)
+            ray_feature = None
+    temp_fetch_rays_layer.SyncToDisk()
+    temp_fetch_rays_layer = None
+    temp_fetch_rays_vector = None
 
     # rasterize WWIII fields to a raster (there are many)
 
@@ -378,7 +424,8 @@ def _create_shore_points(
     byte_nodata = 255
     pygeoprocessing.create_raster_from_vector_extents(
         temp_utm_clipped_vector_path,
-        temp_grid_raster_path, [i / 2.0 for i in smallest_feature_size],
+        temp_grid_raster_path, (
+            smallest_feature_size / 2.0, -smallest_feature_size / 2.0),
         gdal.GDT_Byte, byte_nodata, fill_value=0)
 
     # rasterize utm global clip to grid
