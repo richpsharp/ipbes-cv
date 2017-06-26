@@ -127,28 +127,70 @@ def _create_shore_points(
     Returns:
         None.
     """
+    # create the spatial reference from the base vector
+    base_spatial_reference = osr.SpatialReference()
+    base_spatial_reference.ImportFromWkt(
+        pygeoprocessing.get_vector_info(base_vector_path)['projection'])
+
     if os.path.exists(target_sample_point_vector_path):
         os.remove(target_sample_point_vector_path)
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
     target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
         target_sample_point_vector_path)
-
-    # create the spatial reference from the base vector
-    spatial_reference = osr.SpatialReference()
-    spatial_reference.ImportFromWkt(
-        pygeoprocessing.get_vector_info(base_vector_path)['projection'])
-
     target_sample_point_layer = target_sample_point_vector.CreateLayer(
         os.path.splitext(target_sample_point_vector_path)[0],
-        spatial_reference, ogr.wkbPoint)
+        #base_spatial_reference, ogr.wkbPoint)
+        base_spatial_reference, ogr.wkbPolygon)
 
     target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
 
+
+
+    # transform lat/lng box to utm -> local box
     grid_vector = ogr.Open(grid_vector_path)
     grid_layer = grid_vector.GetLayer()
     grid_feature = grid_layer.GetFeature(grid_id)
     grid_shapely = shapely.wkb.loads(
         grid_feature.GetGeometryRef().ExportToWkb())
+
+    utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
+    utm_bounding_box = pygeoprocessing.transform_bounding_box(
+        grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
+        utm_spatial_reference.ExportToWkt(), edge_samples=11)
+
+    base_bounding_box = pygeoprocessing.transform_bounding_box(
+        utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+        base_spatial_reference.ExportToWkt(), edge_samples=11)
+
+    ring = ogr.Geometry(ogr.wkbLinearRing)
+    for i, j in [(0, 1), (2, 1), (2, 3), (0, 3), (0, 1)]:
+        ring.AddPoint(base_bounding_box[i], base_bounding_box[j])
+    cell_geometry = ogr.Geometry(ogr.wkbPolygon)
+    cell_geometry.AddGeometry(ring)
+    target_feature = ogr.Feature(target_sample_point_defn)
+    target_feature.SetGeometry(cell_geometry)
+    target_sample_point_layer.CreateFeature(target_feature)
+    target_feature = None
+
+    print utm_bounding_box
+    print base_bounding_box
+
+    return
+    # transform local box back to lat/lng -> global clipping box
+    # clip global polygon to global clipping box
+    # project global polygon clip to UTM
+    # create grid for underlying local utm box
+    # rasterize utm global clip to grid
+    # grid shoreline from raster
+
+
+
+
+
+
+
+
+
 
     base_vector = ogr.Open(base_vector_path)
     base_layer = base_vector.GetLayer()
