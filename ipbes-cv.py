@@ -5,6 +5,7 @@ import os
 import math
 import logging
 
+import numpy
 from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
@@ -151,8 +152,14 @@ def _create_shore_points(
     temp_clipped_vector_path = os.path.join(
         temp_workspace, 'clipped_geometry_vector.shp')
     temp_grid_raster_path = os.path.join(temp_workspace, 'grid.tif')
+    temp_convolution_raster_path = os.path.join(
+        temp_workspace, 'convolution.tif')
     temp_utm_clipped_vector_path = os.path.join(
         temp_workspace, 'clipped_geometry_utm.shp')
+    temp_shore_kernel_path = os.path.join(
+        temp_workspace, 'kernel.tif')
+    temp_shore_raster_path = os.path.join(
+        temp_workspace, 'shore.tif')
 
     for path in [target_sample_point_vector_path,
                  temp_clipped_vector_path,
@@ -229,46 +236,43 @@ def _create_shore_points(
         temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
         temp_utm_clipped_vector_path)
 
+    byte_nodata = 255
     pygeoprocessing.create_raster_from_vector_extents(
         temp_utm_clipped_vector_path,
         temp_grid_raster_path, [i / 2.0 for i in smallest_feature_size],
-        gdal.GDT_Byte, 255, fill_value=0)
-
-    LOGGER.warn('TODO: delete temporary files')
-    return
-
-
+        gdal.GDT_Byte, byte_nodata, fill_value=0)
 
     # rasterize utm global clip to grid
+    pygeoprocessing.rasterize(
+        temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
+
     # grid shoreline from raster
+    _make_shore_kernel(temp_shore_kernel_path)
+    pygeoprocessing.convolve_2d(
+        (temp_grid_raster_path, 1), (temp_shore_kernel_path, 1),
+        temp_convolution_raster_path, target_datatype=gdal.GDT_Byte)
 
+    temp_grid_nodata = pygeoprocessing.get_raster_info(
+        temp_grid_raster_path)['nodata'][0]
 
+    def _shore_mask_op(shore_convolution):
+        """Mask values on land that border water."""
+        result = numpy.empty(shore_convolution.shape, dtype=numpy.uint8)
+        result[:] = byte_nodata
+        valid_mask = shore_convolution != temp_grid_nodata
+        # If a pixel is on land, it gets at least a 9, but if it's all on
+        # land it gets an 17 (8 neighboring pixels), so we search between 9
+        # and 17 to determine a shore pixel
+        result[valid_mask] = numpy.where(
+            (shore_convolution[valid_mask] >= 9) &
+            (shore_convolution[valid_mask] < 17), 1, byte_nodata)
+        return result
 
+    pygeoprocessing.raster_calculator(
+        [(temp_convolution_raster_path, 1)], _shore_mask_op,
+        temp_shore_raster_path, gdal.GDT_Byte, byte_nodata)
 
-
-
-
-
-
-
-
-
-    # the input path has a .dat extension, but the `rtree` package only uses
-    # the basename.  It's a quirk of the library, so we'll deal with it by
-    # cutting off the extension.
-    base_vector_rtree = rtree.index.Index(
-        os.path.splitext(rtree_path)[0])
-    LOGGER.debug("test %s", grid_shapely.bounds)
-    for feature_id in base_vector_rtree.intersection(grid_shapely.bounds):
-        base_feature = base_layer.GetFeature(feature_id)
-        base_shapely = shapely.wkb.loads(
-            base_feature.GetGeometryRef().ExportToWkb())
-
-        intersection_shapely = grid_shapely.intersection(base_shapely)
-        intersection_lines = intersection_shapely.boundary
-        intersection_points = intersection_lines.boundary
-        LOGGER.debug(intersection_points)
-    LOGGER.debug("Done with testing fid %d", grid_id)
+    LOGGER.warn('TODO: delete temporary files')
 
 
 def _grid_edges_of_vector(
@@ -448,6 +452,25 @@ def _build_feature_bounding_box_rtree(
                 feature_envelope[1], feature_envelope[3]))
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
+
+
+def _make_shore_kernel(kernel_path):
+    """Make a 3x3 raster with a 9 in the middle and 1s on the outside."""
+    driver = gdal.GetDriverByName('GTiff')
+    kernel_raster = driver.Create(
+        kernel_path.encode('utf-8'), 3, 3, 1,
+        gdal.GDT_Byte)
+
+    # Make some kind of geotransform, it doesn't matter what but
+    # will make GIS libraries behave better if it's all defined
+    kernel_raster.SetGeoTransform([0, 1, 0, 0, 0, -1])
+    srs = osr.SpatialReference()
+    srs.SetWellKnownGeogCS('WGS84')
+    kernel_raster.SetProjection(srs.ExportToWkt())
+
+    kernel_band = kernel_raster.GetRasterBand(1)
+    kernel_band.SetNoDataValue(127)
+    kernel_band.WriteArray(numpy.array([[1, 1, 1], [1, 9, 1], [1, 1, 1]]))
 
 
 def _make_logger_callback(message):
