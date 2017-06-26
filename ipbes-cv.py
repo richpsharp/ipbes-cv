@@ -303,7 +303,7 @@ def _create_shore_points(
                 target_sample_point_layer.CreateFeature(point_feature)
                 point_feature = None
 
-    LOGGER.warn('TODO: delete temporary files')
+    shutil.rmtree(temp_workspace)
 
 
 def _grid_edges_of_vector(
