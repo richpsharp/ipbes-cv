@@ -82,13 +82,13 @@ def main():
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
-    global_rtree_path = os.path.join(
+    landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
-    build_feature_bounding_box_rtree_task = _make_task(
+    build_rtree_task = _make_task(
         _build_feature_bounding_box_rtree, (
-            _GLOBAL_POLYGON_PATH, global_rtree_path),
-        [global_rtree_path], [])
+            _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path),
+        [landmass_bounding_rtree_path], [])
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
@@ -96,9 +96,9 @@ def main():
     grid_edges_of_vector_task = _make_task(
         _grid_edges_of_vector, (
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
-            global_rtree_path, global_grid_vector_path,
+            landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE),
-        [global_grid_vector_path], [build_feature_bounding_box_rtree_task])
+        [global_grid_vector_path], [build_rtree_task])
 
     grid_edges_of_vector_task()
 
@@ -110,40 +110,42 @@ def main():
     temp_workspace = os.path.join(
         _TARGET_WORKSPACE, 'grid_%d' % grid_id)
     _create_shore_points(
-        global_grid_vector_path, grid_id, global_rtree_path,
+        global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         _GLOBAL_POLYGON_PATH, smallest_feature_size, temp_workspace,
         grid_point_path)
 
 
 def _create_shore_points(
-        grid_vector_path, grid_id, rtree_path, base_vector_path,
-        smallest_feature_size, temp_workspace,
-        target_sample_point_vector_path):
-    """Create points that lie on the coast line.
+        sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
+        landmass_vector_path, smallest_feature_size, temp_workspace,
+        target_shore_point_vector_path):
+    """Create points that lie on the coast line of the landmass.
 
     Parameters:
-        grid_vector_path (string): path to vector containing grids
-        grid_id (integer): feature ID in `grid_vector_path`'s layer to operate
-            on.
-        rtree_path (string): path to an rtree index that has bounding box
-            indexes of polygons that might intersect a grid in question.
-        base_vector_path (string): path to polygon vector that we're analyzing
-            over.
+        sample_grid_vector_path (string): path to vector containing grids
+            that are used for discrete global sampling of the landmass
+            polygon.
+        grid_id (integer): feature ID in `sample_grid_vector_path`'s layer to
+            operate on.
+        landmass_bounding_rtree_path (string): path to an rtree index that has
+            bounding box indexes of the polygons in `landmass_vector_path`.
+        landmass_vector_path (string): path to polygon vector representing
+            landmass.
         smallest_feature_size (float): smallest feature size to grid a shore
             point on.
         temp_workspace (string): path to a directory that can be created
             during run to hold temporary files.  Will be deleted on successful
             function completion.
-        target_sample_point_vector_path (string): path to a point vector that
-            samples the edges of the polygon
+        target_shore_point_vector_path (string): path to a point vector that
+            will be created and contain points on the shore of the landmass.
 
     Returns:
         None.
     """
     # create the spatial reference from the base vector
-    base_spatial_reference = osr.SpatialReference()
-    base_spatial_reference.ImportFromWkt(
-        pygeoprocessing.get_vector_info(base_vector_path)['projection'])
+    landmass_spatial_reference = osr.SpatialReference()
+    landmass_spatial_reference.ImportFromWkt(
+        pygeoprocessing.get_vector_info(landmass_vector_path)['projection'])
 
     if os.path.exists(temp_workspace):
         shutil.rmtree(temp_workspace)
@@ -161,7 +163,7 @@ def _create_shore_points(
     temp_shore_raster_path = os.path.join(
         temp_workspace, 'shore.tif')
 
-    for path in [target_sample_point_vector_path,
+    for path in [target_shore_point_vector_path,
                  temp_clipped_vector_path,
                  temp_grid_raster_path]:
         if os.path.exists(path):
@@ -169,57 +171,58 @@ def _create_shore_points(
 
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
 
+    # this will hold the clipped landmass geometry
     temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
         temp_clipped_vector_path)
     temp_clipped_layer = (
         temp_clipped_vector.CreateLayer(
             os.path.splitext(temp_clipped_vector_path)[0],
-            base_spatial_reference, ogr.wkbPolygon))
+            landmass_spatial_reference, ogr.wkbPolygon))
 
-    target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
-        target_sample_point_vector_path)
-    target_sample_point_layer = target_sample_point_vector.CreateLayer(
-        os.path.splitext(target_sample_point_vector_path)[0],
-        base_spatial_reference, ogr.wkbPoint)
+    # this will hold the output sample points on the shore
+    target_shore_point_vector = esri_shapefile_driver.CreateDataSource(
+        target_shore_point_vector_path)
+    target_shore_point_layer = target_shore_point_vector.CreateLayer(
+        os.path.splitext(target_shore_point_vector_path)[0],
+        landmass_spatial_reference, ogr.wkbPoint)
 
-    target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
+    target_shore_point_defn = target_shore_point_layer.GetLayerDefn()
 
-    base_vector = ogr.Open(base_vector_path)
-    base_layer = base_vector.GetLayer()
+    landmass_vector = ogr.Open(landmass_vector_path)
+    landmass_layer = landmass_vector.GetLayer()
 
-    grid_vector = ogr.Open(grid_vector_path)
+    grid_vector = ogr.Open(sample_grid_vector_path)
     grid_layer = grid_vector.GetLayer()
     grid_feature = grid_layer.GetFeature(grid_id)
-
-    base_vector_rtree = rtree.index.Index(
-        os.path.splitext(rtree_path)[0])
-
     grid_shapely = shapely.wkb.loads(
         grid_feature.GetGeometryRef().ExportToWkb())
+
+    landmass_vector_rtree = rtree.index.Index(
+        os.path.splitext(landmass_bounding_rtree_path)[0])
 
     # project global polygon clip to UTM
     # transform lat/lng box to utm -> local box
     utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
     utm_bounding_box = pygeoprocessing.transform_bounding_box(
-        grid_shapely.bounds, base_spatial_reference.ExportToWkt(),
+        grid_shapely.bounds, landmass_spatial_reference.ExportToWkt(),
         utm_spatial_reference.ExportToWkt(), edge_samples=11)
 
     # transform local box back to lat/lng -> global clipping box
-    base_clipping_box = pygeoprocessing.transform_bounding_box(
+    utm_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
-        base_spatial_reference.ExportToWkt(), edge_samples=11)
-    base_clipping_shapely = shapely.geometry.box(*base_clipping_box)
+        landmass_spatial_reference.ExportToWkt(), edge_samples=11)
+    utm_clipping_shapely = shapely.geometry.box(*utm_clipping_box)
 
     # clip global polygon to global clipping box
-    for feature_id in base_vector_rtree.intersection(base_clipping_box):
-        base_feature = base_layer.GetFeature(feature_id)
+    for feature_id in landmass_vector_rtree.intersection(utm_clipping_box):
+        base_feature = landmass_layer.GetFeature(feature_id)
         base_shapely = shapely.wkb.loads(
             base_feature.GetGeometryRef().ExportToWkb())
-        intersection_shapely = base_clipping_shapely.intersection(base_shapely)
+        intersection_shapely = utm_clipping_shapely.intersection(base_shapely)
         try:
             target_geometry = ogr.CreateGeometryFromWkt(
                 intersection_shapely.wkt)
-            target_feature = ogr.Feature(target_sample_point_defn)
+            target_feature = ogr.Feature(target_shore_point_defn)
             target_feature.SetGeometry(target_geometry)
             temp_clipped_layer.CreateFeature(target_feature)
             target_feature = None
@@ -276,7 +279,7 @@ def _create_shore_points(
         temp_shore_raster_path)['geotransform']
 
     utm_to_base_transform = osr.CoordinateTransformation(
-        utm_spatial_reference, base_spatial_reference)
+        utm_spatial_reference, landmass_spatial_reference)
 
     for offset_info, data_block in pygeoprocessing.iterblocks(
             temp_shore_raster_path):
@@ -293,15 +296,15 @@ def _create_shore_points(
             shore_geotransform[4] * (col_indexes[valid_mask] + 0.5) +
             shore_geotransform[5] * (row_indexes[valid_mask] + 0.5))
         for x_coord, y_coord in zip(x_coordinates, y_coordinates):
-            point_geometry = ogr.Geometry(ogr.wkbPoint)
-            point_geometry.AddPoint(x_coord, y_coord)
-            point_geometry.Transform(utm_to_base_transform)
+            shore_point_geometry = ogr.Geometry(ogr.wkbPoint)
+            shore_point_geometry.AddPoint(x_coord, y_coord)
+            shore_point_geometry.Transform(utm_to_base_transform)
             if grid_shapely.intersects(shapely.geometry.Point(
-                    point_geometry.GetX(), point_geometry.GetY())):
-                point_feature = ogr.Feature(target_sample_point_defn)
-                point_feature.SetGeometry(point_geometry)
-                target_sample_point_layer.CreateFeature(point_feature)
-                point_feature = None
+                    shore_point_geometry.GetX(), shore_point_geometry.GetY())):
+                shore_point_feature = ogr.Feature(target_shore_point_defn)
+                shore_point_feature.SetGeometry(shore_point_geometry)
+                target_shore_point_layer.CreateFeature(shore_point_feature)
+                shore_point_feature = None
 
     shutil.rmtree(temp_workspace)
 
