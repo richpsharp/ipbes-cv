@@ -176,7 +176,12 @@ def _calculate_wind_exposure(
     utm_bounding_box = pygeoprocessing.get_vector_info(
         utm_shore_point_vector_path)['bounding_box']
 
-    LOGGER.debug(utm_bounding_box)
+    # extend bounding box for max fetch distance
+    utm_bounding_box = [
+        utm_bounding_box[0] - max_fetch_distance,
+        utm_bounding_box[1] - max_fetch_distance,
+        utm_bounding_box[2] + max_fetch_distance,
+        utm_bounding_box[3] + max_fetch_distance]
 
     # get lat/lng bounding box of utm projected coordinates
 
@@ -231,29 +236,11 @@ def _calculate_wind_exposure(
         temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
         temp_utm_clipped_vector_path)
 
-    driver = gdal.GetDriverByName('GTiff')
-    landmass_geotransform = [
-        utm_bounding_box[0] - max_fetch_distance,
-        smallest_feature_size[0] / 2.0,
-        0.0,
-        utm_bounding_box[3] + max_fetch_distance,
-        0.0,
-        smallest_feature_size[1] / 2.0]
-    landmass_n_cols = (
-        utm_bounding_box[2] - landmass_geotransform[0] +
-        max_fetch_distance) / (smallest_feature_size[0] / 2.0)
-    landmass_n_rows = (
-        utm_bounding_box[1] - landmass_geotransform[3] -
-        max_fetch_distance) / (smallest_feature_size[1] / 2.0)
-    LOGGER.debug("%s", landmass_geotransform)
-    LOGGER.debug("%d, %d", landmass_n_cols, landmass_n_rows)
-    landmass_raster = driver.Create(
-        temp_grid_raster_path, int(landmass_n_cols),
-        int(landmass_n_rows), 1, gdal.GDT_Byte,
-        options=['TILED=YES', 'BLOCKXSIZE=64', 'BLOCKYSIZE=64'])
-    landmass_raster.SetProjection(utm_spatial_reference.ExportToWkt())
-    landmass_raster.SetGeoTransform(landmass_geotransform)
-    landmass_raster = None
+    byte_nodata = 255
+    pygeoprocessing.create_raster_from_vector_extents(
+        temp_utm_clipped_vector_path, temp_grid_raster_path,
+        [i / 2.0 for i in smallest_feature_size],
+        gdal.GDT_Byte, byte_nodata, fill_value=0)
 
     pygeoprocessing.rasterize(
         temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
