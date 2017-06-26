@@ -272,6 +272,37 @@ def _create_shore_points(
         [(temp_convolution_raster_path, 1)], _shore_mask_op,
         temp_shore_raster_path, gdal.GDT_Byte, byte_nodata)
 
+    shore_geotransform = pygeoprocessing.get_raster_info(
+        temp_shore_raster_path)['geotransform']
+
+    utm_to_base_transform = osr.CoordinateTransformation(
+        utm_spatial_reference, base_spatial_reference)
+
+    for offset_info, data_block in pygeoprocessing.iterblocks(
+            temp_shore_raster_path):
+        row_indexes, col_indexes = numpy.mgrid[
+            offset_info['yoff']:offset_info['yoff']+offset_info['win_ysize'],
+            offset_info['xoff']:offset_info['xoff']+offset_info['win_xsize']]
+        valid_mask = data_block == 1
+        x_coordinates = (
+            shore_geotransform[0] +
+            shore_geotransform[1] * (col_indexes[valid_mask] + 0.5) +
+            shore_geotransform[2] * (row_indexes[valid_mask] + 0.5))
+        y_coordinates = (
+            shore_geotransform[3] +
+            shore_geotransform[4] * (col_indexes[valid_mask] + 0.5) +
+            shore_geotransform[5] * (row_indexes[valid_mask] + 0.5))
+        for x_coord, y_coord in zip(x_coordinates, y_coordinates):
+            point_geometry = ogr.Geometry(ogr.wkbPoint)
+            point_geometry.AddPoint(x_coord, y_coord)
+            point_geometry.Transform(utm_to_base_transform)
+            if grid_shapely.intersects(shapely.geometry.Point(
+                    point_geometry.GetX(), point_geometry.GetY())):
+                point_feature = ogr.Feature(target_sample_point_defn)
+                point_feature.SetGeometry(point_geometry)
+                target_sample_point_layer.CreateFeature(point_feature)
+                point_feature = None
+
     LOGGER.warn('TODO: delete temporary files')
 
 
