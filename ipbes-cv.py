@@ -1,9 +1,11 @@
 """IPBES global coastal vulnerability calculation."""
+import shutil
 import time
 import os
 import math
 import logging
 
+from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
 import rtree
@@ -103,13 +105,18 @@ def main():
     grid_id = 122
     grid_point_path = os.path.join(
         _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
+    smallest_feature_size = [250, -250]
+    temp_workspace = os.path.join(
+        _TARGET_WORKSPACE, 'grid_%d' % grid_id)
     _create_shore_points(
         global_grid_vector_path, grid_id, global_rtree_path,
-        _GLOBAL_POLYGON_PATH, grid_point_path)
+        _GLOBAL_POLYGON_PATH, smallest_feature_size, temp_workspace,
+        grid_point_path)
 
 
 def _create_shore_points(
         grid_vector_path, grid_id, rtree_path, base_vector_path,
+        smallest_feature_size, temp_workspace,
         target_sample_point_vector_path):
     """Create points that lie on the coast line.
 
@@ -121,6 +128,11 @@ def _create_shore_points(
             indexes of polygons that might intersect a grid in question.
         base_vector_path (string): path to polygon vector that we're analyzing
             over.
+        smallest_feature_size (float): smallest feature size to grid a shore
+            point on.
+        temp_workspace (string): path to a directory that can be created
+            during run to hold temporary files.  Will be deleted on successful
+            function completion.
         target_sample_point_vector_path (string): path to a point vector that
             samples the edges of the polygon
 
@@ -132,14 +144,36 @@ def _create_shore_points(
     base_spatial_reference.ImportFromWkt(
         pygeoprocessing.get_vector_info(base_vector_path)['projection'])
 
-    if os.path.exists(target_sample_point_vector_path):
-        os.remove(target_sample_point_vector_path)
+    if os.path.exists(temp_workspace):
+        shutil.rmtree(temp_workspace)
+    os.makedirs(temp_workspace)
+
+    temp_clipped_vector_path = os.path.join(
+        temp_workspace, 'clipped_geometry_vector.shp')
+    temp_grid_raster_path = os.path.join(temp_workspace, 'grid.tif')
+    temp_utm_clipped_vector_path = os.path.join(
+        temp_workspace, 'clipped_geometry_utm.shp')
+
+    for path in [target_sample_point_vector_path,
+                 temp_clipped_vector_path,
+                 temp_grid_raster_path]:
+        if os.path.exists(path):
+            os.remove(path)
+
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+
+    temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
+        temp_clipped_vector_path)
+    temp_clipped_layer = (
+        temp_clipped_vector.CreateLayer(
+            os.path.splitext(temp_clipped_vector_path)[0],
+            base_spatial_reference, ogr.wkbPolygon))
+
     target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
         target_sample_point_vector_path)
     target_sample_point_layer = target_sample_point_vector.CreateLayer(
         os.path.splitext(target_sample_point_vector_path)[0],
-        base_spatial_reference, ogr.wkbPolygon)
+        base_spatial_reference, ogr.wkbPoint)
 
     target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
 
@@ -180,19 +214,31 @@ def _create_shore_points(
                 intersection_shapely.wkt)
             target_feature = ogr.Feature(target_sample_point_defn)
             target_feature.SetGeometry(target_geometry)
-            target_sample_point_layer.CreateFeature(target_feature)
+            temp_clipped_layer.CreateFeature(target_feature)
             target_feature = None
         except Exception:
             LOGGER.warn(
                 "Couldn't process this intersection %s",
                 intersection_shapely)
+    temp_clipped_layer.SyncToDisk()
+    temp_clipped_layer = None
+    temp_clipped_vector = None
 
-    # project clipped geometry into UTM
+    # create grid for underlying local utm box
+    pygeoprocessing.reproject_vector(
+        temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
+        temp_utm_clipped_vector_path)
+
+    pygeoprocessing.create_raster_from_vector_extents(
+        temp_utm_clipped_vector_path,
+        temp_grid_raster_path, [i / 2.0 for i in smallest_feature_size],
+        gdal.GDT_Byte, 255, fill_value=0)
+
+    LOGGER.warn('TODO: delete temporary files')
     return
 
 
 
-    # create grid for underlying local utm box
     # rasterize utm global clip to grid
     # grid shoreline from raster
 
