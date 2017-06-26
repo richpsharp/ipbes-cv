@@ -100,7 +100,7 @@ def main():
     grid_edges_of_vector_task()
 
     LOGGER.info("Find shore points in clipped polygon.")
-    grid_id = 0
+    grid_id = 122
     grid_point_path = os.path.join(
         _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
     _create_shore_points(
@@ -139,7 +139,6 @@ def _create_shore_points(
         target_sample_point_vector_path)
     target_sample_point_layer = target_sample_point_vector.CreateLayer(
         os.path.splitext(target_sample_point_vector_path)[0],
-        #base_spatial_reference, ogr.wkbPoint)
         base_spatial_reference, ogr.wkbPolygon)
 
     target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
@@ -149,47 +148,14 @@ def _create_shore_points(
 
     grid_vector = ogr.Open(grid_vector_path)
     grid_layer = grid_vector.GetLayer()
+    grid_feature = grid_layer.GetFeature(grid_id)
 
     base_vector_rtree = rtree.index.Index(
         os.path.splitext(rtree_path)[0])
 
-    for grid_feature in grid_layer:
-    #grid_feature = grid_layer.GetFeature(grid_id)
-        LOGGER.debug(grid_feature.GetFID())
-        grid_shapely = shapely.wkb.loads(
-            grid_feature.GetGeometryRef().ExportToWkb())
+    grid_shapely = shapely.wkb.loads(
+        grid_feature.GetGeometryRef().ExportToWkb())
 
-        # clip global polygon to global clipping box
-        for feature_id in base_vector_rtree.intersection(grid_shapely.bounds):
-            base_feature = base_layer.GetFeature(feature_id)
-            base_shapely = shapely.wkb.loads(
-                base_feature.GetGeometryRef().ExportToWkb())
-            intersection_shapely = grid_shapely.intersection(base_shapely)
-            try:
-                target_geometry = ogr.CreateGeometryFromWkt(intersection_shapely.wkt)
-                target_feature = ogr.Feature(target_sample_point_defn)
-                target_feature.SetGeometry(target_geometry)
-                target_sample_point_layer.CreateFeature(target_feature)
-                target_feature = None
-            except IllegalArgumentException:
-                LOGGER.warn(
-                    "Couldn't process this intersection %s",
-                    intersection_shapely)
-
-        # project clipped geometry into UTM
-        if os.path.exists(target_sample_point_vector_path):
-            os.remove(target_sample_point_vector_path)
-        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
-        target_sample_point_vector = esri_shapefile_driver.CreateDataSource(
-            target_sample_point_vector_path)
-        target_sample_point_layer = target_sample_point_vector.CreateLayer(
-            os.path.splitext(target_sample_point_vector_path)[0],
-            #base_spatial_reference, ogr.wkbPoint)
-            base_spatial_reference, ogr.wkbPolygon)
-
-        target_sample_point_defn = target_sample_point_layer.GetLayerDefn()
-
-    return
     # project global polygon clip to UTM
     # transform lat/lng box to utm -> local box
     utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
@@ -198,9 +164,31 @@ def _create_shore_points(
         utm_spatial_reference.ExportToWkt(), edge_samples=11)
 
     # transform local box back to lat/lng -> global clipping box
-    base_bounding_box = pygeoprocessing.transform_bounding_box(
+    base_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
         base_spatial_reference.ExportToWkt(), edge_samples=11)
+    base_clipping_shapely = shapely.geometry.box(*base_clipping_box)
+
+    # clip global polygon to global clipping box
+    for feature_id in base_vector_rtree.intersection(base_clipping_box):
+        base_feature = base_layer.GetFeature(feature_id)
+        base_shapely = shapely.wkb.loads(
+            base_feature.GetGeometryRef().ExportToWkb())
+        intersection_shapely = base_clipping_shapely.intersection(base_shapely)
+        try:
+            target_geometry = ogr.CreateGeometryFromWkt(
+                intersection_shapely.wkt)
+            target_feature = ogr.Feature(target_sample_point_defn)
+            target_feature.SetGeometry(target_geometry)
+            target_sample_point_layer.CreateFeature(target_feature)
+            target_feature = None
+        except Exception:
+            LOGGER.warn(
+                "Couldn't process this intersection %s",
+                intersection_shapely)
+
+    # project clipped geometry into UTM
+    return
 
 
 
