@@ -278,7 +278,11 @@ def _calculate_wind_exposure(
     utm_shore_point_layer = utm_shore_point_vector.GetLayer()
 
     n_fetch_rays = 16
+    shore_point_logger = _make_logger_callback("Shore point %.2f%% complete.")
     for shore_point_feature in utm_shore_point_layer:
+        shore_point_logger(
+            float(shore_point_feature.GetFID()) /
+            utm_shore_point_layer.GetFeatureCount())
         for sample_index in xrange(n_fetch_rays):
             compass_theta = float(sample_index) / n_fetch_rays * 360
             cartesian_theta = -(compass_theta - 90)
@@ -307,6 +311,23 @@ def _calculate_wind_exposure(
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
                 ray_feature.SetGeometry(ray)
                 temp_fetch_rays_layer.CreateFeature(ray_feature)
+            else:
+                intersection_ray = ray_shapely.difference(landmass_shapely)
+                # if there's a difference it's be a line or a multiline
+                # anything else will be an empty set
+                if intersection_ray.geom_type == "LineString":
+                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                    ray_feature.SetGeometry(
+                        ogr.CreateGeometryFromWkt(
+                            intersection_ray.wkt))
+                    temp_fetch_rays_layer.CreateFeature(ray_feature)
+                elif intersection_ray.geom_type == "MultiLineString":
+                    # the first line segment is the originating ray
+                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                    ray_feature.SetGeometry(
+                        ogr.CreateGeometryFromWkt(
+                            intersection_ray.geoms[0].wkt))
+                    temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
