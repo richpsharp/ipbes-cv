@@ -24,6 +24,8 @@ _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
 _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
 
+_GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
+
 # The global bounding box to do the entire analysis
 # This range was roughly picked to avoid the poles
 # [min_lat, min_lng, max_lat, max_lng]
@@ -112,8 +114,8 @@ def main():
         _TARGET_WORKSPACE, 'grid_%d' % grid_id)
     _create_shore_points(
         global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-        _GLOBAL_POLYGON_PATH, smallest_feature_size, temp_workspace,
-        grid_point_path)
+        _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH, smallest_feature_size,
+        temp_workspace, grid_point_path)
 
     LOGGER.info("Calculate wind exposure.")
     temp_workspace = os.path.join(
@@ -122,13 +124,13 @@ def main():
     _calculate_wind_exposure(
         grid_point_path, landmass_bounding_rtree_path,
         _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-        max_fetch_distance, grid_point_path)
+        _GLOBAL_WWIII_PATH, max_fetch_distance, grid_point_path)
 
 
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
-        smallest_feature_size, max_fetch_distance,
+        smallest_feature_size, wwiii_vector_path, max_fetch_distance,
         target_fetch_point_vector_path):
     """Calculate wind exposure for each shore point.
 
@@ -143,13 +145,17 @@ def _calculate_wind_exposure(
             temporary workspace files
         smallest_feature_size (float): smallest feature size to detect in
             meters.
+        wwiii_vector_path (string): path to point shapefile representing
+            the Wave Watch III data.  Must contain at least these fields:
+
+                *
+
         max_fetch_distance (float): maximum fetch distance for a ray in
             meters.
         target_fetch_point_vector_path (string): path to target point file,
             will be a copy of `base_shore_point_vector_path`'s geometry with
             an 'REI' (relative exposure index) field added.
     """
-
     if os.path.exists(temp_workspace):
         shutil.rmtree(temp_workspace)
     os.makedirs(temp_workspace)
@@ -344,8 +350,8 @@ def _calculate_wind_exposure(
 
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-        landmass_vector_path, smallest_feature_size, temp_workspace,
-        target_shore_point_vector_path):
+        landmass_vector_path, wwiii_vector_path, smallest_feature_size,
+        temp_workspace, target_shore_point_vector_path):
     """Create points that lie on the coast line of the landmass.
 
     Parameters:
@@ -510,6 +516,17 @@ def _create_shore_points(
     utm_to_base_transform = osr.CoordinateTransformation(
         utm_spatial_reference, landmass_spatial_reference)
 
+    wwiii_rtree = rtree.index.Index()
+
+    wwiii_vector = ogr.Open(wwiii_vector_path)
+    wwiii_layer = wwiii_vector.GetLayer()
+    for wwiii_feature in wwiii_layer:
+        wwiii_geometry = wwiii_feature.GetGeometryRef()
+        wwiii_x = wwiii_geometry.GetX()
+        wwiii_y = wwiii_geometry.GetY()
+        wwiii_rtree.insert(
+            wwiii_feature.GetFID(), (wwiii_x, wwiii_y, wwiii_x, wwiii_y))
+
     for offset_info, data_block in pygeoprocessing.iterblocks(
             temp_shore_raster_path):
         row_indexes, col_indexes = numpy.mgrid[
@@ -532,6 +549,13 @@ def _create_shore_points(
                     shore_point_geometry.GetX(), shore_point_geometry.GetY())):
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
+
+                LOGGER.debug(list(wwiii_rtree.nearest(
+                    (shore_point_geometry.GetX(),
+                     shore_point_geometry.GetY(),
+                     shore_point_geometry.GetX(),
+                     shore_point_geometry.GetY()), 3)))
+
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
 
