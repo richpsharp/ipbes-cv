@@ -107,7 +107,7 @@ def main():
     grid_id = 122
     grid_point_path = os.path.join(
         _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
-    smallest_feature_size = 250
+    smallest_feature_size = 2000
     temp_workspace = os.path.join(
         _TARGET_WORKSPACE, 'grid_%d' % grid_id)
     _create_shore_points(
@@ -253,15 +253,6 @@ def _calculate_wind_exposure(
         clipped_geometry_shapely_list)
     clipped_geometry_shapely_list = None
 
-    byte_nodata = 255
-    pygeoprocessing.create_raster_from_vector_extents(
-        temp_utm_clipped_vector_path, temp_grid_raster_path,
-        (smallest_feature_size, -smallest_feature_size),
-        gdal.GDT_Byte, byte_nodata, fill_value=0)
-
-    pygeoprocessing.rasterize(
-        temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
-
     # load land geometry into shapely object
     landmass_shapely_prep = shapely.prepared.prep(landmass_shapely)
 
@@ -273,6 +264,8 @@ def _calculate_wind_exposure(
             os.path.splitext(temp_clipped_vector_path)[0],
             utm_spatial_reference, ogr.wkbLineString))
     temp_fetch_rays_defn = temp_fetch_rays_layer.GetLayerDefn()
+    temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
+        'fetch_dist', ogr.OFTReal))
 
     utm_shore_point_vector = ogr.Open(utm_shore_point_vector_path)
     utm_shore_point_layer = utm_shore_point_vector.GetLayer()
@@ -310,24 +303,35 @@ def _calculate_wind_exposure(
             if not landmass_shapely_prep.intersects(ray_shapely):
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
                 ray_feature.SetGeometry(ray)
+                ray_feature.SetField(
+                    'fetch_dist', ray_shapely.length)
                 temp_fetch_rays_layer.CreateFeature(ray_feature)
             else:
                 intersection_ray = ray_shapely.difference(landmass_shapely)
                 # if there's a difference it's be a line or a multiline
                 # anything else will be an empty set
                 if intersection_ray.geom_type == "LineString":
-                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                    ray_feature.SetGeometry(
-                        ogr.CreateGeometryFromWkt(
-                            intersection_ray.wkt))
-                    temp_fetch_rays_layer.CreateFeature(ray_feature)
+                    # ensure they have the same starting points, otherwise
+                    # it's probably further down the line ray
+                    if intersection_ray.coords[0] == ray_shapely.coords[0]:
+                        ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                        ray_feature.SetGeometry(
+                            ogr.CreateGeometryFromWkt(
+                                intersection_ray.wkt))
+                        ray_feature.SetField(
+                            'fetch_dist', intersection_ray.length)
+                        temp_fetch_rays_layer.CreateFeature(ray_feature)
                 elif intersection_ray.geom_type == "MultiLineString":
                     # the first line segment is the originating ray
-                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                    ray_feature.SetGeometry(
-                        ogr.CreateGeometryFromWkt(
-                            intersection_ray.geoms[0].wkt))
-                    temp_fetch_rays_layer.CreateFeature(ray_feature)
+                    if (intersection_ray.geoms[0].coords[0] ==
+                            ray_shapely.coords[0]):
+                        ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                        ray_feature.SetGeometry(
+                            ogr.CreateGeometryFromWkt(
+                                intersection_ray.geoms[0].wkt))
+                        ray_feature.SetField(
+                            'fetch_dist', intersection_ray.geoms[0].length)
+                        temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
