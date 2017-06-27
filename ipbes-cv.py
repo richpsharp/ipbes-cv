@@ -12,6 +12,7 @@ from osgeo import ogr
 import rtree
 import shapely
 import shapely.wkb
+import shapely.ops
 import pygeoprocessing
 
 logging.basicConfig(
@@ -238,6 +239,20 @@ def _calculate_wind_exposure(
         temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
         temp_utm_clipped_vector_path)
 
+    clipped_geometry_shapely_list = []
+    temp_utm_clipped_vector = ogr.Open(temp_utm_clipped_vector_path)
+    temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
+    for tmp_utm_feature in temp_utm_clipped_layer:
+        tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
+        clipped_geometry_shapely_list.append(
+            shapely.wkb.loads(tmp_utm_geometry.ExportToWkb()))
+        tmp_utm_geometry = None
+    temp_utm_clipped_layer = None
+    temp_utm_clipped_vector = None
+    landmass_shapely = shapely.ops.cascaded_union(
+        clipped_geometry_shapely_list)
+    clipped_geometry_shapely_list = None
+
     byte_nodata = 255
     pygeoprocessing.create_raster_from_vector_extents(
         temp_utm_clipped_vector_path, temp_grid_raster_path,
@@ -246,6 +261,9 @@ def _calculate_wind_exposure(
 
     pygeoprocessing.rasterize(
         temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
+
+    # load land geometry into shapely object
+    landmass_shapely_prep = shapely.prepared.prep(landmass_shapely)
 
     # create fetch rays
     temp_fetch_rays_vector = esri_shapefile_driver.CreateDataSource(
@@ -283,9 +301,12 @@ def _calculate_wind_exposure(
             ray.AddPoint(point_a_x, point_a_y)
             ray.AddPoint(point_b_x, point_b_y)
 
-            ray_feature = ogr.Feature(temp_fetch_rays_defn)
-            ray_feature.SetGeometry(ray)
-            temp_fetch_rays_layer.CreateFeature(ray_feature)
+            # TEST RAY AGAINST LANDMASS FOR POSSIBLE CLIP
+            ray_shapely = shapely.wkb.loads(ray.ExportToWkb())
+            if not landmass_shapely_prep.intersects(ray_shapely):
+                ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                ray_feature.SetGeometry(ray)
+                temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
