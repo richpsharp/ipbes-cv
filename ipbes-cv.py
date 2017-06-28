@@ -103,28 +103,36 @@ def main():
             _WGS84_GRID_SIZE),
         [global_grid_vector_path], [build_rtree_task])
 
-    grid_edges_of_vector_task()
+    global_grid_vector = ogr.Open(global_grid_vector_path)
+    global_grid_layer = global_grid_vector.GetLayer()
+    grid_count = global_grid_layer.GetFeatureCount()
 
-    LOGGER.info("Find shore points in clipped polygon.")
-    grid_id = 122
-    grid_point_path = os.path.join(
-        _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
     smallest_feature_size = 2000
-    temp_workspace = os.path.join(
-        _TARGET_WORKSPACE, 'grid_%d' % grid_id)
-    _create_shore_points(
-        global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-        _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH, smallest_feature_size,
-        temp_workspace, grid_point_path)
-
-    LOGGER.info("Calculate wind exposure.")
-    temp_workspace = os.path.join(
-        _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
     max_fetch_distance = 60000
-    _calculate_wind_exposure(
-        grid_point_path, landmass_bounding_rtree_path,
-        _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-        max_fetch_distance, grid_point_path)
+
+    for grid_id in xrange(grid_count):
+        LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
+        grid_point_path = os.path.join(
+            _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
+        temp_workspace = os.path.join(
+            _TARGET_WORKSPACE, 'grid_%d' % grid_id)
+        create_shore_points_task = _make_task(
+            _create_shore_points, (
+                global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
+                _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH, smallest_feature_size,
+                temp_workspace, grid_point_path),
+            [grid_point_path], [])
+
+        temp_workspace = os.path.join(
+            _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
+        calculate_wind_exposure_task = _make_task(
+            _calculate_wind_exposure, (
+                grid_point_path, landmass_bounding_rtree_path,
+                _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
+                max_fetch_distance, grid_point_path),
+            [], [create_shore_points_task])
+
+        calculate_wind_exposure_task()
 
 
 def _calculate_wind_exposure(
