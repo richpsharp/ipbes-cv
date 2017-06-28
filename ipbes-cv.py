@@ -124,13 +124,13 @@ def main():
     _calculate_wind_exposure(
         grid_point_path, landmass_bounding_rtree_path,
         _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-        _GLOBAL_WWIII_PATH, max_fetch_distance, grid_point_path)
+        max_fetch_distance, grid_point_path)
 
 
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
-        smallest_feature_size, wwiii_vector_path, max_fetch_distance,
+        smallest_feature_size, max_fetch_distance,
         target_fetch_point_vector_path):
     """Calculate wind exposure for each shore point.
 
@@ -145,11 +145,6 @@ def _calculate_wind_exposure(
             temporary workspace files
         smallest_feature_size (float): smallest feature size to detect in
             meters.
-        wwiii_vector_path (string): path to point shapefile representing
-            the Wave Watch III data.  Must contain at least these fields:
-
-                *
-
         max_fetch_distance (float): maximum fetch distance for a ray in
             meters.
         target_fetch_point_vector_path (string): path to target point file,
@@ -364,6 +359,8 @@ def _create_shore_points(
             bounding box indexes of the polygons in `landmass_vector_path`.
         landmass_vector_path (string): path to polygon vector representing
             landmass.
+        wwiii_vector_path (string): path to point shapefile representing
+            the Wave Watch III data.
         smallest_feature_size (float): smallest feature size to grid a shore
             point on.
         temp_workspace (string): path to a directory that can be created
@@ -420,6 +417,17 @@ def _create_shore_points(
         os.path.splitext(target_shore_point_vector_path)[0],
         landmass_spatial_reference, ogr.wkbPoint)
 
+    wwiii_vector = ogr.Open(wwiii_vector_path)
+    wwiii_layer = wwiii_vector.GetLayer()
+    wwiii_defn = wwiii_layer.GetLayerDefn()
+    field_names = []
+    for field_index in xrange(wwiii_defn.GetFieldCount()):
+        field_defn = wwiii_defn.GetFieldDefn(field_index)
+        field_name = field_defn.GetName()
+        if field_name in ['I', 'J']:
+            continue
+        field_names.append(field_name)
+        target_shore_point_layer.CreateField(field_defn)
     target_shore_point_defn = target_shore_point_layer.GetLayerDefn()
 
     landmass_vector = ogr.Open(landmass_vector_path)
@@ -450,8 +458,10 @@ def _create_shore_points(
     # clip global polygon to global clipping box
     for feature_id in landmass_vector_rtree.intersection(utm_clipping_box):
         base_feature = landmass_layer.GetFeature(feature_id)
+        base_geometry = base_feature.GetGeometryRef()
         base_shapely = shapely.wkb.loads(
-            base_feature.GetGeometryRef().ExportToWkb())
+            base_geometry.ExportToWkb())
+        base_geometry = None
         intersection_shapely = utm_clipping_shapely.intersection(base_shapely)
         try:
             target_geometry = ogr.CreateGeometryFromWkt(
@@ -460,6 +470,7 @@ def _create_shore_points(
             target_feature.SetGeometry(target_geometry)
             temp_clipped_layer.CreateFeature(target_feature)
             target_feature = None
+            target_geometry = None
         except Exception:
             LOGGER.warn(
                 "Couldn't process this intersection %s",
@@ -518,8 +529,6 @@ def _create_shore_points(
 
     wwiii_rtree = rtree.index.Index()
 
-    wwiii_vector = ogr.Open(wwiii_vector_path)
-    wwiii_layer = wwiii_vector.GetLayer()
     for wwiii_feature in wwiii_layer:
         wwiii_geometry = wwiii_feature.GetGeometryRef()
         wwiii_x = wwiii_geometry.GetX()
@@ -550,11 +559,28 @@ def _create_shore_points(
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
 
-                LOGGER.debug(list(wwiii_rtree.nearest(
+                nearest_points = list(wwiii_rtree.nearest(
                     (shore_point_geometry.GetX(),
                      shore_point_geometry.GetY(),
                      shore_point_geometry.GetX(),
-                     shore_point_geometry.GetY()), 3)))
+                     shore_point_geometry.GetY()), 3))[0:3]
+                shore_point_shapely = shapely.geometry.Point(
+                    (shore_point_geometry.GetX(),
+                     shore_point_geometry.GetY()))
+                for field_name in field_names:
+                    value = 0.0
+                    total_distance = 0.0
+                    for fid in nearest_points:
+                        wwiii_feature = wwiii_layer.GetFeature(fid)
+                        wwiii_shapely = shapely.wkb.loads(
+                            wwiii_feature.GetGeometryRef().ExportToWkb())
+                        distance = shore_point_shapely.distance(
+                            wwiii_shapely)
+                        field_value = wwiii_feature.GetField(field_name)
+                        value += (float(field_value) * distance)
+                        total_distance += distance
+                    shore_point_feature.SetField(
+                        field_name, value / total_distance)
 
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
