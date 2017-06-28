@@ -125,12 +125,14 @@ def main():
 
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
+        done_flag_path = os.path.join(
+            _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id, 'done')
         calculate_wind_exposure_task = _make_task(
             _calculate_wind_exposure, (
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-                max_fetch_distance, grid_point_path),
-            [], [create_shore_points_task])
+                max_fetch_distance, grid_point_path, done_flag_path),
+            [done_flag_path], [create_shore_points_task])
 
         calculate_wind_exposure_task()
 
@@ -163,8 +165,6 @@ def _calculate_wind_exposure(
         shutil.rmtree(temp_workspace)
     os.makedirs(temp_workspace)
 
-    utm_shore_point_vector_path = os.path.join(
-        temp_workspace, 'utm_shore_points.shp')
     temp_utm_clipped_vector_path = os.path.join(
         temp_workspace, 'utm_clipped_landmass.shp')
     temp_grid_raster_path = os.path.join(
@@ -183,10 +183,10 @@ def _calculate_wind_exposure(
 
     pygeoprocessing.reproject_vector(
         base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-        utm_shore_point_vector_path)
+        target_fetch_point_vector_path)
 
     utm_bounding_box = pygeoprocessing.get_vector_info(
-        utm_shore_point_vector_path)['bounding_box']
+        target_fetch_point_vector_path)['bounding_box']
 
     # extend bounding box for max fetch distance
     utm_bounding_box = [
@@ -276,16 +276,16 @@ def _calculate_wind_exposure(
     temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
         'fetch_dist', ogr.OFTReal))
 
-    utm_shore_point_vector = ogr.Open(utm_shore_point_vector_path, 1)
-    utm_shore_point_layer = utm_shore_point_vector.GetLayer()
-    utm_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
+    target_shore_point_vector = ogr.Open(target_fetch_point_vector_path, 1)
+    target_shore_point_layer = target_shore_point_vector.GetLayer()
+    target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
 
     n_fetch_rays = 16
     shore_point_logger = _make_logger_callback("Shore point %.2f%% complete.")
-    for shore_point_feature in utm_shore_point_layer:
+    for shore_point_feature in target_shore_point_layer:
         shore_point_logger(
             float(shore_point_feature.GetFID()) /
-            utm_shore_point_layer.GetFeatureCount())
+            target_shore_point_layer.GetFeatureCount())
         rei_value = 0.0
         for sample_index in xrange(n_fetch_rays):
             compass_theta = float(sample_index) / n_fetch_rays * 360
@@ -352,15 +352,14 @@ def _calculate_wind_exposure(
             ray_feature = None
             rei_value += ray_length * rei_pct * rei_v
         shore_point_feature.SetField('REI', rei_value)
-        utm_shore_point_layer.SetFeature(shore_point_feature)
+        target_shore_point_layer.SetFeature(shore_point_feature)
 
+    target_shore_point_layer.SyncToDisk()
+    target_shore_point_layer = None
+    target_shore_point_vector = None
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
     temp_fetch_rays_vector = None
-
-    # rasterize WWIII fields to a raster (there are many)
-
-    # raytrace all the rays for fetch
 
 
 def _create_shore_points(
