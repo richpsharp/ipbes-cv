@@ -268,8 +268,9 @@ def _calculate_wind_exposure(
     temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
         'fetch_dist', ogr.OFTReal))
 
-    utm_shore_point_vector = ogr.Open(utm_shore_point_vector_path)
+    utm_shore_point_vector = ogr.Open(utm_shore_point_vector_path, 1)
     utm_shore_point_layer = utm_shore_point_vector.GetLayer()
+    utm_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
 
     n_fetch_rays = 16
     shore_point_logger = _make_logger_callback("Shore point %.2f%% complete.")
@@ -277,8 +278,13 @@ def _calculate_wind_exposure(
         shore_point_logger(
             float(shore_point_feature.GetFID()) /
             utm_shore_point_layer.GetFeatureCount())
+        rei_value = 0.0
         for sample_index in xrange(n_fetch_rays):
             compass_theta = float(sample_index) / n_fetch_rays * 360
+            rei_pct = shore_point_feature.GetField(
+                'REI_PCT%d' % int(compass_theta))
+            rei_v = shore_point_feature.GetField(
+                'REI_V%d' % int(compass_theta))
             cartesian_theta = -(compass_theta - 90)
             delta_x = math.cos(cartesian_theta * math.pi / 180)
             delta_y = math.sin(cartesian_theta * math.pi / 180)
@@ -301,6 +307,7 @@ def _calculate_wind_exposure(
 
             # TEST RAY AGAINST LANDMASS FOR POSSIBLE CLIP
             ray_shapely = shapely.wkb.loads(ray.ExportToWkb())
+            ray_length = 0.0
             if not landmass_shapely_prep.intersects(ray_shapely):
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
                 ray_feature.SetGeometry(ray)
@@ -319,8 +326,9 @@ def _calculate_wind_exposure(
                         ray_feature.SetGeometry(
                             ogr.CreateGeometryFromWkt(
                                 intersection_ray.wkt))
+                        ray_length = intersection_ray.length
                         ray_feature.SetField(
-                            'fetch_dist', intersection_ray.length)
+                            'fetch_dist', ray_length)
                         temp_fetch_rays_layer.CreateFeature(ray_feature)
                 elif intersection_ray.geom_type == "MultiLineString":
                     # the first line segment is the originating ray
@@ -330,10 +338,14 @@ def _calculate_wind_exposure(
                         ray_feature.SetGeometry(
                             ogr.CreateGeometryFromWkt(
                                 intersection_ray.geoms[0].wkt))
-                        ray_feature.SetField(
-                            'fetch_dist', intersection_ray.geoms[0].length)
+                        ray_length = intersection_ray.geoms[0].length
+                        ray_feature.SetField('fetch_dist', ray_length)
                         temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
+            rei_value += ray_length * rei_pct * rei_v
+        shore_point_feature.SetField('REI', rei_value)
+        utm_shore_point_layer.SetFeature(shore_point_feature)
+
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
     temp_fetch_rays_vector = None
