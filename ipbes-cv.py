@@ -44,6 +44,7 @@ _UTM_GRID_SIZE = 250
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
+_WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 
 
 def _make_task(func, args, expected_output_path_list, dependant_task_list):
@@ -127,11 +128,14 @@ def main():
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
         done_flag_path = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id, 'done')
+        target_wind_exposure_point_path = os.path.join(
+            _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         calculate_wind_exposure_task = _make_task(
             _calculate_wind_exposure, (
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-                max_fetch_distance, grid_point_path, done_flag_path),
+                max_fetch_distance, target_wind_exposure_point_path,
+                done_flag_path),
             [done_flag_path], [create_shore_points_task])
 
         calculate_wind_exposure_task()
@@ -141,7 +145,7 @@ def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
         smallest_feature_size, max_fetch_distance,
-        target_fetch_point_vector_path):
+        target_fetch_point_vector_path, done_flag_path):
     """Calculate wind exposure for each shore point.
 
     Parameters:
@@ -160,6 +164,8 @@ def _calculate_wind_exposure(
         target_fetch_point_vector_path (string): path to target point file,
             will be a copy of `base_shore_point_vector_path`'s geometry with
             an 'REI' (relative exposure index) field added.
+        done_flag_path (string): path to file that once created signals that
+            the function is complete.
     """
     if os.path.exists(temp_workspace):
         shutil.rmtree(temp_workspace)
@@ -360,6 +366,8 @@ def _calculate_wind_exposure(
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
     temp_fetch_rays_vector = None
+    with open(done_flag_path, 'w') as done_file:
+        done_file.write('Done.\n')
 
 
 def _create_shore_points(
