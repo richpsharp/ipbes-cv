@@ -5,6 +5,8 @@ import os
 import math
 import logging
 import multiprocessing
+import traceback
+import sys
 
 import numpy
 from osgeo import gdal
@@ -50,29 +52,38 @@ _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 
 def _worker(input_queue):
     for func, args in iter(input_queue.get, 'STOP'):
-        func(*args)
+        try:
+            func(*args)
+        except Exception as e:
+            LOGGER.error(
+                "".join(traceback.format_exception(*sys.exc_info())))
+            LOGGER.error(e)
         input_queue.task_done()
     input_queue.task_done()
 
 
-class Task:
+class Task(object):
+    """Encapsulates work/task state for multiprocessing."""
+
     def __init__(
             self, func, args, expected_output_path_list, dependant_task_list):
-            """Make a task.
+        """Make a task.
 
-                Parameters:
-                    func (function): a function that takes the argument list `args`
-                    args (tuple): a list of arguments to pass to `func`.
-                    expected_output_path_list (list): a list of strings representing
-                        expected file path outputs.
-                    dependant_task_list (list of function): a list of other functions
-                        class by `Task` that contain an .execute() method:
-                        These are all invoked before `func(args)` is invoked.
-            """
-            self.func = func
-            self.args = args
-            self.expected_output_path_list = expected_output_path_list
-            self.dependant_task_list = dependant_task_list
+            Parameters:
+                func (function): a function that takes the argument list
+                    `args`
+                args (tuple): a list of arguments to pass to `func`.
+                expected_output_path_list (list): a list of strings
+                    representing expected file path outputs.
+                dependant_task_list (list of function): a list of other
+                    functions class by `Task` that contain an .execute()
+                    method: These are all invoked before `func(args)` is
+                    invoked.
+        """
+        self.func = func
+        self.args = args
+        self.expected_output_path_list = expected_output_path_list
+        self.dependant_task_list = dependant_task_list
 
     def __call__(self):
         """Invoke this method when ready to execute task."""
@@ -89,7 +100,7 @@ class Task:
 
 def main():
     """Entry point."""
-    work_queue = multiprocessing.JoinableQueue()
+    work_queue = multiprocessing.JoinableQueue(multiprocessing.cpu_count())
     for _ in range(multiprocessing.cpu_count()):
         multiprocessing.Process(
             target=_worker, args=(work_queue,)).start()
@@ -192,8 +203,6 @@ def _calculate_wind_exposure(
 
     temp_utm_clipped_vector_path = os.path.join(
         temp_workspace, 'utm_clipped_landmass.shp')
-    temp_grid_raster_path = os.path.join(
-        temp_workspace, 'landmass_mask.tif')
     temp_fetch_rays_path = os.path.join(
         temp_workspace, 'fetch_rays.shp')
 
@@ -639,7 +648,7 @@ def _grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
         target_grid_size):
-    """Builds a sparse grid covering the edges of the base polygons.
+    """Build a sparse grid covering the edges of the base polygons.
 
     Parameters:
         base_bounding_box (list/tuple): format [minx, miny, maxx, maxy]
