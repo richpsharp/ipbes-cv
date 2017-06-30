@@ -18,6 +18,8 @@ import shapely.wkb
 import shapely.ops
 import pygeoprocessing
 
+from . import task_graph
+
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
@@ -50,60 +52,13 @@ _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WORK_COMPLETE_TOKEN = 'work.complete'
 
-def _worker(input_queue):
-    for func, args in iter(input_queue.get, 'STOP'):
-        try:
-            func(*args)
-        except Exception as e:
-            LOGGER.error(
-                "".join(traceback.format_exception(*sys.exc_info())))
-            LOGGER.error(e)
-        input_queue.task_done()
-    input_queue.task_done()
-
-
-class Task(object):
-    """Encapsulates work/task state for multiprocessing."""
-
-    def __init__(
-            self, func, args, expected_output_path_list, dependant_task_list):
-        """Make a task.
-
-            Parameters:
-                func (function): a function that takes the argument list
-                    `args`
-                args (tuple): a list of arguments to pass to `func`.
-                expected_output_path_list (list): a list of strings
-                    representing expected file path outputs.
-                dependant_task_list (list of function): a list of other
-                    functions class by `Task` that contain an .execute()
-                    method: These are all invoked before `func(args)` is
-                    invoked.
-        """
-        self.func = func
-        self.args = args
-        self.expected_output_path_list = expected_output_path_list
-        self.dependant_task_list = dependant_task_list
-
-    def __call__(self):
-        """Invoke this method when ready to execute task."""
-        if all(os.path.exists(p) for p in self.expected_output_path_list):
-            LOGGER.info(
-                "All expected files exist for %s so not executing",
-                self.func.__name__)
-            return
-
-        for task in self.dependant_task_list:
-            task()
-        self.func(*self.args)
-
 
 def main():
     """Entry point."""
     work_queue = multiprocessing.JoinableQueue(multiprocessing.cpu_count())
     for _ in range(multiprocessing.cpu_count()):
         multiprocessing.Process(
-            target=_worker, args=(work_queue,)).start()
+            target=task_graph.worker, args=(work_queue,)).start()
 
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
@@ -111,7 +66,7 @@ def main():
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
-    build_rtree_task = Task(
+    build_rtree_task = task_graph.Task(
         _build_feature_bounding_box_rtree, (
             _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path),
         [landmass_bounding_rtree_path], [])
@@ -119,7 +74,7 @@ def main():
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
 
-    grid_edges_of_vector_task = Task(
+    grid_edges_of_vector_task = task_graph.Task(
         _grid_edges_of_vector, (
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
             landmass_bounding_rtree_path, global_grid_vector_path,
@@ -136,7 +91,8 @@ def main():
     smallest_feature_size = 2000
     max_fetch_distance = 60000
 
-    for grid_id in xrange(grid_count):
+    #for grid_id in xrange(grid_count):
+    for grid_id in [3]:
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
         grid_point_path = os.path.join(
             _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
@@ -144,7 +100,7 @@ def main():
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
         work_complete_token_path = os.path.join(
             temp_workspace, _WORK_COMPLETE_TOKEN)
-        create_shore_points_task = Task(
+        create_shore_points_task = task_graph.Task(
             _create_shore_points, (
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
@@ -158,7 +114,7 @@ def main():
             temp_workspace, _WORK_COMPLETE_TOKEN)
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        calculate_wind_exposure_task = Task(
+        calculate_wind_exposure_task = task_graph.Task(
             _calculate_wind_exposure, (
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
