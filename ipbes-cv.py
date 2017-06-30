@@ -48,7 +48,7 @@ _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-
+_WORK_COMPLETE_TOKEN = 'work.complete'
 
 def _worker(input_queue):
     for func, args in iter(input_queue.get, 'STOP'):
@@ -142,17 +142,20 @@ def main():
             _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
+        work_complete_token_path = os.path.join(
+            temp_workspace, _WORK_COMPLETE_TOKEN)
         create_shore_points_task = Task(
             _create_shore_points, (
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
-                smallest_feature_size, temp_workspace, grid_point_path),
-            [grid_point_path], [])
+                smallest_feature_size, temp_workspace, grid_point_path,
+                work_complete_token_path),
+            [work_complete_token_path], [])
 
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
-        done_flag_path = os.path.join(
-            _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id, 'done')
+        work_complete_token_path = os.path.join(
+            temp_workspace, _WORK_COMPLETE_TOKEN)
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         calculate_wind_exposure_task = Task(
@@ -160,8 +163,8 @@ def main():
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
                 max_fetch_distance, target_wind_exposure_point_path,
-                done_flag_path),
-            [done_flag_path], [create_shore_points_task])
+                work_complete_token_path),
+            [work_complete_token_path], [create_shore_points_task])
 
         work_queue.put((calculate_wind_exposure_task, ()))
 
@@ -175,7 +178,7 @@ def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
         smallest_feature_size, max_fetch_distance,
-        target_fetch_point_vector_path, done_flag_path):
+        target_fetch_point_vector_path, work_complete_token_path):
     """Calculate wind exposure for each shore point.
 
     Parameters:
@@ -194,8 +197,8 @@ def _calculate_wind_exposure(
         target_fetch_point_vector_path (string): path to target point file,
             will be a copy of `base_shore_point_vector_path`'s geometry with
             an 'REI' (relative exposure index) field added.
-        done_flag_path (string): path to file that once created signals that
-            the function is complete.
+        work_complete_token_path (string): path to file that once created
+            signals that the function is complete.
     """
     if os.path.exists(temp_workspace):
         shutil.rmtree(temp_workspace)
@@ -395,14 +398,15 @@ def _calculate_wind_exposure(
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
     temp_fetch_rays_vector = None
-    with open(done_flag_path, 'w') as done_file:
+    with open(work_complete_token_path, 'w') as done_file:
         done_file.write('Done.\n')
 
 
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, smallest_feature_size,
-        temp_workspace, target_shore_point_vector_path):
+        temp_workspace, target_shore_point_vector_path,
+        work_complete_token_path):
     """Create points that lie on the coast line of the landmass.
 
     Parameters:
@@ -640,7 +644,8 @@ def _create_shore_points(
 
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
-
+    with open(work_complete_token_path, 'w') as work_complete_token_file:
+        work_complete_token_file.write("Complete!\n")
     #shutil.rmtree(temp_workspace)
 
 
