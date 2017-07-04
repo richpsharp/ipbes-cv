@@ -18,7 +18,7 @@ import shapely.wkb
 import shapely.ops
 import pygeoprocessing
 
-from . import task_graph
+import task_graph
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
@@ -50,7 +50,7 @@ _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-_WORK_COMPLETE_TOKEN = 'work.complete'
+_WORK_COMPLETE_TOKEN = 'work.complete_%s'
 
 
 def main():
@@ -60,29 +60,37 @@ def main():
         multiprocessing.Process(
             target=task_graph.worker, args=(work_queue,)).start()
 
+    global_thread_map = {}
+    global_task_lock = multiprocessing.Lock()
+
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
+    rtree_done_token = os.path.join(
+        _TARGET_WORKSPACE, _WORK_COMPLETE_TOKEN % ('rtree_task'))
     build_rtree_task = task_graph.Task(
         _build_feature_bounding_box_rtree, (
-            _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path),
-        [landmass_bounding_rtree_path], [])
+            _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path,
+            rtree_done_token),
+        [rtree_done_token], [], global_thread_map, global_task_lock)
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
+    global_grid_token = os.path.join(
+        _TARGET_WORKSPACE, _WORK_COMPLETE_TOKEN % ('global_grid_task'))
 
     grid_edges_of_vector_task = task_graph.Task(
         _grid_edges_of_vector, (
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
             landmass_bounding_rtree_path, global_grid_vector_path,
-            _WGS84_GRID_SIZE),
-        [global_grid_vector_path], [build_rtree_task])
+            _WGS84_GRID_SIZE, global_grid_token),
+        [global_grid_token], [build_rtree_task],
+        global_thread_map, global_task_lock)
 
-    work_queue.put((grid_edges_of_vector_task, []))
-    work_queue.join()
+    grid_edges_of_vector_task()
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
@@ -106,7 +114,8 @@ def main():
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
                 smallest_feature_size, temp_workspace, grid_point_path,
                 work_complete_token_path),
-            [work_complete_token_path], [])
+            [work_complete_token_path], [], global_thread_map,
+            global_task_lock)
 
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
@@ -120,13 +129,13 @@ def main():
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
                 max_fetch_distance, target_wind_exposure_point_path,
                 work_complete_token_path),
-            [work_complete_token_path], [create_shore_points_task])
+            [work_complete_token_path], [create_shore_points_task],
+            global_thread_map, global_task_lock)
 
-        work_queue.put((calculate_wind_exposure_task, ()))
+    calculate_wind_exposure_task()
 
     for _ in range(multiprocessing.cpu_count()):
         work_queue.put('STOP')
-
     work_queue.join()
 
 
@@ -608,7 +617,7 @@ def _create_shore_points(
 def _grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
-        target_grid_size):
+        target_grid_size, done_token_path):
     """Build a sparse grid covering the edges of the base polygons.
 
     Parameters:
@@ -625,6 +634,8 @@ def _grid_edges_of_vector(
             created by this function.
         target_grid_size (float): length of side of the grid cell to be
             created in the target_grid_vector.
+        done_token_path (string): path to a file to create when the function
+            is complete.
     """
     LOGGER.info("Building global grid.")
     n_rows = int((
@@ -716,6 +727,9 @@ def _grid_edges_of_vector(
     target_grid_layer = None
     target_grid_vector = None
 
+    with open(done_token_path, 'w') as done_token_file:
+        done_token_file.write("Done!\n")
+
 
 def _get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
@@ -745,13 +759,15 @@ def _get_utm_spatial_reference(bounding_box):
 
 
 def _build_feature_bounding_box_rtree(
-        vector_path, target_rtree_path):
+        vector_path, target_rtree_path, done_token_path):
     """Builds an r-tree index of the global feature envelopes.
 
     Parameter:
         vector_path (string): path to vector to build bounding box index for
         target_rtree_path (string): path to ".dat" file to store the saved
             r-tree.
+        done_token_path (string): path to a file to create when function is
+            complete.
 
     Returns:
         None.
@@ -782,6 +798,9 @@ def _build_feature_bounding_box_rtree(
                 feature_envelope[1], feature_envelope[3]))
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
+
+    with open(done_token_path, 'w') as done_token_file:
+        done_token_file.write("Done!\n")
 
 
 def _make_shore_kernel(kernel_path):
