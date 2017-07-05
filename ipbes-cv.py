@@ -683,8 +683,8 @@ def _grid_edges_of_vector(
 
             if (prepared_geometry[fid].intersects(
                     cell_geometry_shapely) and
-                not prepared_geometry[fid].contains(
-                    cell_geometry_shapely)):
+                    not prepared_geometry[fid].contains(
+                        cell_geometry_shapely)):
                 # add cell to target layer if it intersects the edge of a
                 # base polygon feature
                 target_feature = ogr.Feature(target_grid_defn)
@@ -731,17 +731,19 @@ def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     Parameter:
         vector_path (string): path to vector to build bounding box index for
         target_rtree_path (string): path to ".dat" file to store the saved
-            r-tree.
+            r-tree.  A ValueError is raised if this file already exists
 
     Returns:
         None.
     """
-    LOGGER.info("Building rtree index.")
     # the input path has a .dat extension, but the `rtree` package only uses
     # the basename.  It's a quirk of the library, so we'll deal with it by
     # cutting off the extension.
     global_feature_index_base = os.path.splitext(
         target_rtree_path)[0]
+    LOGGER.info("Building rtree index at %s", global_feature_index_base)
+    if os.path.exists(target_rtree_path):
+        raise ValueError("rtree storage path %s already exists.")
     global_feature_index = rtree.index.Index(global_feature_index_base)
 
     global_vector = ogr.Open(vector_path)
@@ -762,9 +764,6 @@ def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
                 feature_envelope[1], feature_envelope[3]))
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
-
-    with open(done_token_path, 'w') as done_token_file:
-        done_token_file.write("Done!\n")
 
 
 def _make_shore_kernel(kernel_path):

@@ -38,7 +38,7 @@ class TaskGraph(object):
             if exception.errno != errno.EEXIST:
                 raise
         self.token_storage_path = token_storage_path
-        self.worker_semaphore = threading.Semaphore(n_workers)
+        self.worker_pool = multiprocessing.Pool(n_workers)
 
         # used to lock global resources
         self.global_lock = threading.Lock()
@@ -89,19 +89,19 @@ class TaskGraph(object):
         for task in self.task_list:
             # see if task is top level task, if so, execute it
             if len(task.dependent_task_list) == 0:
-                with self.global_lock:
-                    if task.task_id not in self.global_working_task_dict:
-                        thread = threading.Thread(
-                            target=task, args=(
-                                self.global_lock,
-                                self.global_working_task_dict,
-                                self.worker_semaphore))
-                        thread_list.append(thread)
-                        self.global_working_task_dict[task.task_id] = task
-                        task.task_lock.acquire()
-                        thread.start()
-        for thread in thread_list:
+                thread = threading.Thread(
+                    target=task, args=(
+                        self.global_lock,
+                        self.global_working_task_dict,
+                        self.worker_pool))
+                thread_list.append((thread, task))
+                thread.start()
+        for thread, task in thread_list:
             thread.join()
+            if not task.is_complete():
+                raise RuntimeError(
+                    "Task %s didn't complete, discontinuing task graph." % (
+                        task.task_id))
 
 
 class Task(object):
@@ -131,11 +131,11 @@ class Task(object):
         self.dependent_task_list = dependent_task_list
 
         # Make a unique hash of the input parameters of the function call
-        task_string = '%s:%s:%s:%s' % (
+        task_string = '%s:%s:%s' % (
             target.__name__, pickle.dumps(args),
-            json.dumps(kwargs, sort_keys=True),
-            pickle.dumps(dependent_task_list))
-        self.task_id = hashlib.sha1(task_string)
+            json.dumps(kwargs, sort_keys=True))
+        self.task_id = '%s_%s' % (
+            target.__name__, hashlib.sha1(task_string).hexdigest())
 
         # https://stackoverflow.com/questions/273192/how-can-i-create-a-directory-if-it-does-not-exist
         try:
@@ -152,7 +152,7 @@ class Task(object):
 
     def __call__(
             self, global_lock, global_working_task_dict,
-            global_worker_semaphore):
+            global_worker_pool):
         """Invoke this method when ready to execute task.
 
         Parameters:
@@ -161,9 +161,8 @@ class Task(object):
             global_working_task_dict (dict): contains a dictionary of task_ids
                 to Tasks that are currently executing.  Global resource and
                 should acquire lock before modifying it.
-            global_worker_semaphore (threading.Semaphore): a semaphore used
-                to guard the number of worker subprocesses that can be
-                launched.
+            global_worker_pool (multiprocessing.Pool): a process pool used to
+                execute subprocesses.
 
         Returns:
             None
@@ -192,7 +191,7 @@ class Task(object):
         LOGGER.debug("Starting task %s", self.task_id)
         # finally block below releases `self.task_lock` and deregisters it
         try:
-            if os.path.exists(self.token_path):
+            if self.is_complete():
                 LOGGER.info(
                     "Completion token exists for %s so not executing",
                     self.task_id)
@@ -216,33 +215,47 @@ class Task(object):
                             target=task,
                             args=(global_lock, global_working_task_dict))
                         global_working_task_dict[self.task_id] = self
-                        pending_dependent_thread_list.append(thread)
+                        pending_dependent_thread_list.append((thread, task))
 
             # start the threads
-            LOGGER.debug("Starting dependent threads %d", self.task_id)
-            for thread in pending_dependent_thread_list:
-                thread.start()
+            if len(pending_dependent_thread_list) > 0:
+                LOGGER.debug("Starting dependent threads %s", self.task_id)
+                for thread in pending_dependent_thread_list:
+                    thread.start()
 
             # Block on all the dependent locks
-            LOGGER.debug("Waiting for dependent locks %d", self.task_id)
-            for task in pending_dependent_tasks:
-                with task.task_lock:
-                    pass
+            if len(pending_dependent_tasks) > 0:
+                LOGGER.debug("Waiting for dependent locks %s", self.task_id)
+                for task in pending_dependent_tasks:
+                    with task.task_lock:
+                        pass
+                    if not task.is_complete():
+                        raise RuntimeError(
+                            "Task %s didn't complete, discontinuing "
+                            "execution of %s" % (task.task_id, self.task_id))
 
             # wait for all the dependent threads
-            LOGGER.debug("Joining dependent threads %d", self.task_id)
-            for thread in pending_dependent_thread_list:
-                thread.join()
+            if len(pending_dependent_thread_list) > 0:
+                LOGGER.debug("Joining dependent threads %s", self.task_id)
+                for thread, task in pending_dependent_thread_list:
+                    thread.join()
+                    if not task.is_complete():
+                        raise RuntimeError(
+                            "Task %s didn't complete, discontinuing "
+                            "execution of %s" % (task.task_id, self.task_id))
 
             # Do this task's work
-            with global_worker_semaphore:
-                worker_process = multiprocessing.Process(
-                    target=self.target, args=self.args, kwargs=self.kwargs)
-                worker_process.start()
-                worker_process.join()
-                with open(self.token_path, 'w') as token_file:
-                    token_file.write(str(datetime.datetime.now()))
+            LOGGER.debug("Starting process for %s", self.task_id)
+            result = global_worker_pool.apply_async(
+                func=self.target, args=self.args, kwds=self.kwargs)
+            result.get()
+            with open(self.token_path, 'w') as token_file:
+                token_file.write(str(datetime.datetime.now()))
         finally:
             with global_lock:
                 del global_working_task_dict[self.task_id]
             self.task_lock.release()
+
+    def is_complete(self):
+        """Return true if complete token exists."""
+        return os.path.exists(self.token_path)
