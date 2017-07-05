@@ -102,7 +102,6 @@ def main():
     smallest_feature_size = 2000
     max_fetch_distance = 60000
 
-    #for grid_id in xrange(grid_count):
     for grid_id in [3]:
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
         grid_point_path = os.path.join(
