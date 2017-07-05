@@ -51,7 +51,8 @@ _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WORK_COMPLETE_TOKEN = 'work.complete_%s'
-
+_WORK_COMPLETE_PATH = os.path.join(
+    _TARGET_WORKSPACE, 'work_tokens')
 
 def main():
     """Entry point."""
@@ -65,12 +66,14 @@ def main():
 
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
+    if not os.path.exists(_WORK_COMPLETE_PATH):
+        os.makedirs(_WORK_COMPLETE_PATH)
 
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
     rtree_done_token = os.path.join(
-        _TARGET_WORKSPACE, _WORK_COMPLETE_TOKEN % ('rtree_task'))
+        _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('rtree_task'))
     build_rtree_task = task_graph.Task(
         _build_feature_bounding_box_rtree, (
             _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path,
@@ -80,7 +83,7 @@ def main():
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
     global_grid_token = os.path.join(
-        _TARGET_WORKSPACE, _WORK_COMPLETE_TOKEN % ('global_grid_task'))
+        _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('global_grid_task'))
 
     grid_edges_of_vector_task = task_graph.Task(
         _grid_edges_of_vector, (
@@ -107,7 +110,7 @@ def main():
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
         work_complete_token_path = os.path.join(
-            temp_workspace, _WORK_COMPLETE_TOKEN)
+            _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('grid_%d' % grid_id))
         create_shore_points_task = task_graph.Task(
             _create_shore_points, (
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
@@ -120,7 +123,8 @@ def main():
         temp_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
         work_complete_token_path = os.path.join(
-            temp_workspace, _WORK_COMPLETE_TOKEN)
+            _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % (
+                'wind_exposure_%d' % grid_id))
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         calculate_wind_exposure_task = task_graph.Task(
