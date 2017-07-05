@@ -18,7 +18,7 @@ import shapely.wkb
 import shapely.ops
 import pygeoprocessing
 
-import task_graph
+import Task
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
@@ -59,7 +59,7 @@ def main():
     work_queue = multiprocessing.JoinableQueue(multiprocessing.cpu_count())
     for _ in range(multiprocessing.cpu_count()):
         multiprocessing.Process(
-            target=task_graph.worker, args=(work_queue,)).start()
+            target=Task.worker, args=(work_queue,)).start()
 
     global_thread_map = {}
     global_task_lock = multiprocessing.Lock()
@@ -74,7 +74,7 @@ def main():
 
     rtree_done_token = os.path.join(
         _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('rtree_task'))
-    build_rtree_task = task_graph.Task(
+    build_rtree_task = Task.Task(
         _build_feature_bounding_box_rtree, (
             _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path,
             rtree_done_token),
@@ -85,7 +85,7 @@ def main():
     global_grid_token = os.path.join(
         _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('global_grid_task'))
 
-    grid_edges_of_vector_task = task_graph.Task(
+    grid_edges_of_vector_task = Task.Task(
         _grid_edges_of_vector, (
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
             landmass_bounding_rtree_path, global_grid_vector_path,
@@ -110,7 +110,7 @@ def main():
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
         work_complete_token_path = os.path.join(
             _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('grid_%d' % grid_id))
-        create_shore_points_task = task_graph.Task(
+        create_shore_points_task = Task.Task(
             _create_shore_points, (
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
@@ -126,7 +126,7 @@ def main():
                 'wind_exposure_%d' % grid_id))
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        calculate_wind_exposure_task = task_graph.Task(
+        calculate_wind_exposure_task = Task.Task(
             _calculate_wind_exposure, (
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
