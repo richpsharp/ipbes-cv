@@ -16,7 +16,7 @@ LOGGER = logging.getLogger('ipbes-cv')
 
 
 class TaskGraph(object):
-    """Encapsulates the woker and tasks states for parallel processing."""
+    """Encapsulates the worker and tasks states for parallel processing."""
 
     def __init__(self, token_storage_path, n_workers):
         """Create a task graph.
@@ -42,11 +42,9 @@ class TaskGraph(object):
 
         # used to lock global resources
         self.global_lock = threading.Lock()
-        # if a Task is in here, it's currently executing
-        self.global_working_task_dict = {}
 
-        # list of tasks for the graph
-        self.task_list = []
+        # if a Task pair is in here, it's been previously created
+        self.global_working_task_dict = {}
 
     def add_task(
             self, target=None, args=None, kwargs=None,
@@ -71,35 +69,24 @@ class TaskGraph(object):
             dependent_task_list = []
         if target is None:
             target = lambda: None
-        self.task_list.append(
-            Task(target, args, kwargs, dependent_task_list,
-                 self.token_storage_path))
-        return self.task_list[-1]
+        task = Task(
+            target, args, kwargs, dependent_task_list,
+            self.token_storage_path)
+        thread = threading.Thread(
+            target=task, args=(
+                self.global_lock,
+                self.global_working_task_dict,
+                self.worker_pool))
+        with self.global_lock:
+            self.global_working_task_dict[task.task_id] = task
+        task.thread = thread
+        thread.start()
+        return task
 
-    def execute(self):
-        """Execute the task graph.
-
-        At the top level, function iterates through all tasks and triggers a
-        `__call__` on each Task with an empty dependency graph.
-
-        Returns:
-            None
-        """
-        thread_list = []
-        for task in self.task_list:
-            thread = threading.Thread(
-                target=task, args=(
-                    self.global_lock,
-                    self.global_working_task_dict,
-                    self.worker_pool))
-            thread_list.append((thread, task))
-            thread.start()
-        for thread, task in thread_list:
-            thread.join()
-            if not task.is_complete():
-                raise RuntimeError(
-                    "Task %s didn't complete, discontinuing task graph." % (
-                        task.task_id))
+    def join(self):
+        """Join all threads in the graph."""
+        for task in self.global_working_task_dict.itervalues():
+            task.thread.join()
 
 
 class Task(object):
@@ -145,9 +132,6 @@ class Task(object):
         # The following file will be written when work is complete
         self.token_path = os.path.join(token_storage_path, self.task_id)
 
-        # used to lock execution of the current Task
-        self.task_lock = threading.Lock()
-
     def __call__(
             self, global_lock, global_working_task_dict,
             global_worker_pool):
@@ -166,93 +150,31 @@ class Task(object):
             None
         """
         # if this Task is currently running somewhere, then wait for it.
-        LOGGER.debug("Entering task %s", self.task_id)
-        wait_for_task = False
-        with global_lock:
-            if self.task_id not in global_working_task_dict:
-                # acquire our own lock so nobody else runs and register in
-                # the global task_dict
-                self.task_lock.acquire()
-                global_working_task_dict[self.task_id] = self
-            else:
-                wait_for_task = True
-        if wait_for_task:
-            # Task is running somewhere else, block on this call in case
-            # something else is waiting for it and return when lock is
-            # released
-            LOGGER.debug(
-                "Task is running somewhere else, waiting for it to finish %s",
-                self.task_id)
-            with self.task_lock:
-                return
-
         LOGGER.debug("Starting task %s", self.task_id)
         # finally block below releases `self.task_lock` and deregisters it
-        try:
-            if self.is_complete():
-                LOGGER.info(
-                    "Completion token exists for %s so not executing",
-                    self.task_id)
-                return
+        if self.is_complete():
+            LOGGER.info(
+                "Completion token exists for %s so not executing",
+                self.task_id)
+            return
 
-            # Otherwise execute dependencies
-            pending_dependent_thread_list = []
-            pending_dependent_tasks = []
-            with global_lock:
-                for task in self.dependent_task_list:
-                    LOGGER.debug("Checking dependent task %s", task.task_id)
-                    if task.task_id in global_working_task_dict:
-                        # task is already executing, wait for it to terminate
-                        LOGGER.debug(
-                            "%s is a task in the global_working_task_dict",
-                            task.task_id)
-                        pending_dependent_tasks.append(task)
-                    else:
-                        # No thread exists yet, register to start outside lock
-                        thread = threading.Thread(
-                            target=task,
-                            args=(global_lock, global_working_task_dict))
-                        global_working_task_dict[self.task_id] = self
-                        pending_dependent_thread_list.append((thread, task))
+        # Otherwise execute dependencies
+        if len(self.dependent_task_list) > 0:
+            LOGGER.debug("joining dependent threads %s", self.task_id)
+            for task in self.dependent_task_list:
+                task.thread.join()
+                if not task.is_complete():
+                    raise RuntimeError(
+                        "Task %s didn't complete, discontinuing "
+                        "execution of %s" % (task.task_id, self.task_id))
 
-            # start the threads
-            if len(pending_dependent_thread_list) > 0:
-                LOGGER.debug("Starting dependent threads %s", self.task_id)
-                for thread, _ in pending_dependent_thread_list:
-                    thread.start()
-
-            # Block on all the dependent locks
-            if len(pending_dependent_tasks) > 0:
-                LOGGER.debug("Waiting for dependent locks %s", self.task_id)
-                for task in pending_dependent_tasks:
-                    with task.task_lock:
-                        pass
-                    if not task.is_complete():
-                        raise RuntimeError(
-                            "Task %s didn't complete, discontinuing "
-                            "execution of %s" % (task.task_id, self.task_id))
-
-            # wait for all the dependent threads
-            if len(pending_dependent_thread_list) > 0:
-                LOGGER.debug("Joining dependent threads %s", self.task_id)
-                for thread, task in pending_dependent_thread_list:
-                    thread.join()
-                    if not task.is_complete():
-                        raise RuntimeError(
-                            "Task %s didn't complete, discontinuing "
-                            "execution of %s" % (task.task_id, self.task_id))
-
-            # Do this task's work
-            LOGGER.debug("Starting process for %s", self.task_id)
-            result = global_worker_pool.apply_async(
-                func=self.target, args=self.args, kwds=self.kwargs)
-            result.get()
-            with open(self.token_path, 'w') as token_file:
-                token_file.write(str(datetime.datetime.now()))
-        finally:
-            with global_lock:
-                del global_working_task_dict[self.task_id]
-            self.task_lock.release()
+        # Do this task's work
+        LOGGER.debug("Starting process for %s", self.task_id)
+        result = global_worker_pool.apply_async(
+            func=self.target, args=self.args, kwds=self.kwargs)
+        result.get()
+        with open(self.token_path, 'w') as token_file:
+            token_file.write(str(datetime.datetime.now()))
 
     def is_complete(self):
         """Return true if complete token exists."""

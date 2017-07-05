@@ -75,7 +75,7 @@ def main():
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
 
-    task_graph.execute()
+    task_graph.join()
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
