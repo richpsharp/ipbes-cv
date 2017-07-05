@@ -5,8 +5,6 @@ import os
 import math
 import logging
 import multiprocessing
-import traceback
-import sys
 
 import numpy
 from osgeo import gdal
@@ -50,50 +48,34 @@ _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-_WORK_COMPLETE_TOKEN = 'work.complete_%s'
-_WORK_COMPLETE_PATH = os.path.join(
+_WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
+
 
 def main():
     """Entry point."""
-    work_queue = multiprocessing.JoinableQueue(multiprocessing.cpu_count())
-    for _ in range(multiprocessing.cpu_count()):
-        multiprocessing.Process(
-            target=Task.worker, args=(work_queue,)).start()
-
-    global_thread_map = {}
-    global_task_lock = multiprocessing.Lock()
-
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
-    if not os.path.exists(_WORK_COMPLETE_PATH):
-        os.makedirs(_WORK_COMPLETE_PATH)
 
+    task_graph = Task.TaskGraph(
+        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
-    rtree_done_token = os.path.join(
-        _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('rtree_task'))
-    build_rtree_task = Task.Task(
-        _build_feature_bounding_box_rtree, (
-            _GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path,
-            rtree_done_token),
-        [rtree_done_token], [], global_thread_map, global_task_lock)
+    build_rtree_task = task_graph.add_task(
+        target=_build_feature_bounding_box_rtree,
+        args=(_GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path))
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
-    global_grid_token = os.path.join(
-        _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('global_grid_task'))
 
-    grid_edges_of_vector_task = Task.Task(
-        _grid_edges_of_vector, (
+    grid_edges_of_vector_task = task_graph.add_task(
+        target=_grid_edges_of_vector, args=(
             _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
             landmass_bounding_rtree_path, global_grid_vector_path,
-            _WGS84_GRID_SIZE, global_grid_token),
-        [global_grid_token], [build_rtree_task],
-        global_thread_map, global_task_lock)
+            _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
 
-    grid_edges_of_vector_task()
+    task_graph.execute()
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
@@ -106,47 +88,37 @@ def main():
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
         grid_point_path = os.path.join(
             _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
-        temp_workspace = os.path.join(
+
+        shore_points_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
-        work_complete_token_path = os.path.join(
-            _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % ('grid_%d' % grid_id))
-        create_shore_points_task = Task.Task(
-            _create_shore_points, (
+
+        create_shore_points_task = task_graph.add_task(
+            target=_create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
-                smallest_feature_size, temp_workspace, grid_point_path,
-                work_complete_token_path),
-            [work_complete_token_path], [], global_thread_map,
-            global_task_lock)
+                smallest_feature_size, shore_points_workspace,
+                grid_point_path),
+            dependent_task_list=[grid_edges_of_vector_task])
 
-        temp_workspace = os.path.join(
+        wind_exposure_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
-        work_complete_token_path = os.path.join(
-            _WORK_COMPLETE_PATH, _WORK_COMPLETE_TOKEN % (
-                'wind_exposure_%d' % grid_id))
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        calculate_wind_exposure_task = Task.Task(
-            _calculate_wind_exposure, (
+        calculate_wind_exposure_task = task_graph.add_task(
+            target=_calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
-                _GLOBAL_POLYGON_PATH, temp_workspace, smallest_feature_size,
-                max_fetch_distance, target_wind_exposure_point_path,
-                work_complete_token_path),
-            [work_complete_token_path], [create_shore_points_task],
-            global_thread_map, global_task_lock)
+                _GLOBAL_POLYGON_PATH, wind_exposure_workspace,
+                smallest_feature_size, max_fetch_distance,
+                target_wind_exposure_point_path))
 
-    calculate_wind_exposure_task()
-
-    for _ in range(multiprocessing.cpu_count()):
-        work_queue.put('STOP')
-    work_queue.join()
+    task_graph.execute()
 
 
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
         smallest_feature_size, max_fetch_distance,
-        target_fetch_point_vector_path, work_complete_token_path):
+        target_fetch_point_vector_path):
     """Calculate wind exposure for each shore point.
 
     Parameters:
@@ -165,8 +137,9 @@ def _calculate_wind_exposure(
         target_fetch_point_vector_path (string): path to target point file,
             will be a copy of `base_shore_point_vector_path`'s geometry with
             an 'REI' (relative exposure index) field added.
-        work_complete_token_path (string): path to file that once created
-            signals that the function is complete.
+
+    Returns:
+        None
     """
     if os.path.exists(temp_workspace):
         shutil.rmtree(temp_workspace)
@@ -366,15 +339,12 @@ def _calculate_wind_exposure(
     temp_fetch_rays_layer.SyncToDisk()
     temp_fetch_rays_layer = None
     temp_fetch_rays_vector = None
-    with open(work_complete_token_path, 'w') as done_file:
-        done_file.write('Done.\n')
 
 
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, smallest_feature_size,
-        temp_workspace, target_shore_point_vector_path,
-        work_complete_token_path):
+        temp_workspace, target_shore_point_vector_path):
     """Create points that lie on the coast line of the landmass.
 
     Parameters:
@@ -612,15 +582,12 @@ def _create_shore_points(
 
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
-    with open(work_complete_token_path, 'w') as work_complete_token_file:
-        work_complete_token_file.write("Complete!\n")
-    #shutil.rmtree(temp_workspace)
 
 
 def _grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
-        target_grid_size, done_token_path):
+        target_grid_size):
     """Build a sparse grid covering the edges of the base polygons.
 
     Parameters:
@@ -730,9 +697,6 @@ def _grid_edges_of_vector(
     target_grid_layer = None
     target_grid_vector = None
 
-    with open(done_token_path, 'w') as done_token_file:
-        done_token_file.write("Done!\n")
-
 
 def _get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
@@ -761,16 +725,13 @@ def _get_utm_spatial_reference(bounding_box):
     return utm_sr
 
 
-def _build_feature_bounding_box_rtree(
-        vector_path, target_rtree_path, done_token_path):
+def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     """Builds an r-tree index of the global feature envelopes.
 
     Parameter:
         vector_path (string): path to vector to build bounding box index for
         target_rtree_path (string): path to ".dat" file to store the saved
             r-tree.
-        done_token_path (string): path to a file to create when function is
-            complete.
 
     Returns:
         None.
