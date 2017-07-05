@@ -1,4 +1,5 @@
 """Task graph framework."""
+import traceback
 import os
 import math
 import logging
@@ -66,7 +67,7 @@ class Task(object):
         self.global_lock_dict = global_lock_dict
         self.global_lock = global_lock
         with self.global_lock:
-            if not hasattr(Task, 'task_id'):
+            if not hasattr(Task, 'next_task_id'):
                 Task.next_task_id = 0
             self.task_id = Task.next_task_id
             Task.next_task_id += 1
@@ -74,7 +75,6 @@ class Task(object):
     def __call__(self):
         """Invoke this method when ready to execute task."""
         # if this Task is currently running somewhere, then wait for it.
-        current_call_thread = None
         LOGGER.debug("Entering task %s", self.task_id)
         with self.global_lock:
             if self.task_id in self.global_lock_dict:
@@ -108,6 +108,9 @@ class Task(object):
                     if task.task_id in self.global_lock_dict:
                         # If the task is already got a thread assigned to it,
                         # then wait for that thread to terminate
+                        LOGGER.debug(
+                            "%d is a task in the global lock dict",
+                            task.task_id)
                         dependant_lock_list.append(
                             self.global_lock_dict[task.task_id])
                     else:
