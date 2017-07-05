@@ -87,15 +87,13 @@ class TaskGraph(object):
         """
         thread_list = []
         for task in self.task_list:
-            # see if task is top level task, if so, execute it
-            if len(task.dependent_task_list) == 0:
-                thread = threading.Thread(
-                    target=task, args=(
-                        self.global_lock,
-                        self.global_working_task_dict,
-                        self.worker_pool))
-                thread_list.append((thread, task))
-                thread.start()
+            thread = threading.Thread(
+                target=task, args=(
+                    self.global_lock,
+                    self.global_working_task_dict,
+                    self.worker_pool))
+            thread_list.append((thread, task))
+            thread.start()
         for thread, task in thread_list:
             thread.join()
             if not task.is_complete():
@@ -202,11 +200,11 @@ class Task(object):
             pending_dependent_tasks = []
             with global_lock:
                 for task in self.dependent_task_list:
-                    LOGGER.debug("Checking dependent task %d", task.task_id)
+                    LOGGER.debug("Checking dependent task %s", task.task_id)
                     if task.task_id in global_working_task_dict:
                         # task is already executing, wait for it to terminate
                         LOGGER.debug(
-                            "%d is a task in the global_working_task_dict",
+                            "%s is a task in the global_working_task_dict",
                             task.task_id)
                         pending_dependent_tasks.append(task)
                     else:
@@ -220,7 +218,7 @@ class Task(object):
             # start the threads
             if len(pending_dependent_thread_list) > 0:
                 LOGGER.debug("Starting dependent threads %s", self.task_id)
-                for thread in pending_dependent_thread_list:
+                for thread, _ in pending_dependent_thread_list:
                     thread.start()
 
             # Block on all the dependent locks
