@@ -8,12 +8,18 @@ import logging
 import multiprocessing
 import threading
 import errno
+import Queue
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
 LOGGER = logging.getLogger('ipbes-cv')
 
+
+def _worker(work_queue):
+    """Thread worker.  `work_queue` has func/args tuple or 'STOP'."""
+    for func, args in iter(work_queue.get, 'STOP'):
+        func(*args)
 
 class TaskGraph(object):
     """Encapsulates the worker and tasks states for parallel processing."""
@@ -39,6 +45,8 @@ class TaskGraph(object):
                 raise
         self.token_storage_path = token_storage_path
         self.worker_pool = multiprocessing.Pool(n_workers)
+
+        self.global_thread_semaphore = threading.Semaphore(n_workers * 2)
 
         # used to lock global resources
         self.global_lock = threading.Lock()
@@ -72,21 +80,22 @@ class TaskGraph(object):
         task = Task(
             target, args, kwargs, dependent_task_list,
             self.token_storage_path)
-        thread = threading.Thread(
+
+        self.global_thread_semaphore.acquire()
+        threading.Thread(
             target=task, args=(
                 self.global_lock,
                 self.global_working_task_dict,
-                self.worker_pool))
+                self.worker_pool,
+                self.global_thread_semaphore)).start()
         with self.global_lock:
             self.global_working_task_dict[task.task_id] = task
-        task.thread = thread
-        thread.start()
         return task
 
     def join(self):
         """Join all threads in the graph."""
         for task in self.global_working_task_dict.itervalues():
-            task.thread.join()
+            task.join()
 
 
 class Task(object):
@@ -115,10 +124,13 @@ class Task(object):
         self.kwargs = kwargs
         self.dependent_task_list = dependent_task_list
 
+        # Used to ensure only one attempt at executing and also a mechanism
+        # to see when Task is complete
+        self.lock = threading.Lock()
+
         # Make a unique hash of the input parameters of the function call
-        LOGGER.warn(
-            'TODO: consider file date/time, dependent tasks, '
-            'new implementations (code versions)')
+        # TODO: consider file date/time, dependent tasks,
+        # TODO: new implementations (code versions)')
         task_string = '%s:%s:%s' % (
             target.__name__, pickle.dumps(args),
             json.dumps(kwargs, sort_keys=True))
@@ -137,7 +149,7 @@ class Task(object):
 
     def __call__(
             self, global_lock, global_working_task_dict,
-            global_worker_pool):
+            global_worker_pool, global_thread_semaphore):
         """Invoke this method when ready to execute task.
 
         Parameters:
@@ -148,35 +160,47 @@ class Task(object):
                 should acquire lock before modifying it.
             global_worker_pool (multiprocessing.Pool): a process pool used to
                 execute subprocesses.
+            global_thread_semaphore (threading.Semaphore): a semaphore to
+                throttle the total number of global threads that are
+                spun up.  This task releases a semaphore when complete.
 
         Returns:
             None
         """
-        LOGGER.debug("Starting task %s", self.task_id)
-        if self.is_complete():
-            LOGGER.info(
-                "Completion token exists for %s so not executing",
-                self.task_id)
-            return
+        try:
+            with self.lock:
+                LOGGER.debug("Starting task %s", self.task_id)
+                if self.is_complete():
+                    LOGGER.info(
+                        "Completion token exists for %s so not executing",
+                        self.task_id)
+                    return
 
-        # if this Task is currently running somewhere, wait for it.
-        if len(self.dependent_task_list) > 0:
-            LOGGER.debug("joining dependent threads %s", self.task_id)
-            for task in self.dependent_task_list:
-                task.thread.join()
-                if not task.is_complete():
-                    raise RuntimeError(
-                        "Task %s didn't complete, discontinuing "
-                        "execution of %s" % (task.task_id, self.task_id))
+                # if this Task is currently running somewhere, wait for it.
+                if len(self.dependent_task_list) > 0:
+                    LOGGER.debug("joining dependent threads %s", self.task_id)
+                    for task in self.dependent_task_list:
+                        task.join()
+                        if not task.is_complete():
+                            raise RuntimeError(
+                                "Task %s didn't complete, discontinuing "
+                                "execution of %s" % (task.task_id, self.task_id))
 
-        # Do this task's work
-        LOGGER.debug("Starting process for %s", self.task_id)
-        result = global_worker_pool.apply_async(
-            func=self.target, args=self.args, kwds=self.kwargs)
-        result.get()
-        with open(self.token_path, 'w') as token_file:
-            token_file.write(str(datetime.datetime.now()))
+                # Do this task's work
+                LOGGER.debug("Starting process for %s", self.task_id)
+                result = global_worker_pool.apply_async(
+                    func=self.target, args=self.args, kwds=self.kwargs)
+                result.get()
+                with open(self.token_path, 'w') as token_file:
+                    token_file.write(str(datetime.datetime.now()))
+        finally:
+            global_thread_semaphore.release()
 
     def is_complete(self):
         """Return true if complete token exists."""
         return os.path.exists(self.token_path)
+
+    def join(self):
+        """Block until task is complete."""
+        with self.lock:
+            pass

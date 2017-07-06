@@ -108,7 +108,7 @@ def main():
         create_shore_points_task = task_graph.add_task(
             target=_create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-                _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
+                simplified_vector_path, _GLOBAL_WWIII_PATH,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
             dependent_task_list=[grid_edges_of_vector_task])
@@ -120,7 +120,7 @@ def main():
         _ = task_graph.add_task(
             target=_calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
-                _GLOBAL_POLYGON_PATH, wind_exposure_workspace,
+                simplified_vector_path, wind_exposure_workspace,
                 _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
                 target_wind_exposure_point_path),
             dependent_task_list=[create_shore_points_task])
