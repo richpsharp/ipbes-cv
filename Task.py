@@ -116,6 +116,9 @@ class Task(object):
         self.dependent_task_list = dependent_task_list
 
         # Make a unique hash of the input parameters of the function call
+        LOGGER.warn(
+            'TODO: consider file date/time, dependent tasks, '
+            'new implementations (code versions)')
         task_string = '%s:%s:%s' % (
             target.__name__, pickle.dumps(args),
             json.dumps(kwargs, sort_keys=True))
@@ -149,16 +152,14 @@ class Task(object):
         Returns:
             None
         """
-        # if this Task is currently running somewhere, then wait for it.
         LOGGER.debug("Starting task %s", self.task_id)
-        # finally block below releases `self.task_lock` and deregisters it
         if self.is_complete():
             LOGGER.info(
                 "Completion token exists for %s so not executing",
                 self.task_id)
             return
 
-        # Otherwise execute dependencies
+        # if this Task is currently running somewhere, wait for it.
         if len(self.dependent_task_list) > 0:
             LOGGER.debug("joining dependent threads %s", self.task_id)
             for task in self.dependent_task_list:

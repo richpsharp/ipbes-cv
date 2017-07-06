@@ -51,6 +51,9 @@ _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 
+_SMALLEST_FEATURE_SIZE = 2000
+_MAX_FETCH_DISTANCE = 60000
+
 
 def main():
     """Entry point."""
@@ -59,19 +62,30 @@ def main():
 
     task_graph = Task.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+
+    simplified_vector_path = os.path.join(
+        _TARGET_WORKSPACE, 'simplified_geometry.shp')
+    # make an approximation of smallest feature size in degrees
+    smallest_feature_size_degrees = 1. / 111000 * _SMALLEST_FEATURE_SIZE / 2.0
+    simplify_geometry_task = task_graph.add_task(
+        target=simplify_geometry, args=(
+            _GLOBAL_POLYGON_PATH, smallest_feature_size_degrees,
+            simplified_vector_path))
+
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
 
     build_rtree_task = task_graph.add_task(
         target=_build_feature_bounding_box_rtree,
-        args=(_GLOBAL_POLYGON_PATH, landmass_bounding_rtree_path))
+        args=(simplified_vector_path, landmass_bounding_rtree_path),
+        dependent_task_list=[simplify_geometry_task])
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
 
     grid_edges_of_vector_task = task_graph.add_task(
         target=_grid_edges_of_vector, args=(
-            _GLOBAL_BOUNDING_BOX_WGS84, _GLOBAL_POLYGON_PATH,
+            _GLOBAL_BOUNDING_BOX_WGS84, simplified_vector_path,
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
 
@@ -80,11 +94,10 @@ def main():
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
     grid_count = global_grid_layer.GetFeatureCount()
+    global_grid_layer = None
+    global_grid_vector = None
 
-    smallest_feature_size = 2000
-    max_fetch_distance = 60000
-
-    for grid_id in [3]:
+    for grid_id in xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
         grid_point_path = os.path.join(
             _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
@@ -96,7 +109,7 @@ def main():
             target=_create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, _GLOBAL_WWIII_PATH,
-                smallest_feature_size, shore_points_workspace,
+                _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
             dependent_task_list=[grid_edges_of_vector_task])
 
@@ -104,14 +117,58 @@ def main():
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
         target_wind_exposure_point_path = os.path.join(
             _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        calculate_wind_exposure_task = task_graph.add_task(
+        _ = task_graph.add_task(
             target=_calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
                 _GLOBAL_POLYGON_PATH, wind_exposure_workspace,
-                smallest_feature_size, max_fetch_distance,
-                target_wind_exposure_point_path))
+                _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
+                target_wind_exposure_point_path),
+            dependent_task_list=[create_shore_points_task])
 
-    task_graph.execute()
+    task_graph.join()
+
+
+def simplify_geometry(
+        base_vector_path, tolerance, target_simplified_vector_path):
+    """Simplify all the geometry in the vector.
+
+    Parameters:
+        base_vector_path (string): path to base vector.
+        tolerance (float): all new vertices in the geometry will be within
+            this distance (in units of the vector's projection).
+        target_simplified_vector_path (string): path to desired simplified
+            vector.
+
+    Returns:
+        None
+    """
+    base_vector = ogr.Open(base_vector_path)
+    base_layer = base_vector.GetLayer()
+
+    if os.path.exists(target_simplified_vector_path):
+        os.remove(target_simplified_vector_path)
+
+    esri_driver = ogr.GetDriverByName('ESRI Shapefile')
+
+    target_simplified_vector = esri_driver.CreateDataSource(
+        target_simplified_vector_path)
+    target_simplified_layer = target_simplified_vector.CreateLayer(
+        os.path.splitext(os.path.basename(target_simplified_vector_path))[0],
+        base_layer.GetSpatialRef(), ogr.wkbPolygon)
+
+    for feature in base_layer:
+        target_feature = ogr.Feature(target_simplified_layer.GetLayerDefn())
+        feature_geometry = feature.GetGeometryRef()
+        simplified_geometry = feature_geometry.Simplify(tolerance)
+        feature_geometry = None
+        if (simplified_geometry is not None and
+                simplified_geometry.GetArea() > 0):
+            target_feature.SetGeometry(simplified_geometry)
+            target_simplified_layer.CreateFeature(target_feature)
+
+    target_simplified_layer.SyncToDisk()
+    target_simplified_layer = None
+    target_simplified_vector = None
 
 
 def _calculate_wind_exposure(
