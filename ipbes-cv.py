@@ -97,13 +97,13 @@ def main():
     global_grid_layer = None
     global_grid_vector = None
 
-    for grid_id in xrange(grid_count):
+    for grid_id in [3]:#xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
-        grid_point_path = os.path.join(
-            _TARGET_WORKSPACE, _GRID_POINT_FILE_PATTERN % (grid_id))
 
         shore_points_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
+        grid_point_path = os.path.join(
+            shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
 
         create_shore_points_task = task_graph.add_task(
             target=_create_shore_points, args=(
@@ -116,7 +116,8 @@ def main():
         wind_exposure_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
         target_wind_exposure_point_path = os.path.join(
-            _TARGET_WORKSPACE, _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+            wind_exposure_workspace,
+            _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         _ = task_graph.add_task(
             target=_calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
@@ -173,7 +174,7 @@ def simplify_geometry(
 
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
-        landmass_bounding_rtree_path, landmass_vector_path, temp_workspace,
+        landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
         smallest_feature_size, max_fetch_distance,
         target_fetch_point_vector_path):
     """Calculate wind exposure for each shore point.
@@ -185,7 +186,7 @@ def _calculate_wind_exposure(
         landmass_bounding_rtree_path (string): path to an rtree bounding box
             for the landmass polygons.
         landmass_vector_path (string): path to landmass polygon vetor.
-        temp_workspace (string): path to a directory that can be created for
+        workspace_dir (string): path to a directory that can be created for
             temporary workspace files
         smallest_feature_size (float): smallest feature size to detect in
             meters.
@@ -198,14 +199,14 @@ def _calculate_wind_exposure(
     Returns:
         None
     """
-    if os.path.exists(temp_workspace):
-        shutil.rmtree(temp_workspace)
-    os.makedirs(temp_workspace)
+    if os.path.exists(workspace_dir):
+        shutil.rmtree(workspace_dir)
+    os.makedirs(workspace_dir)
 
-    temp_utm_clipped_vector_path = os.path.join(
-        temp_workspace, 'utm_clipped_landmass.shp')
+    utm_clipped_vector_path = os.path.join(
+        workspace_dir, 'utm_clipped_landmass.shp')
     temp_fetch_rays_path = os.path.join(
-        temp_workspace, 'fetch_rays.shp')
+        workspace_dir, 'fetch_rays.shp')
 
     # reproject base_shore_point_vector_path to utm coordinates
     base_shore_info = pygeoprocessing.get_vector_info(
@@ -248,7 +249,7 @@ def _calculate_wind_exposure(
     # this will hold the clipped landmass geometry
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
     temp_clipped_vector_path = os.path.join(
-        temp_workspace, 'clipped_geometry_vector.shp')
+        workspace_dir, 'clipped_geometry_vector.shp')
     temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
         temp_clipped_vector_path)
     temp_clipped_layer = (
@@ -282,10 +283,10 @@ def _calculate_wind_exposure(
     LOGGER.debug("reprojecting grid %s", base_shore_point_vector_path)
     pygeoprocessing.reproject_vector(
         temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-        temp_utm_clipped_vector_path)
+        utm_clipped_vector_path)
 
     clipped_geometry_shapely_list = []
-    temp_utm_clipped_vector = ogr.Open(temp_utm_clipped_vector_path)
+    temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
     temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
     for tmp_utm_feature in temp_utm_clipped_layer:
         tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
@@ -401,7 +402,7 @@ def _calculate_wind_exposure(
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, smallest_feature_size,
-        temp_workspace, target_shore_point_vector_path):
+        workspace_dir, target_shore_point_vector_path):
     """Create points that lie on the coast line of the landmass.
 
     Parameters:
@@ -418,7 +419,7 @@ def _create_shore_points(
             the Wave Watch III data.
         smallest_feature_size (float): smallest feature size to grid a shore
             point on.
-        temp_workspace (string): path to a directory that can be created
+        workspace_dir (string): path to a directory that can be created
             during run to hold temporary files.  Will be deleted on successful
             function completion.
         target_shore_point_vector_path (string): path to a point vector that
@@ -427,43 +428,44 @@ def _create_shore_points(
     Returns:
         None.
     """
+    LOGGER.info("Creating shore points for grid %s", grid_id)
     # create the spatial reference from the base vector
     landmass_spatial_reference = osr.SpatialReference()
     landmass_spatial_reference.ImportFromWkt(
         pygeoprocessing.get_vector_info(landmass_vector_path)['projection'])
 
-    if os.path.exists(temp_workspace):
-        shutil.rmtree(temp_workspace)
-    os.makedirs(temp_workspace)
+    if os.path.exists(workspace_dir):
+        shutil.rmtree(workspace_dir)
+    os.makedirs(workspace_dir)
 
-    temp_clipped_vector_path = os.path.join(
-        temp_workspace, 'clipped_geometry_vector.shp')
-    temp_grid_raster_path = os.path.join(temp_workspace, 'grid.tif')
-    temp_convolution_raster_path = os.path.join(
-        temp_workspace, 'convolution.tif')
-    temp_utm_clipped_vector_path = os.path.join(
-        temp_workspace, 'clipped_geometry_utm.shp')
-    temp_shore_kernel_path = os.path.join(
-        temp_workspace, 'kernel.tif')
-    temp_shore_raster_path = os.path.join(
-        temp_workspace, 'shore.tif')
+    lat_lng_clipped_vector_path = os.path.join(
+        workspace_dir, 'clipped_geometry_lat_lng.shp')
+    grid_raster_path = os.path.join(workspace_dir, 'grid.tif')
+    convolution_raster_path = os.path.join(
+        workspace_dir, 'convolution.tif')
+    utm_clipped_vector_path = os.path.join(
+        workspace_dir, 'clipped_geometry_utm.shp')
+    shore_kernel_path = os.path.join(
+        workspace_dir, 'shore_kernel.tif')
+    shore_raster_path = os.path.join(
+        workspace_dir, 'shore_raster.tif')
 
     for path in [target_shore_point_vector_path,
-                 temp_clipped_vector_path,
-                 temp_grid_raster_path]:
+                 lat_lng_clipped_vector_path,
+                 grid_raster_path]:
         if os.path.exists(path):
             os.remove(path)
 
     esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
 
     # this will hold the clipped landmass geometry
-    temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
-        temp_clipped_vector_path)
-    temp_clipped_layer = (
-        temp_clipped_vector.CreateLayer(
-            os.path.splitext(temp_clipped_vector_path)[0],
+    lat_lng_clipped_vector = esri_shapefile_driver.CreateDataSource(
+        lat_lng_clipped_vector_path)
+    lat_lng_clipped_layer = (
+        lat_lng_clipped_vector.CreateLayer(
+            os.path.splitext(lat_lng_clipped_vector_path)[0],
             landmass_spatial_reference, ogr.wkbPolygon))
-    temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
+    lat_lng_clipped_defn = lat_lng_clipped_layer.GetLayerDefn()
 
     # this will hold the output sample points on the shore
     target_shore_point_vector = esri_shapefile_driver.CreateDataSource(
@@ -491,8 +493,8 @@ def _create_shore_points(
     grid_vector = ogr.Open(sample_grid_vector_path)
     grid_layer = grid_vector.GetLayer()
     grid_feature = grid_layer.GetFeature(grid_id)
-    grid_shapely = shapely.wkb.loads(
-        grid_feature.GetGeometryRef().ExportToWkb())
+    grid_geometry_ref = grid_feature.GetGeometryRef()
+    grid_shapely = shapely.wkb.loads(grid_geometry_ref.ExportToWkb())
 
     landmass_vector_rtree = rtree.index.Index(
         os.path.splitext(landmass_bounding_rtree_path)[0])
@@ -505,59 +507,62 @@ def _create_shore_points(
         utm_spatial_reference.ExportToWkt(), edge_samples=11)
 
     # transform local box back to lat/lng -> global clipping box
-    utm_clipping_box = pygeoprocessing.transform_bounding_box(
+    lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
         landmass_spatial_reference.ExportToWkt(), edge_samples=11)
-    utm_clipping_shapely = shapely.geometry.box(*utm_clipping_box)
+    lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
-    # clip global polygon to global clipping box
-    for feature_id in landmass_vector_rtree.intersection(utm_clipping_box):
+    # clip global polygon to utm clipping box
+    LOGGER.info(
+        "clip global polygon to utm clipping box for grid %s", grid_id)
+    for feature_id in landmass_vector_rtree.intersection(
+            lat_lng_clipping_box):
         base_feature = landmass_layer.GetFeature(feature_id)
         base_geometry = base_feature.GetGeometryRef()
-        base_shapely = shapely.wkb.loads(
-            base_geometry.ExportToWkb())
+        base_shapely = shapely.wkb.loads(base_geometry.ExportToWkb())
         base_geometry = None
-        intersection_shapely = utm_clipping_shapely.intersection(base_shapely)
+        intersection_shapely = lat_lng_clipping_shapely.intersection(
+            base_shapely)
         try:
             target_geometry = ogr.CreateGeometryFromWkt(
                 intersection_shapely.wkt)
-            target_feature = ogr.Feature(temp_clipped_defn)
+            target_feature = ogr.Feature(lat_lng_clipped_defn)
             target_feature.SetGeometry(target_geometry)
-            temp_clipped_layer.CreateFeature(target_feature)
+            lat_lng_clipped_layer.CreateFeature(target_feature)
             target_feature = None
             target_geometry = None
         except Exception:
             LOGGER.warn(
                 "Couldn't process this intersection %s",
                 intersection_shapely)
-    temp_clipped_layer.SyncToDisk()
-    temp_clipped_layer = None
-    temp_clipped_vector = None
+    lat_lng_clipped_layer.SyncToDisk()
+    lat_lng_clipped_layer = None
+    lat_lng_clipped_vector = None
 
     # create grid for underlying local utm box
     pygeoprocessing.reproject_vector(
-        temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-        temp_utm_clipped_vector_path)
+        lat_lng_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
+        utm_clipped_vector_path)
 
     byte_nodata = 255
     pygeoprocessing.create_raster_from_vector_extents(
-        temp_utm_clipped_vector_path,
-        temp_grid_raster_path, (
+        utm_clipped_vector_path,
+        grid_raster_path, (
             smallest_feature_size / 2.0, -smallest_feature_size / 2.0),
         gdal.GDT_Byte, byte_nodata, fill_value=0)
 
     # rasterize utm global clip to grid
     pygeoprocessing.rasterize(
-        temp_utm_clipped_vector_path, temp_grid_raster_path, [1], None)
+        utm_clipped_vector_path, grid_raster_path, [1], None)
 
     # grid shoreline from raster
-    _make_shore_kernel(temp_shore_kernel_path)
+    _make_shore_kernel(shore_kernel_path)
     pygeoprocessing.convolve_2d(
-        (temp_grid_raster_path, 1), (temp_shore_kernel_path, 1),
-        temp_convolution_raster_path, target_datatype=gdal.GDT_Byte)
+        (grid_raster_path, 1), (shore_kernel_path, 1),
+        convolution_raster_path, target_datatype=gdal.GDT_Byte)
 
     temp_grid_nodata = pygeoprocessing.get_raster_info(
-        temp_grid_raster_path)['nodata'][0]
+        grid_raster_path)['nodata'][0]
 
     def _shore_mask_op(shore_convolution):
         """Mask values on land that border water."""
@@ -573,17 +578,18 @@ def _create_shore_points(
         return result
 
     pygeoprocessing.raster_calculator(
-        [(temp_convolution_raster_path, 1)], _shore_mask_op,
-        temp_shore_raster_path, gdal.GDT_Byte, byte_nodata)
+        [(convolution_raster_path, 1)], _shore_mask_op,
+        shore_raster_path, gdal.GDT_Byte, byte_nodata)
 
     shore_geotransform = pygeoprocessing.get_raster_info(
-        temp_shore_raster_path)['geotransform']
+        shore_raster_path)['geotransform']
 
     utm_to_base_transform = osr.CoordinateTransformation(
         utm_spatial_reference, landmass_spatial_reference)
 
     wwiii_rtree = rtree.index.Index()
 
+    LOGGER.info("Build wave watch iii rtree for grid %s", grid_id)
     for wwiii_feature in wwiii_layer:
         wwiii_geometry = wwiii_feature.GetGeometryRef()
         wwiii_x = wwiii_geometry.GetX()
@@ -591,8 +597,12 @@ def _create_shore_points(
         wwiii_rtree.insert(
             wwiii_feature.GetFID(), (wwiii_x, wwiii_y, wwiii_x, wwiii_y))
 
+    LOGGER.info(
+        "Interpolating shore points with Wave Watch III data for grid %s",
+        grid_id)
+    feature_lookup = {}
     for offset_info, data_block in pygeoprocessing.iterblocks(
-            temp_shore_raster_path):
+            shore_raster_path):
         row_indexes, col_indexes = numpy.mgrid[
             offset_info['yoff']:offset_info['yoff']+offset_info['win_ysize'],
             offset_info['xoff']:offset_info['xoff']+offset_info['win_xsize']]
@@ -605,32 +615,44 @@ def _create_shore_points(
             shore_geotransform[3] +
             shore_geotransform[4] * (col_indexes[valid_mask] + 0.5) +
             shore_geotransform[5] * (row_indexes[valid_mask] + 0.5))
+        LOGGER.debug(x_coordinates.size)
+        LOGGER.debug(y_coordinates)
+
         for x_coord, y_coord in zip(x_coordinates, y_coordinates):
             shore_point_geometry = ogr.Geometry(ogr.wkbPoint)
             shore_point_geometry.AddPoint(x_coord, y_coord)
             shore_point_geometry.Transform(utm_to_base_transform)
-            if grid_shapely.intersects(shapely.geometry.Point(
-                    shore_point_geometry.GetX(), shore_point_geometry.GetY())):
+            LOGGER.debug("test point %s", shore_point_geometry)
+            if grid_geometry_ref.Intersects(shore_point_geometry):
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
 
+                LOGGER.debug("search nearest 3 WWIII points")
                 nearest_points = list(wwiii_rtree.nearest(
                     (shore_point_geometry.GetX(),
                      shore_point_geometry.GetY(),
                      shore_point_geometry.GetX(),
                      shore_point_geometry.GetY()), 3))[0:3]
-                shore_point_shapely = shapely.geometry.Point(
-                    (shore_point_geometry.GetX(),
-                     shore_point_geometry.GetY()))
+
                 for field_name in field_names:
                     value = 0.0
                     total_distance = 0.0
                     for fid in nearest_points:
-                        wwiii_feature = wwiii_layer.GetFeature(fid)
-                        wwiii_shapely = shapely.wkb.loads(
-                            wwiii_feature.GetGeometryRef().ExportToWkb())
-                        distance = shore_point_shapely.distance(
-                            wwiii_shapely)
+                        try:
+                            wwiii_feature, wwiii_geometry = (
+                                feature_lookup[fid])
+                        except KeyError:
+                            wwiii_feature = wwiii_layer.GetFeature(fid)
+                            wwiii_geometry = wwiii_feature.GetGeometryRef()
+                            feature_lookup[fid] = (
+                                wwiii_feature, wwiii_geometry)
+
+                        #wwiii_shapely = shapely.wkb.loads(
+                        #    wwiii_feature.GetGeometryRef().ExportToWkb())
+                        #distance = shore_point_shapely.distance(
+                        #    wwiii_shapely)
+                        distance = wwiii_geometry.Distance(
+                            shore_point_geometry)
                         field_value = wwiii_feature.GetField(field_name)
                         value += (float(field_value) * distance)
                         total_distance += distance
@@ -639,6 +661,8 @@ def _create_shore_points(
 
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
+    del feature_lookup
+    LOGGER.info("All done with shore points for grid %s", grid_id)
 
 
 def _grid_edges_of_vector(
