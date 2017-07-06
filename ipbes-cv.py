@@ -45,7 +45,8 @@ _WGS84_GRID_SIZE = 3.0
 _UTM_GRID_SIZE = 250
 
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
-_GLOBAL_FEATURE_INDEX_FILE_PATTERN = 'global_feature_index.dat'
+_LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
+_GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
@@ -63,6 +64,13 @@ def main():
     task_graph = Task.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
 
+    wwiii_rtree_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
+
+    build_wwiii_task = task_graph.add_task(
+        target=_build_wwiii_rtree, args=(
+            _GLOBAL_WWIII_PATH, wwiii_rtree_path))
+
     simplified_vector_path = os.path.join(
         _TARGET_WORKSPACE, 'simplified_geometry.shp')
     # make an approximation of smallest feature size in degrees
@@ -73,7 +81,7 @@ def main():
             simplified_vector_path))
 
     landmass_bounding_rtree_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_FEATURE_INDEX_FILE_PATTERN)
+        _TARGET_WORKSPACE, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
 
     build_rtree_task = task_graph.add_task(
         target=_build_feature_bounding_box_rtree,
@@ -108,10 +116,10 @@ def main():
         create_shore_points_task = task_graph.add_task(
             target=_create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-                simplified_vector_path, _GLOBAL_WWIII_PATH,
+                simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
-            dependent_task_list=[grid_edges_of_vector_task])
+            dependent_task_list=[grid_edges_of_vector_task, build_wwiii_task])
 
         wind_exposure_workspace = os.path.join(
             _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
@@ -401,7 +409,8 @@ def _calculate_wind_exposure(
 
 def _create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-        landmass_vector_path, wwiii_vector_path, smallest_feature_size,
+        landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
+        smallest_feature_size,
         workspace_dir, target_shore_point_vector_path):
     """Create points that lie on the coast line of the landmass.
 
@@ -417,6 +426,8 @@ def _create_shore_points(
             landmass.
         wwiii_vector_path (string): path to point shapefile representing
             the Wave Watch III data.
+        wwiii_rtree_path (string): path to an rtree index that has
+            the points of `wwiii_vector_path` indexed.
         smallest_feature_size (float): smallest feature size to grid a shore
             point on.
         workspace_dir (string): path to a directory that can be created
@@ -587,15 +598,10 @@ def _create_shore_points(
     utm_to_base_transform = osr.CoordinateTransformation(
         utm_spatial_reference, landmass_spatial_reference)
 
-    wwiii_rtree = rtree.index.Index()
-
-    LOGGER.info("Build wave watch iii rtree for grid %s", grid_id)
-    for wwiii_feature in wwiii_layer:
-        wwiii_geometry = wwiii_feature.GetGeometryRef()
-        wwiii_x = wwiii_geometry.GetX()
-        wwiii_y = wwiii_geometry.GetY()
-        wwiii_rtree.insert(
-            wwiii_feature.GetFID(), (wwiii_x, wwiii_y, wwiii_x, wwiii_y))
+    # rtree index loads without the extension
+    wwiii_rtree_base_path = os.path.splitext(
+        wwiii_rtree_path)[0]
+    wwiii_rtree = rtree.index.Index(wwiii_rtree_base_path)
 
     LOGGER.info(
         "Interpolating shore points with Wave Watch III data for grid %s",
@@ -622,12 +628,10 @@ def _create_shore_points(
             shore_point_geometry = ogr.Geometry(ogr.wkbPoint)
             shore_point_geometry.AddPoint(x_coord, y_coord)
             shore_point_geometry.Transform(utm_to_base_transform)
-            LOGGER.debug("test point %s", shore_point_geometry)
             if grid_geometry_ref.Intersects(shore_point_geometry):
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
 
-                LOGGER.debug("search nearest 3 WWIII points")
                 nearest_points = list(wwiii_rtree.nearest(
                     (shore_point_geometry.GetX(),
                      shore_point_geometry.GetY(),
@@ -647,10 +651,6 @@ def _create_shore_points(
                             feature_lookup[fid] = (
                                 wwiii_feature, wwiii_geometry)
 
-                        #wwiii_shapely = shapely.wkb.loads(
-                        #    wwiii_feature.GetGeometryRef().ExportToWkb())
-                        #distance = shore_point_shapely.distance(
-                        #    wwiii_shapely)
                         distance = wwiii_geometry.Distance(
                             shore_point_geometry)
                         field_value = wwiii_feature.GetField(field_name)
@@ -892,6 +892,22 @@ def _make_logger_callback(message):
             logger_callback.total_time = 0.0
 
     return logger_callback
+
+
+def _build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
+    """Build RTree indexed by FID for points in `wwwiii_vector_path`."""
+    wwiii_rtree = rtree.index.Index(os.path.splitext(wwiii_rtree_path)[0])
+
+    wwiii_vector = ogr.Open(wwiii_vector_path)
+    wwiii_layer = wwiii_vector.GetLayer()
+    for wwiii_feature in wwiii_layer:
+        wwiii_geometry = wwiii_feature.GetGeometryRef()
+        wwiii_x = wwiii_geometry.GetX()
+        wwiii_y = wwiii_geometry.GetY()
+        wwiii_rtree.insert(
+            wwiii_feature.GetFID(), (wwiii_x, wwiii_y, wwiii_x, wwiii_y))
+    wwiii_layer = None
+    wwiii_vector = None
 
 
 if __name__ == '__main__':
