@@ -621,43 +621,46 @@ def _create_shore_points(
             shore_geotransform[3] +
             shore_geotransform[4] * (col_indexes[valid_mask] + 0.5) +
             shore_geotransform[5] * (row_indexes[valid_mask] + 0.5))
-        LOGGER.debug(x_coordinates.size)
-        LOGGER.debug(y_coordinates)
 
         for x_coord, y_coord in zip(x_coordinates, y_coordinates):
             shore_point_geometry = ogr.Geometry(ogr.wkbPoint)
             shore_point_geometry.AddPoint(x_coord, y_coord)
             shore_point_geometry.Transform(utm_to_base_transform)
+            # make sure shore point is within the bounding box of the gri
             if grid_geometry_ref.Intersects(shore_point_geometry):
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
 
+                # get the nearest wave watch III points from the shore point
                 nearest_points = list(wwiii_rtree.nearest(
                     (shore_point_geometry.GetX(),
                      shore_point_geometry.GetY(),
                      shore_point_geometry.GetX(),
                      shore_point_geometry.GetY()), 3))[0:3]
 
-                for field_name in field_names:
-                    value = 0.0
-                    total_distance = 0.0
-                    for fid in nearest_points:
-                        try:
-                            wwiii_feature, wwiii_geometry = (
-                                feature_lookup[fid])
-                        except KeyError:
-                            wwiii_feature = wwiii_layer.GetFeature(fid)
-                            wwiii_geometry = wwiii_feature.GetGeometryRef()
-                            feature_lookup[fid] = (
-                                wwiii_feature, wwiii_geometry)
+                # create placeholders for point geometry and field values
+                wwiii_points = numpy.empty((3, 2))
+                wwiii_values = numpy.empty((3, len(field_names)))
+                for fid_index, fid in enumerate(nearest_points):
+                    wwiii_feature = wwiii_layer.GetFeature(fid)
+                    wwiii_geometry = wwiii_feature.GetGeometryRef()
+                    wwiii_points[fid_index] = numpy.array(
+                        [wwiii_geometry.GetX(), wwiii_geometry.GetY()])
+                    wwiii_values[fid_index] = numpy.array(
+                        [float(wwiii_feature.GetField(field_name))
+                         for field_name in field_names])
 
-                        distance = wwiii_geometry.Distance(
-                            shore_point_geometry)
-                        field_value = wwiii_feature.GetField(field_name)
-                        value += (float(field_value) * distance)
-                        total_distance += distance
+                distance = numpy.linalg.norm(
+                    wwiii_points - numpy.array(
+                        (shore_point_geometry.GetX(),
+                         shore_point_geometry.GetY())))
+
+                wwiii_values *= distance
+                wwiii_values = numpy.mean(wwiii_values, axis=0)
+
+                for field_name_index, field_name in enumerate(field_names):
                     shore_point_feature.SetField(
-                        field_name, value / total_distance)
+                        field_name, wwiii_values[field_name_index])
 
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
