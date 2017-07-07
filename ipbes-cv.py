@@ -49,6 +49,7 @@ _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
+_GLOBAL_WIND_EXPOSURE_POINT = 'global_rei_points.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 
@@ -105,7 +106,9 @@ def main():
     global_grid_layer = None
     global_grid_vector = None
 
-    for grid_id in [304]:#xrange(grid_count):
+    local_rei_point_path_list = []
+    wind_exposure_task_list = []
+    for grid_id in [0,1]:#xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -126,13 +129,29 @@ def main():
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        _ = task_graph.add_task(
+        wind_exposure_task = task_graph.add_task(
             target=_calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
                 simplified_vector_path, wind_exposure_workspace,
                 _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
                 target_wind_exposure_point_path),
             dependent_task_list=[create_shore_points_task])
+        wind_exposure_task_list.append(
+            wind_exposure_task)
+        local_rei_point_path_list.append(
+            target_wind_exposure_point_path)
+
+    target_merged_vector_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_WIND_EXPOSURE_POINT)
+    target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
+        _GLOBAL_POLYGON_PATH)['projection']
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_rei_point_path_list,
+            target_spatial_reference_wkt,
+            target_merged_vector_path,
+            ['REI']),
+        dependent_task_list=wind_exposure_task_list)
 
     task_graph.join()
 
@@ -517,6 +536,13 @@ def _create_shore_points(
         grid_shapely.bounds, landmass_spatial_reference.ExportToWkt(),
         utm_spatial_reference.ExportToWkt(), edge_samples=11)
 
+    # add a pixel buffer so we clip land that's a little outside the grid
+    pixel_buffer = 1
+    utm_bounding_box[0] -= pixel_buffer * smallest_feature_size
+    utm_bounding_box[1] -= pixel_buffer * smallest_feature_size
+    utm_bounding_box[2] += pixel_buffer * smallest_feature_size
+    utm_bounding_box[3] += pixel_buffer * smallest_feature_size
+
     # transform local box back to lat/lng -> global clipping box
     lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
@@ -556,6 +582,7 @@ def _create_shore_points(
         utm_clipped_vector_path)
 
     byte_nodata = 255
+
     pygeoprocessing.create_raster_from_vector_extents(
         utm_clipped_vector_path,
         grid_raster_path, (
@@ -916,6 +943,67 @@ def _build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
             wwiii_feature.GetFID(), (wwiii_x, wwiii_y, wwiii_x, wwiii_y))
     wwiii_layer = None
     wwiii_vector = None
+
+
+def merge_vectors(
+        base_vector_path_list, target_spatial_reference_wkt,
+        target_merged_vector_path, field_list_to_copy):
+    """Merge all the vectors in the `base_vector_path_list`.
+
+    Parameters:
+        base_vector_path_list (list): a list of OGR DataSources.  Should
+            all be single layer identical feature definitions.
+        target_merged_vector_path (string): path to desired output vector.
+            will contain a single layer with all merged features from the
+            base vectors.
+        field_list_to_copy (string): list of field names to copy from the base
+            vectors to the target vectors
+
+    Returns:
+        None
+    """
+    target_spatial_reference = osr.SpatialReference()
+    target_spatial_reference.ImportFromWkt(target_spatial_reference_wkt)
+
+    esri_driver = ogr.GetDriverByName('ESRI Shapefile')
+    if os.path.exists(target_merged_vector_path):
+        esri_driver.DeleteDataSource(target_merged_vector_path)
+    base_vector = ogr.Open(base_vector_path_list[0])
+    base_layer = base_vector.GetLayer()
+    base_layer_defn = base_layer.GetLayerDefn()
+
+    target_vector = esri_driver.CreateDataSource(target_merged_vector_path)
+    target_layer = target_vector.CreateLayer(
+        target_merged_vector_path, srs=target_spatial_reference,
+        geom_type=base_layer.GetGeomType())
+    for field_name in field_list_to_copy:
+        target_layer.CreateField(
+            base_layer_defn.GetFieldDefn(
+                base_layer_defn.GetFieldIndex(field_name)))
+
+    base_layer = None
+    base_vector = None
+
+    for base_vector_path in base_vector_path_list:
+        base_vector = ogr.Open(base_vector_path)
+        base_layer = base_vector.GetLayer()
+
+        base_spatial_reference = base_layer.GetSpatialRef()
+        base_to_target_transform = osr.CoordinateTransformation(
+            base_spatial_reference, target_spatial_reference)
+
+        for feature in base_layer:
+            target_feat = ogr.Feature(target_layer.GetLayerDefn())
+            target_geometry = feature.GetGeometryRef().Clone()
+            target_geometry.Transform(base_to_target_transform)
+            target_feat.SetGeometry(target_geometry)
+            for field_name in field_list_to_copy:
+                target_feat.SetField(field_name, feature.GetField(field_name))
+            target_layer.CreateFeature(target_feat)
+            target_feat = None
+    target_layer.SyncToDisk()
+    target_layer = None
+    target_vector = None
 
 
 if __name__ == '__main__':
