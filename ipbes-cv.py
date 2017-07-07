@@ -49,7 +49,7 @@ _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-_GLOBAL_WIND_EXPOSURE_POINT = 'global_rei_points.shp'
+_GLOBAL_WIND_EXPOSURE_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 
@@ -129,20 +129,25 @@ def main():
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        wind_exposure_task = task_graph.add_task(
-            target=_calculate_wind_exposure, args=(
-                grid_point_path, landmass_bounding_rtree_path,
-                simplified_vector_path, wind_exposure_workspace,
-                _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
-                target_wind_exposure_point_path),
-            dependent_task_list=[create_shore_points_task])
+        _calculate_wind_exposure(
+            grid_point_path, landmass_bounding_rtree_path,
+            simplified_vector_path, wind_exposure_workspace,
+            _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
+            target_wind_exposure_point_path)
+        #wind_exposure_task = task_graph.add_task(
+        #    target=_calculate_wind_exposure, args=(
+        #        grid_point_path, landmass_bounding_rtree_path,
+        #        simplified_vector_path, wind_exposure_workspace,
+        #        _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
+        #        target_wind_exposure_point_path),
+        #    dependent_task_list=[create_shore_points_task])
         wind_exposure_task_list.append(
             wind_exposure_task)
         local_rei_point_path_list.append(
             target_wind_exposure_point_path)
 
     target_merged_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_WIND_EXPOSURE_POINT)
+        _TARGET_WORKSPACE, _GLOBAL_WIND_EXPOSURE_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     _ = task_graph.add_task(
@@ -329,6 +334,11 @@ def _calculate_wind_exposure(
     # load land geometry into shapely object
     landmass_shapely_prep = shapely.prepared.prep(landmass_shapely)
 
+    # explode landmass into lines for easy intersection
+    polygon_line_rtree = rtree.index.Index()
+    for line in geometry_to_lines(landmass_shapely):
+        polygon_line_rtree.insert(0, line.bounds, obj=line)
+
     # create fetch rays
     temp_fetch_rays_vector = esri_shapefile_driver.CreateDataSource(
         temp_fetch_rays_path)
@@ -386,33 +396,29 @@ def _calculate_wind_exposure(
                 ray_feature.SetField(
                     'fetch_dist', ray_shapely.length)
                 temp_fetch_rays_layer.CreateFeature(ray_feature)
-            else:
-                intersection_ray = ray_shapely.difference(landmass_shapely)
-                # if there's a difference it's be a line or a multiline
-                # anything else will be an empty set
-                if intersection_ray.geom_type == "LineString":
-                    # ensure they have the same starting points, otherwise
-                    # it's probably further down the line ray
-                    if intersection_ray.coords[0] == ray_shapely.coords[0]:
-                        ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                        ray_feature.SetGeometry(
-                            ogr.CreateGeometryFromWkt(
-                                intersection_ray.wkt))
-                        ray_length = intersection_ray.length
-                        ray_feature.SetField(
-                            'fetch_dist', ray_length)
-                        temp_fetch_rays_layer.CreateFeature(ray_feature)
-                elif intersection_ray.geom_type == "MultiLineString":
-                    # the first line segment is the originating ray
-                    if (intersection_ray.geoms[0].coords[0] ==
-                            ray_shapely.coords[0]):
-                        ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                        ray_feature.SetGeometry(
-                            ogr.CreateGeometryFromWkt(
-                                intersection_ray.geoms[0].wkt))
-                        ray_length = intersection_ray.geoms[0].length
-                        ray_feature.SetField('fetch_dist', ray_length)
-                        temp_fetch_rays_layer.CreateFeature(ray_feature)
+            elif not landmass_shapely_prep.intersects(
+                    shapely.geometry.Point(point_a_x, point_a_y)):
+                ray_length = ray_shapely.length
+                min_point = ray_shapely.coords[1]
+                for poly_line in polygon_line_rtree.intersection(
+                        ray_shapely.bounds, objects=True):
+                    if ray_shapely.intersects(poly_line.object):
+                        intersection_point = ray_shapely.intersection(
+                            poly_line.object)
+                        LOGGER.debug(poly_line.object)
+                        intersection_distance = intersection_point.distance(
+                            shapely.geometry.Point(ray_shapely.coords[0]))
+                        if intersection_distance < ray_length:
+                            ray_length = intersection_distance
+                            min_point = intersection_point
+                    intersection_ray = shapely.geometry.LineString(
+                        [ray_shapely.coords[0], min_point])
+                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                    ray_feature.SetField(
+                        'fetch_dist', ray_length)
+                    ray_feature.SetGeometry(
+                        ogr.CreateGeometryFromWkt(intersection_ray.wkt))
+                    temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
             rei_value += ray_length * rei_pct * rei_v
         shore_point_feature.SetField('REI', rei_value)
@@ -1005,6 +1011,30 @@ def merge_vectors(
     target_layer = None
     target_vector = None
 
+
+def geometry_to_lines(geometry):
+    if geometry.type == 'Polygon':
+        return polygon_to_lines(geometry)
+    elif geometry.type == 'MultiPolygon':
+        line_list = []
+        for geom in geometry.geoms:
+            line_list.extend(geometry_to_lines(geom))
+        return line_list
+
+
+def polygon_to_lines(geometry):
+    """Return a list of shapely lines given higher order shapely geometry."""
+    #print geometry.exterior.coords[0]
+    last_point = geometry.exterior.coords[0]
+    line_list = []
+    for point in geometry.exterior.coords[1::]:
+        if point == last_point:
+            continue
+        line_list.append(shapely.geometry.LineString([last_point, point]))
+        last_point = point
+    line_list.append(shapely.geometry.LineString([
+        last_point, geometry.exterior.coords[0]]))
+    return line_list
 
 if __name__ == '__main__':
     main()
