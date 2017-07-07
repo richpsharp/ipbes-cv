@@ -108,7 +108,7 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in [0,1]:#xrange(grid_count):
+    for grid_id in [3]:#xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
