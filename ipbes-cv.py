@@ -105,7 +105,7 @@ def main():
     global_grid_layer = None
     global_grid_vector = None
 
-    for grid_id in [3]:#xrange(grid_count):
+    for grid_id in [304]:#xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -602,6 +602,7 @@ def _create_shore_points(
     wwiii_rtree_base_path = os.path.splitext(
         wwiii_rtree_path)[0]
     wwiii_rtree = rtree.index.Index(wwiii_rtree_base_path)
+    wwiii_field_lookup = {}
 
     LOGGER.info(
         "Interpolating shore points with Wave Watch III data for grid %s",
@@ -627,7 +628,7 @@ def _create_shore_points(
             shore_point_geometry.AddPoint(x_coord, y_coord)
             shore_point_geometry.Transform(utm_to_base_transform)
             # make sure shore point is within the bounding box of the gri
-            if grid_geometry_ref.Intersects(shore_point_geometry):
+            if grid_geometry_ref.Contains(shore_point_geometry):
                 shore_point_feature = ogr.Feature(target_shore_point_defn)
                 shore_point_feature.SetGeometry(shore_point_geometry)
 
@@ -646,9 +647,13 @@ def _create_shore_points(
                     wwiii_geometry = wwiii_feature.GetGeometryRef()
                     wwiii_points[fid_index] = numpy.array(
                         [wwiii_geometry.GetX(), wwiii_geometry.GetY()])
-                    wwiii_values[fid_index] = numpy.array(
-                        [float(wwiii_feature.GetField(field_name))
-                         for field_name in field_names])
+                    try:
+                        wwiii_values[fid_index] = wwiii_field_lookup[fid]
+                    except KeyError:
+                        wwiii_field_lookup[fid] = numpy.array(
+                            [float(wwiii_feature.GetField(field_name))
+                             for field_name in field_names])
+                        wwiii_values[fid_index] = wwiii_field_lookup[fid]
 
                 distance = numpy.linalg.norm(
                     wwiii_points - numpy.array(
