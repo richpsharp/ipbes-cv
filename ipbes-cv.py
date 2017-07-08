@@ -108,7 +108,7 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in [3]:#xrange(grid_count):
+    for grid_id in [2]:#xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -430,7 +430,6 @@ def _calculate_wind_exposure(
             ray_point_origin_shapely = shapely.geometry.Point(
                 point_a_x, point_a_y)
             ray_shapely = shapely.wkb.loads(ray_geometry.ExportToWkb())
-            ray_length = 0.0
 
             # by experimentation I've found the constant 10 below is
             #an effective division for minimizing the intersection query space
@@ -440,25 +439,13 @@ def _calculate_wind_exposure(
                         math.cos(cartesian_theta * math.pi / 180) *
                         math.sin(cartesian_theta * math.pi / 180)) *
                     10 + .5))
-            seg_x_len = float(
-                ray_shapely.bounds[2] -
-                ray_shapely.bounds[0]) / n_ray_segments
-            seg_y_len = float(
-                ray_shapely.bounds[3] -
-                ray_shapely.bounds[1]) / n_ray_segments
+            seg_x_len = abs(point_a_x - point_b_x) / n_ray_segments
+            seg_y_len = abs(point_a_y - point_b_y) / n_ray_segments
 
-            if not landmass_shapely_prep.intersects(ray_shapely):
-                # this is the case where the ray doesn't intersect land
-                # make it maximum length
-                ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                ray_feature.SetGeometry(ray_geometry)
-                ray_feature.SetField(
-                    'fetch_dist', ray_shapely.length)
-                ray_length = ray_shapely.length + smallest_feature_size
-                temp_fetch_rays_layer.CreateFeature(ray_feature)
-            elif not landmass_shapely_prep.intersects(
+            ray_length = 0.0
+            if not landmass_shapely_prep.intersects(
                     ray_point_origin_shapely):
-                # the ray intersects land but the origin is in ocean
+                # the origin is in ocean
                 ray_length = ray_shapely.length
                 min_point = ogr.Geometry(ogr.wkbPoint)
                 min_point.AddPoint(point_b_x, point_b_y)
