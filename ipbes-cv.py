@@ -347,15 +347,20 @@ def _calculate_wind_exposure(
 
     polygon_line_rtree = rtree.index.Index()
     polygon_line_index = []
-    for line_id, line in enumerate(geometry_to_lines(landmass_shapely)):
+    line_id = 0
+    for line in geometry_to_lines(landmass_shapely):
         segment_feature = ogr.Feature(temp_polygon_segments_defn)
         segement_geometry = ogr.Geometry(ogr.wkbLineString)
         segement_geometry.AddPoint(*line.coords[0])
         segement_geometry.AddPoint(*line.coords[1])
         segment_feature.SetGeometry(segement_geometry)
         temp_polygon_segments_layer.CreateFeature(segment_feature)
+
+        if (line.bounds[0] == line.bounds[2] and
+                line.bounds[1] == line.bounds[3]):
+            continue
         polygon_line_rtree.insert(line_id, line.bounds)
-        # can we append an ogr.geometry?
+        line_id += 1
         polygon_line_index.append(segement_geometry)
 
     temp_polygon_segments_layer.SyncToDisk()
@@ -435,7 +440,7 @@ def _calculate_wind_exposure(
                     abs(
                         math.cos(cartesian_theta * math.pi / 180) *
                         math.sin(cartesian_theta * math.pi / 180)) *
-                    5 + .5))
+                    10 + .5))
             seg_x_len = float(
                 ray_shapely.bounds[2] -
                 ray_shapely.bounds[0]) / n_ray_segments
