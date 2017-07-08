@@ -426,6 +426,23 @@ def _calculate_wind_exposure(
                 point_a_x, point_a_y)
             ray_shapely = shapely.wkb.loads(ray_geometry.ExportToWkb())
             ray_length = 0.0
+
+            # by experimentation I've found subdividing the ray into a maximum
+            # of 5 segments when it's diagonal is an effective division for
+            # minimizing the intersection query space
+            n_ray_segments = int(
+                math.ceil(
+                    abs(
+                        math.cos(cartesian_theta * math.pi / 180) *
+                        math.sin(cartesian_theta * math.pi / 180)) *
+                    5 + .5))
+            seg_x_len = float(
+                ray_shapely.bounds[2] -
+                ray_shapely.bounds[0]) / n_ray_segments
+            seg_y_len = float(
+                ray_shapely.bounds[3] -
+                ray_shapely.bounds[1]) / n_ray_segments
+
             if not landmass_shapely_prep.intersects(ray_shapely):
                 # this is the case where the ray doesn't intersect land
                 # make it maximum length
@@ -444,8 +461,19 @@ def _calculate_wind_exposure(
 
                 # consider all the poly lines's bounding boxes that intersect
                 # the ray's bounding box
-                for poly_line_index in polygon_line_rtree.intersection(
-                        ray_shapely.bounds):
+                possible_ids = [
+                    polygon_line_rtree.intersection(
+                        (point_a_x + seg_x_len * seg_index,
+                         point_a_y + seg_y_len * seg_index,
+                         point_a_x + seg_x_len * (seg_index+1),
+                         point_a_y + seg_y_len * (seg_index+1)))
+                    for seg_index in xrange(n_ray_segments)]
+
+                for poly_line_index in set([
+                        item for sublist in possible_ids
+                        for item in sublist]):
+                #for poly_line_index in polygon_line_rtree.intersection(
+                #        ray_shapely.bounds):
                     poly_line = polygon_line_index[poly_line_index]
                     if ray_geometry.Intersects(poly_line):
                         # if the ray intersects the poly line, test to see if
