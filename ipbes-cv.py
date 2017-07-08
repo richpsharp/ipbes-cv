@@ -432,9 +432,8 @@ def _calculate_wind_exposure(
             ray_shapely = shapely.wkb.loads(ray_geometry.ExportToWkb())
             ray_length = 0.0
 
-            # by experimentation I've found subdividing the ray into a maximum
-            # of 5 segments when it's diagonal is an effective division for
-            # minimizing the intersection query space
+            # by experimentation I've found the constant 10 below is
+            #an effective division for minimizing the intersection query space
             n_ray_segments = int(
                 math.ceil(
                     abs(
