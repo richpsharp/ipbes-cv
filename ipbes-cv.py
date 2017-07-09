@@ -109,7 +109,7 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in [2]:#xrange(grid_count):
+    for grid_id in xrange(grid_count):
         LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -130,18 +130,13 @@ def main():
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        _calculate_wind_exposure(
-            grid_point_path, landmass_bounding_rtree_path,
-            simplified_vector_path, wind_exposure_workspace,
-            _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
-            target_wind_exposure_point_path)
-        #wind_exposure_task = task_graph.add_task(
-        #    target=_calculate_wind_exposure, args=(
-        #        grid_point_path, landmass_bounding_rtree_path,
-        #        simplified_vector_path, wind_exposure_workspace,
-        #        _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
-        #        target_wind_exposure_point_path),
-        #    dependent_task_list=[create_shore_points_task])
+        wind_exposure_task = task_graph.add_task(
+            target=_calculate_wind_exposure, args=(
+                grid_point_path, landmass_bounding_rtree_path,
+                simplified_vector_path, wind_exposure_workspace,
+                _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
+                target_wind_exposure_point_path),
+            dependent_task_list=[create_shore_points_task])
         wind_exposure_task_list.append(
             wind_exposure_task)
         local_rei_point_path_list.append(
@@ -204,7 +199,7 @@ def simplify_geometry(
     target_simplified_layer = None
     target_simplified_vector = None
 
-@profile
+
 def _calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
@@ -387,7 +382,7 @@ def _calculate_wind_exposure(
     target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
 
     n_fetch_rays = 16
-    shore_point_logger = _make_logger_callback("Shore point %.2f%% complete.")
+    shore_point_logger = _make_logger_callback("Wind exposure %.2f%% complete.")
     # Iterate over every shore point
     for shore_point_feature in target_shore_point_layer:
         shore_point_logger(
@@ -456,7 +451,8 @@ def _calculate_wind_exposure(
                 intersection_ray.AddPoint(*ray_shapely.coords[0])
                 intersection_ray.AddPoint(*ray_shapely.coords[1])
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                ray_feature.SetField('fetch_dist', ray_shapely.length)
+                ray_length = ray_shapely.length
+                ray_feature.SetField('fetch_dist', ray_length)
                 ray_feature.SetGeometry(intersection_ray)
                 temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
