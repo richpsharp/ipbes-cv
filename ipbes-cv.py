@@ -431,22 +431,6 @@ def _calculate_wind_exposure(
                 point_a_x, point_a_y)
             ray_shapely = shapely.wkb.loads(ray_geometry.ExportToWkb())
 
-            # by experimentation I've found the constant 10 below is
-            #an effective division for minimizing the intersection query space
-            n_ray_segments = int(abs(
-                math.cos(cartesian_theta * math.pi / 180) *
-                math.sin(cartesian_theta * math.pi / 180)) * 10 + 0.5) + 1
-            left, bottom, right, top = ray_shapely.bounds
-            seg_x_len = (right - left) / n_ray_segments
-            seg_y_len = (top - bottom) / n_ray_segments
-
-            # depending on the slope of the line we might intersect in
-            # a different diagonal
-            try:
-                slope = (point_b_y - point_a_y) / (point_b_x - point_a_x)
-            except ZeroDivisionError:
-                slope = 0
-
             ray_length = 0.0
             if not landmass_shapely_prep.intersects(
                     ray_point_origin_shapely):
@@ -455,57 +439,8 @@ def _calculate_wind_exposure(
                 min_point = ogr.Geometry(ogr.wkbPoint)
                 min_point.AddPoint(point_b_x, point_b_y)
 
-                # consider all the poly lines' bounding boxes that intersect
-                # the ray's bounding box
-                # TODO: WHY DOESN'T THIS WORK WHEN I BREAK INTO SEGMENTS?
-                if slope > 0:
-                    bounding_box_list = [
-                        (left + seg_x_len * (seg_index-0.0),
-                         bottom + seg_y_len * (seg_index-0.0),
-                         left + seg_x_len * (seg_index+1.0),
-                         bottom + seg_y_len * (seg_index+1.0))
-                        for seg_index in xrange(n_ray_segments)]
-                else:
-                    bounding_box_list = [
-                        (left + seg_x_len * (n_ray_segments-1-seg_index-0.0),
-                         bottom + seg_y_len * (seg_index-0.0),
-                         left + seg_x_len * (n_ray_segments-1-seg_index+1.0),
-                         bottom + seg_y_len * (seg_index+1.0))
-                        for seg_index in xrange(n_ray_segments)]
-
-                #for bounding_box in bounding_box_list:
-                #    intersection_ray = ogr.Geometry(ogr.wkbLineString)
-                #    intersection_ray.AddPoint(float(bounding_box[0]), float(bounding_box[1]))
-                #    intersection_ray.AddPoint(float(bounding_box[2]), float(bounding_box[1]))
-                #    intersection_ray.AddPoint(float(bounding_box[2]), float(bounding_box[3]))
-                #    intersection_ray.AddPoint(float(bounding_box[0]), float(bounding_box[3]))
-                #    intersection_ray.AddPoint(float(bounding_box[0]), float(bounding_box[1]))
-                #    ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                #    ray_feature.SetGeometry(intersection_ray)
-                #    temp_fetch_rays_layer.CreateFeature(ray_feature)
-
-                #intersection_ray = ogr.Geometry(ogr.wkbLineString)
-                #intersection_ray.AddPoint(point_a_x, point_a_y)
-                #intersection_ray.AddPoint(point_b_x, point_b_y)
-                #ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                #ray_feature.SetField('fetch_dist', ray_length)
-                #ray_feature.SetGeometry(intersection_ray)
-                #temp_fetch_rays_layer.CreateFeature(ray_feature)
-
-                possible_ids = [
-                    polygon_line_rtree.intersection(
-                        bounding_box) for bounding_box in bounding_box_list]
-                #possible_ids = [
-                #    polygon_line_rtree.intersection(
-                #        (left,
-                #         bottom,
-                #         left + seg_x_len * (n_ray_segments),
-                #         bottom + seg_y_len * (n_ray_segments)))]
-                for poly_line_index in set([
-                        item for sublist in possible_ids
-                        for item in sublist]):
-                #for poly_line_index in polygon_line_rtree.intersection(
-                #        ray_shapely.bounds):
+                for poly_line_index in polygon_line_rtree.intersection(
+                        ray_shapely.bounds):
                     poly_line = polygon_line_index[poly_line_index]
                     if ray_geometry.Intersects(poly_line):
                         # if the ray intersects the poly line, test to see if
@@ -536,7 +471,6 @@ def _calculate_wind_exposure(
             rei_value += ray_length * rei_pct * rei_v
         shore_point_feature.SetField('REI', rei_value)
         target_shore_point_layer.SetFeature(shore_point_feature)
-        #return
 
     target_shore_point_layer.SyncToDisk()
     target_shore_point_layer = None
