@@ -109,7 +109,7 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in [3]:#xrange(grid_count):
+    for grid_id in [2]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -432,9 +432,9 @@ def calculate_wind_exposure(
             # with it and the entire landmass
             ray_point_origin_shapely = shapely.geometry.Point(
                 point_a_x, point_a_y)
-            ray_shapely = shapely.geometry.LineString(
-                [(point_a_x, point_a_y), (point_b_x, point_b_y)])
-            ray_shapely_prepared = shapely.prepared.prep(ray_shapely)
+            #ray_shapely = shapely.geometry.LineString(
+            #    [(point_a_x, point_a_y), (point_b_x, point_b_y)])
+            #ray_shapely_prepared = shapely.prepared.prep(ray_shapely)
 
             ray_length = 0.0
             if not landmass_shapely_prep.intersects(
@@ -450,40 +450,45 @@ def calculate_wind_exposure(
                 # complexity
                 tested_indexes = set()
                 while True:
-                    poly_line_index_set = set(
-                        polygon_line_rtree.intersection(
-                            ray_shapely.bounds)).difference(tested_indexes)
                     intersection = False
-                    for poly_line_index in poly_line_index_set:
+                    ray_envelope = ray_geometry.GetEnvelope()
+                    for poly_line_index in polygon_line_rtree.intersection(
+                            [ray_envelope[i] for i in [0, 2, 1, 3]]):
+                        if poly_line_index in tested_indexes:
+                            continue
                         tested_indexes.add(poly_line_index)
-                        shapely_line_segment = (
-                            shapely_line_index[poly_line_index])
-                        if ray_shapely_prepared.intersects(
-                                shapely_line_segment):
+                        line_segment = (
+                            polygon_line_index[poly_line_index])
+                        if ray_geometry.Intersects(line_segment):
                             # if the ray intersects the poly line, test if
                             # the intersection is closer than any known
                             # intersection so far
-                            intersection_point = ray_shapely.intersection(
-                                shapely_line_segment)
+                            intersection_point = ray_geometry.Intersection(
+                                line_segment)
                             # offset the dist with smallest_feature_size
                             # update the endpoint of the ray
-                            ray_shapely = shapely.geometry.LineString(
-                                [ray_point_origin_shapely, intersection_point])
-                            ray_shapely_prepared = shapely.prepared.prep(
-                                ray_shapely)
+                            ray_geometry = ogr.Geometry(ogr.wkbLineString)
+                            ray_geometry.AddPoint(point_a_x, point_a_y)
+                            ray_geometry.AddPoint(
+                                intersection_point.GetX(),
+                                intersection_point.GetY())
+                            #ray_shapely = shapely.geometry.LineString(
+                            #    [ray_point_origin_shapely, intersection_point])
+                            #ray_shapely_prepared = shapely.prepared.prep(
+                            #    ray_shapely)
                             intersection = True
                             break
                     if not intersection:
                         break
                 # when we get here `min_point` and `ray_length` are the
                 # minimum intersection points for the ray and the landmass
-                intersection_ray = ogr.Geometry(ogr.wkbLineString)
-                intersection_ray.AddPoint(*ray_shapely.coords[0])
-                intersection_ray.AddPoint(*ray_shapely.coords[1])
+                #intersection_ray = ogr.Geometry(ogr.wkbLineString)
+                #intersection_ray.AddPoint(*ray_shapely.coords[0])
+                #intersection_ray.AddPoint(*ray_shapely.coords[1])
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                ray_length = ray_shapely.length
+                ray_length = ray_geometry.Length()
                 ray_feature.SetField('fetch_dist', ray_length)
-                ray_feature.SetGeometry(intersection_ray)
+                ray_feature.SetGeometry(ray_geometry)
                 temp_fetch_rays_layer.CreateFeature(ray_feature)
             ray_feature = None
             ray_geometry = None
