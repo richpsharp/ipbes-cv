@@ -15,6 +15,7 @@ import shapely
 import shapely.wkb
 import shapely.ops
 import pygeoprocessing
+import shapely.speedups
 
 import Task
 
@@ -347,6 +348,7 @@ def _calculate_wind_exposure(
 
     polygon_line_rtree = rtree.index.Index()
     polygon_line_index = []
+    shapely_line_index = []
     line_id = 0
     for line in geometry_to_lines(landmass_shapely):
         segment_feature = ogr.Feature(temp_polygon_segments_defn)
@@ -362,6 +364,8 @@ def _calculate_wind_exposure(
         polygon_line_rtree.insert(line_id, line.bounds)
         line_id += 1
         polygon_line_index.append(segement_geometry)
+        shapely_line_index.append(shapely.wkb.loads(
+            segement_geometry.ExportToWkb()))
 
     temp_polygon_segments_layer.SyncToDisk()
     temp_polygon_segments_layer = None
@@ -430,6 +434,7 @@ def _calculate_wind_exposure(
             ray_point_origin_shapely = shapely.geometry.Point(
                 point_a_x, point_a_y)
             ray_shapely = shapely.wkb.loads(ray_geometry.ExportToWkb())
+            ray_shapely_prepared = shapely.prepared.prep(ray_shapely)
 
             ray_length = 0.0
             if not landmass_shapely_prep.intersects(
@@ -441,13 +446,13 @@ def _calculate_wind_exposure(
 
                 for poly_line_index in polygon_line_rtree.intersection(
                         ray_shapely.bounds):
-                    poly_line = polygon_line_index[poly_line_index]
-                    if ray_geometry.Intersects(poly_line):
+                    if ray_shapely_prepared.intersects(
+                            shapely_line_index[poly_line_index]):
                         # if the ray intersects the poly line, test to see if
                         # the intersection is closer than any known
                         # intersection so far
                         intersection_point = ray_geometry.Intersection(
-                            poly_line)
+                            polygon_line_index[poly_line_index])
                         # offset the dist with smallest_feature_size
                         intersection_distance = (
                             smallest_feature_size +
