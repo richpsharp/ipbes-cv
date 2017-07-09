@@ -14,15 +14,14 @@ import rtree
 import shapely
 import shapely.wkb
 import shapely.ops
-import pygeoprocessing
 import shapely.speedups
+import pygeoprocessing
 
 import Task
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
-LOGGER = logging.getLogger('ipbes-cv')
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
@@ -60,6 +59,7 @@ _MAX_FETCH_DISTANCE = 60000
 
 def main():
     """Entry point."""
+    logger = logging.getLogger('ipbes-cv.main')
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
@@ -70,7 +70,7 @@ def main():
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
 
     build_wwiii_task = task_graph.add_task(
-        target=_build_wwiii_rtree, args=(
+        target=build_wwiii_rtree, args=(
             _GLOBAL_WWIII_PATH, wwiii_rtree_path))
 
     simplified_vector_path = os.path.join(
@@ -86,7 +86,7 @@ def main():
         _TARGET_WORKSPACE, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
 
     build_rtree_task = task_graph.add_task(
-        target=_build_feature_bounding_box_rtree,
+        target=build_feature_bounding_box_rtree,
         args=(simplified_vector_path, landmass_bounding_rtree_path),
         dependent_task_list=[simplify_geometry_task])
 
@@ -94,7 +94,7 @@ def main():
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
 
     grid_edges_of_vector_task = task_graph.add_task(
-        target=_grid_edges_of_vector, args=(
+        target=grid_edges_of_vector, args=(
             _GLOBAL_BOUNDING_BOX_WGS84, simplified_vector_path,
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
@@ -109,8 +109,8 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in xrange(grid_count):
-        LOGGER.info("Calculating grid %d of %d", grid_id, grid_count)
+    for grid_id in xrange(1000, grid_count): #xrange(grid_count):
+        logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
@@ -118,7 +118,7 @@ def main():
             shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
 
         create_shore_points_task = task_graph.add_task(
-            target=_create_shore_points, args=(
+            target=create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
@@ -131,7 +131,7 @@ def main():
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         wind_exposure_task = task_graph.add_task(
-            target=_calculate_wind_exposure, args=(
+            target=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
                 simplified_vector_path, wind_exposure_workspace,
                 _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
@@ -171,6 +171,7 @@ def simplify_geometry(
     Returns:
         None
     """
+    logger = logging.getLogger('ipbes-cv.simplify_geometry')
     base_vector = ogr.Open(base_vector_path)
     base_layer = base_vector.GetLayer()
 
@@ -200,7 +201,7 @@ def simplify_geometry(
     target_simplified_vector = None
 
 
-def _calculate_wind_exposure(
+def calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
         smallest_feature_size, max_fetch_distance,
@@ -227,6 +228,7 @@ def _calculate_wind_exposure(
     Returns:
         None
     """
+    logger = logging.getLogger('ipbes-cv.calculate_wind_exposure')
     if os.path.exists(workspace_dir):
         shutil.rmtree(workspace_dir)
     os.makedirs(workspace_dir)
@@ -240,7 +242,7 @@ def _calculate_wind_exposure(
     base_shore_info = pygeoprocessing.get_vector_info(
         base_shore_point_vector_path)
 
-    utm_spatial_reference = _get_utm_spatial_reference(
+    utm_spatial_reference = get_utm_spatial_reference(
         base_shore_info['bounding_box'])
     base_spatial_reference = osr.SpatialReference()
     base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
@@ -301,14 +303,14 @@ def _calculate_wind_exposure(
             temp_clipped_layer.CreateFeature(clipped_feature)
             clipped_feature = None
         except Exception:
-            LOGGER.warn(
+            logger.warn(
                 "Couldn't process this intersection %s", intersection_shapely)
     temp_clipped_layer.SyncToDisk()
     temp_clipped_layer = None
     temp_clipped_vector = None
 
     # project global clipped polygons to UTM
-    LOGGER.debug("reprojecting grid %s", base_shore_point_vector_path)
+    logger.debug("reprojecting grid %s", base_shore_point_vector_path)
     pygeoprocessing.reproject_vector(
         temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
         utm_clipped_vector_path)
@@ -382,7 +384,8 @@ def _calculate_wind_exposure(
     target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
 
     n_fetch_rays = 16
-    shore_point_logger = _make_logger_callback("Wind exposure %.2f%% complete.")
+    shore_point_logger = _make_logger_callback(
+        "Wind exposure %.2f%% complete.", logger)
     # Iterate over every shore point
     for shore_point_feature in target_shore_point_layer:
         shore_point_logger(
@@ -470,7 +473,7 @@ def _calculate_wind_exposure(
     temp_fetch_rays_vector = None
 
 
-def _create_shore_points(
+def create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
         smallest_feature_size,
@@ -502,7 +505,8 @@ def _create_shore_points(
     Returns:
         None.
     """
-    LOGGER.info("Creating shore points for grid %s", grid_id)
+    logger = logging.getLogger('ipbes-cv.create_shore_points')
+    logger.info("Creating shore points for grid %s", grid_id)
     # create the spatial reference from the base vector
     landmass_spatial_reference = osr.SpatialReference()
     landmass_spatial_reference.ImportFromWkt(
@@ -575,7 +579,7 @@ def _create_shore_points(
 
     # project global polygon clip to UTM
     # transform lat/lng box to utm -> local box
-    utm_spatial_reference = _get_utm_spatial_reference(grid_shapely.bounds)
+    utm_spatial_reference = get_utm_spatial_reference(grid_shapely.bounds)
     utm_bounding_box = pygeoprocessing.transform_bounding_box(
         grid_shapely.bounds, landmass_spatial_reference.ExportToWkt(),
         utm_spatial_reference.ExportToWkt(), edge_samples=11)
@@ -594,7 +598,7 @@ def _create_shore_points(
     lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
     # clip global polygon to utm clipping box
-    LOGGER.info(
+    logger.info(
         "clip global polygon to utm clipping box for grid %s", grid_id)
     for feature_id in landmass_vector_rtree.intersection(
             lat_lng_clipping_box):
@@ -613,7 +617,7 @@ def _create_shore_points(
             target_feature = None
             target_geometry = None
         except Exception:
-            LOGGER.warn(
+            logger.warn(
                 "Couldn't process this intersection %s",
                 intersection_shapely)
     lat_lng_clipped_layer.SyncToDisk()
@@ -638,7 +642,7 @@ def _create_shore_points(
         utm_clipped_vector_path, grid_raster_path, [1], None)
 
     # grid shoreline from raster
-    _make_shore_kernel(shore_kernel_path)
+    make_shore_kernel(shore_kernel_path)
     pygeoprocessing.convolve_2d(
         (grid_raster_path, 1), (shore_kernel_path, 1),
         convolution_raster_path, target_datatype=gdal.GDT_Byte)
@@ -675,7 +679,7 @@ def _create_shore_points(
     wwiii_rtree = rtree.index.Index(wwiii_rtree_base_path)
     wwiii_field_lookup = {}
 
-    LOGGER.info(
+    logger.info(
         "Interpolating shore points with Wave Watch III data for grid %s",
         grid_id)
     feature_lookup = {}
@@ -741,10 +745,10 @@ def _create_shore_points(
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
     del feature_lookup
-    LOGGER.info("All done with shore points for grid %s", grid_id)
+    logger.info("All done with shore points for grid %s", grid_id)
 
 
-def _grid_edges_of_vector(
+def grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
         target_grid_size):
@@ -767,7 +771,8 @@ def _grid_edges_of_vector(
         done_token_path (string): path to a file to create when the function
             is complete.
     """
-    LOGGER.info("Building global grid.")
+    logger = logging.getLogger('ipbes-cv.grid_edges_of_vector')
+    logger.info("Building global grid.")
     n_rows = int((
         base_bounding_box[3]-base_bounding_box[1]) / float(
             target_grid_size))
@@ -804,7 +809,7 @@ def _grid_edges_of_vector(
         os.path.splitext(base_feature_bounding_box_rtree_path)[0])
 
     logger_callback = _make_logger_callback(
-        'Cell coverage %.2f%% complete')
+        'Cell coverage %.2f%% complete', logger)
 
     prepared_geometry = {}
     for cell_index in xrange(n_rows * n_cols):
@@ -858,7 +863,7 @@ def _grid_edges_of_vector(
     target_grid_vector = None
 
 
-def _get_utm_spatial_reference(bounding_box):
+def get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
 
     Parameter:
@@ -885,7 +890,7 @@ def _get_utm_spatial_reference(bounding_box):
     return utm_sr
 
 
-def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
+def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     """Builds an r-tree index of the global feature envelopes.
 
     Parameter:
@@ -899,9 +904,10 @@ def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     # the input path has a .dat extension, but the `rtree` package only uses
     # the basename.  It's a quirk of the library, so we'll deal with it by
     # cutting off the extension.
+    logger = logging.getLogger('ipbes-cv.build_feature_bounding_box_rtree')
     global_feature_index_base = os.path.splitext(
         target_rtree_path)[0]
-    LOGGER.info("Building rtree index at %s", global_feature_index_base)
+    logger.info("Building rtree index at %s", global_feature_index_base)
     if os.path.exists(target_rtree_path):
         raise ValueError("rtree storage path %s already exists.")
     global_feature_index = rtree.index.Index(global_feature_index_base)
@@ -911,7 +917,7 @@ def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     n_features = global_layer.GetFeatureCount()
 
     logger_callback = _make_logger_callback(
-        'rTree construction %.2f%% complete')
+        'rTree construction %.2f%% complete', logger)
 
     for feature_index, global_feature in enumerate(global_layer):
         feature_geometry = global_feature.GetGeometryRef()
@@ -926,7 +932,7 @@ def _build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     global_feature_index.close()
 
 
-def _make_shore_kernel(kernel_path):
+def make_shore_kernel(kernel_path):
     """Make a 3x3 raster with a 9 in the middle and 1s on the outside."""
     driver = gdal.GetDriverByName('GTiff')
     kernel_raster = driver.Create(
@@ -945,7 +951,7 @@ def _make_shore_kernel(kernel_path):
     kernel_band.WriteArray(numpy.array([[1, 1, 1], [1, 9, 1], [1, 1, 1]]))
 
 
-def _make_logger_callback(message):
+def _make_logger_callback(message, logger):
     """Build a timed logger callback that prints `message` replaced.
 
     Parameters:
@@ -963,7 +969,7 @@ def _make_logger_callback(message):
             if ((current_time - logger_callback.last_time) > 5.0 or
                     (proportion_complete == 1.0 and
                      logger_callback.total_time >= 5.0)):
-                LOGGER.info(message, proportion_complete * 100)
+                logger.info(message, proportion_complete * 100)
                 logger_callback.last_time = current_time
                 logger_callback.total_time += current_time
         except AttributeError:
@@ -973,7 +979,7 @@ def _make_logger_callback(message):
     return logger_callback
 
 
-def _build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
+def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     """Build RTree indexed by FID for points in `wwwiii_vector_path`."""
     wwiii_rtree = rtree.index.Index(os.path.splitext(wwiii_rtree_path)[0])
 
