@@ -53,6 +53,10 @@ _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
+_WIND_EXPOSURE_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'wind_exposure_workspaces')
+_GRID_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'grid_workspaces')
 
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
@@ -111,19 +115,13 @@ def main():
     local_rei_point_path_list = []
     wind_exposure_task_list = []
     local_fetch_ray_path_list = []
-    for grid_id in [28]:#xrange(grid_count):
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
-            _TARGET_WORKSPACE, 'grid_%d' % grid_id)
+            _GRID_WORKSPACES, 'grid_%d' % grid_id)
         grid_point_path = os.path.join(
             shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
-
-        create_shore_points(
-            global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
-            simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
-            _SMALLEST_FEATURE_SIZE, shore_points_workspace,
-            grid_point_path)
 
         create_shore_points_task = task_graph.add_task(
             target=create_shore_points, args=(
@@ -134,7 +132,7 @@ def main():
             dependent_task_list=[grid_edges_of_vector_task, build_wwiii_task])
 
         wind_exposure_workspace = os.path.join(
-            _TARGET_WORKSPACE, 'wind_exposure_%d' % grid_id)
+            _WIND_EXPOSURE_WORKSPACES, 'wind_exposure_%d' % grid_id)
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
