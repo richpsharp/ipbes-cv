@@ -109,7 +109,7 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in xrange(1000, grid_count): #xrange(grid_count):
+    for grid_id in [3]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -130,6 +130,12 @@ def main():
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+        calculate_wind_exposure(
+            grid_point_path, landmass_bounding_rtree_path,
+            simplified_vector_path, wind_exposure_workspace,
+            _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
+            target_wind_exposure_point_path)
+        return
         wind_exposure_task = task_graph.add_task(
             target=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
@@ -201,6 +207,7 @@ def simplify_geometry(
     target_simplified_vector = None
 
 
+@profile
 def calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
@@ -433,21 +440,41 @@ def calculate_wind_exposure(
             if not landmass_shapely_prep.intersects(
                     ray_point_origin_shapely):
                 # the origin is in ocean
-                for poly_line_index in polygon_line_rtree.intersection(
-                        ray_shapely.bounds):
-                    shapely_line_segment = shapely_line_index[poly_line_index]
-                    if ray_shapely_prepared.intersects(shapely_line_segment):
-                        # if the ray intersects the poly line, test to see if
-                        # the intersection is closer than any known
-                        # intersection so far
-                        intersection_point = ray_shapely.intersection(
-                            shapely_line_segment)
-                        # offset the dist with smallest_feature_size
-                        # update the endpoint of the ray
-                        ray_shapely = shapely.geometry.LineString(
-                            [ray_point_origin_shapely, intersection_point])
-                        ray_shapely_prepared = shapely.prepared.prep(
-                            ray_shapely)
+
+                # This algorithm searches for intersections, if one is found
+                # the ray updates and a smaller intersection set is determined
+                # by experimentation I've found this is significant, but not
+                # an order of magnitude, faster than looping through all
+                # original possible intersections.  Since this algorithm
+                # will be run for a long time, it's worth the additional
+                # complexity
+                tested_indexes = set()
+                while True:
+                    poly_line_index_set = set(
+                        polygon_line_rtree.intersection(
+                            ray_shapely.bounds)).difference(tested_indexes)
+                    intersection = False
+                    for poly_line_index in poly_line_index_set:
+                        tested_indexes.add(poly_line_index)
+                        shapely_line_segment = (
+                            shapely_line_index[poly_line_index])
+                        if ray_shapely_prepared.intersects(
+                                shapely_line_segment):
+                            # if the ray intersects the poly line, test if
+                            # the intersection is closer than any known
+                            # intersection so far
+                            intersection_point = ray_shapely.intersection(
+                                shapely_line_segment)
+                            # offset the dist with smallest_feature_size
+                            # update the endpoint of the ray
+                            ray_shapely = shapely.geometry.LineString(
+                                [ray_point_origin_shapely, intersection_point])
+                            ray_shapely_prepared = shapely.prepared.prep(
+                                ray_shapely)
+                            intersection = True
+                            break
+                    if not intersection:
+                        break
                 # when we get here `min_point` and `ray_length` are the
                 # minimum intersection points for the ray and the landmass
                 intersection_ray = ogr.Geometry(ogr.wkbLineString)
