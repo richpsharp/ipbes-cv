@@ -426,8 +426,8 @@ def _calculate_wind_exposure(
             # keep the origin point in a geometry object so we can determine
             # the distance between the ray origin and the intersection point
             # with ogr geometry
-            ray_point_origin_geometry = ogr.Geometry(ogr.wkbPoint)
-            ray_point_origin_geometry.AddPoint(point_a_x, point_a_y)
+            ray_point_origin_geometry = shapely.geometry.Point(
+                point_a_x, point_a_y)
 
             # keep a shapely version of the ray so we can do fast intersection
             # with it and the entire landmass
@@ -441,31 +441,36 @@ def _calculate_wind_exposure(
                     ray_point_origin_shapely):
                 # the origin is in ocean
                 ray_length = ray_shapely.length
-                min_point = ogr.Geometry(ogr.wkbPoint)
-                min_point.AddPoint(point_b_x, point_b_y)
+                min_point = shapely.geometry.Point(*ray_shapely.coords[1])
 
                 for poly_line_index in polygon_line_rtree.intersection(
                         ray_shapely.bounds):
-                    if ray_shapely_prepared.intersects(
-                            shapely_line_index[poly_line_index]):
+                    shapely_line_segment = shapely_line_index[poly_line_index]
+                    if ray_shapely_prepared.intersects(shapely_line_segment):
                         # if the ray intersects the poly line, test to see if
                         # the intersection is closer than any known
                         # intersection so far
-                        intersection_point = ray_geometry.Intersection(
-                            polygon_line_index[poly_line_index])
+                        intersection_point = ray_shapely.intersection(
+                            shapely_line_segment)
                         # offset the dist with smallest_feature_size
                         intersection_distance = (
                             smallest_feature_size +
-                            intersection_point.Distance(
+                            intersection_point.distance(
                                 ray_point_origin_geometry))
                         if intersection_distance < ray_length:
+                            # now there's a shorter ray, check less
                             ray_length = intersection_distance
                             min_point = intersection_point
+                            ray_shapely = shapely.geometry.LineString(
+                                [ray_point_origin_shapely.coords[0],
+                                 min_point.coords[0]])
+                            ray_shapely_prepared = shapely.prepared.prep(
+                                ray_shapely)
                 # when we get here `min_point` and `ray_length` are the
                 # minimum intersection points for the ray and the landmass
                 intersection_ray = ogr.Geometry(ogr.wkbLineString)
                 intersection_ray.AddPoint(point_a_x, point_a_y)
-                intersection_ray.AddPoint(min_point.GetX(), min_point.GetY())
+                intersection_ray.AddPoint(*min_point.coords[0])
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
                 ray_feature.SetField('fetch_dist', ray_length)
                 ray_feature.SetGeometry(intersection_ray)
