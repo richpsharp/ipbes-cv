@@ -49,7 +49,8 @@ _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-_GLOBAL_WIND_EXPOSURE_POINT_FILE_PATTERN = 'global_rei_points.shp'
+_GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
+_GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 
@@ -109,13 +110,20 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
-    for grid_id in [2]:#xrange(grid_count):
+    local_fetch_ray_path_list = []
+    for grid_id in [28]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
             _TARGET_WORKSPACE, 'grid_%d' % grid_id)
         grid_point_path = os.path.join(
             shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
+
+        create_shore_points(
+            global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
+            simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
+            _SMALLEST_FEATURE_SIZE, shore_points_workspace,
+            grid_point_path)
 
         create_shore_points_task = task_graph.add_task(
             target=create_shore_points, args=(
@@ -130,12 +138,6 @@ def main():
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
-        calculate_wind_exposure(
-            grid_point_path, landmass_bounding_rtree_path,
-            simplified_vector_path, wind_exposure_workspace,
-            _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
-            target_wind_exposure_point_path)
-        return
         wind_exposure_task = task_graph.add_task(
             target=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
@@ -147,17 +149,31 @@ def main():
             wind_exposure_task)
         local_rei_point_path_list.append(
             target_wind_exposure_point_path)
+        local_fetch_ray_path_list.append(
+            os.path.join(wind_exposure_workspace, 'fetch_rays.shp'))
 
-    target_merged_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_WIND_EXPOSURE_POINT_FILE_PATTERN)
+    target_merged_rei_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     _ = task_graph.add_task(
         target=merge_vectors, args=(
             local_rei_point_path_list,
             target_spatial_reference_wkt,
-            target_merged_vector_path,
+            target_merged_rei_points_path,
             ['REI']),
+        dependent_task_list=wind_exposure_task_list)
+
+    target_merged_fetch_rays_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
+    target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
+        _GLOBAL_POLYGON_PATH)['projection']
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_fetch_ray_path_list,
+            target_spatial_reference_wkt,
+            target_merged_fetch_rays_path,
+            []),
         dependent_task_list=wind_exposure_task_list)
 
     task_graph.join()
@@ -207,7 +223,6 @@ def simplify_geometry(
     target_simplified_vector = None
 
 
-@profile
 def calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
@@ -432,9 +447,6 @@ def calculate_wind_exposure(
             # with it and the entire landmass
             ray_point_origin_shapely = shapely.geometry.Point(
                 point_a_x, point_a_y)
-            #ray_shapely = shapely.geometry.LineString(
-            #    [(point_a_x, point_a_y), (point_b_x, point_b_y)])
-            #ray_shapely_prepared = shapely.prepared.prep(ray_shapely)
 
             ray_length = 0.0
             if not landmass_shapely_prep.intersects(
@@ -472,19 +484,12 @@ def calculate_wind_exposure(
                             ray_geometry.AddPoint(
                                 intersection_point.GetX(),
                                 intersection_point.GetY())
-                            #ray_shapely = shapely.geometry.LineString(
-                            #    [ray_point_origin_shapely, intersection_point])
-                            #ray_shapely_prepared = shapely.prepared.prep(
-                            #    ray_shapely)
                             intersection = True
                             break
                     if not intersection:
                         break
                 # when we get here `min_point` and `ray_length` are the
                 # minimum intersection points for the ray and the landmass
-                #intersection_ray = ogr.Geometry(ogr.wkbLineString)
-                #intersection_ray.AddPoint(*ray_shapely.coords[0])
-                #intersection_ray.AddPoint(*ray_shapely.coords[1])
                 ray_feature = ogr.Feature(temp_fetch_rays_defn)
                 ray_length = ray_geometry.Length()
                 ray_feature.SetField('fetch_dist', ray_length)
@@ -627,6 +632,9 @@ def create_shore_points(
     lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
         landmass_spatial_reference.ExportToWkt(), edge_samples=11)
+    if lat_lng_clipping_box[0] > lat_lng_clipping_box[2]:
+        # we wrapped on the dateline
+        lat_lng_clipping_box[2] += 360
     lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
     # clip global polygon to utm clipping box
