@@ -1,4 +1,5 @@
 """IPBES global coastal vulnerability calculation."""
+import traceback
 import shutil
 import time
 import os
@@ -115,7 +116,7 @@ def main():
     local_rei_point_path_list = []
     wind_exposure_task_list = []
     local_fetch_ray_path_list = []
-    for grid_id in xrange(grid_count):
+    for grid_id in xrange(200):# xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -248,264 +249,277 @@ def calculate_wind_exposure(
     Returns:
         None
     """
-    logger = logging.getLogger('ipbes-cv.calculate_wind_exposure')
-    if os.path.exists(workspace_dir):
-        shutil.rmtree(workspace_dir)
-    os.makedirs(workspace_dir)
+    try:
+        logger = logging.getLogger('ipbes-cv.calculate_wind_exposure')
+        if os.path.exists(workspace_dir):
+            shutil.rmtree(workspace_dir)
+        os.makedirs(workspace_dir)
 
-    utm_clipped_vector_path = os.path.join(
-        workspace_dir, 'utm_clipped_landmass.shp')
-    temp_fetch_rays_path = os.path.join(
-        workspace_dir, 'fetch_rays.shp')
+        utm_clipped_vector_path = os.path.join(
+            workspace_dir, 'utm_clipped_landmass.shp')
+        temp_fetch_rays_path = os.path.join(
+            workspace_dir, 'fetch_rays.shp')
 
-    # reproject base_shore_point_vector_path to utm coordinates
-    base_shore_info = pygeoprocessing.get_vector_info(
-        base_shore_point_vector_path)
+        # reproject base_shore_point_vector_path to utm coordinates
+        base_shore_info = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)
+        base_shore_bounding_box = base_shore_info['bounding_box']
 
-    utm_spatial_reference = get_utm_spatial_reference(
-        base_shore_info['bounding_box'])
-    base_spatial_reference = osr.SpatialReference()
-    base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
+        utm_spatial_reference = get_utm_spatial_reference(
+            base_shore_info['bounding_box'])
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
 
-    pygeoprocessing.reproject_vector(
-        base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-        target_fetch_point_vector_path)
+        pygeoprocessing.reproject_vector(
+            base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
+            target_fetch_point_vector_path)
 
-    utm_bounding_box = pygeoprocessing.get_vector_info(
-        target_fetch_point_vector_path)['bounding_box']
+        utm_bounding_box = pygeoprocessing.get_vector_info(
+            target_fetch_point_vector_path)['bounding_box']
 
-    # extend bounding box for max fetch distance
-    utm_bounding_box = [
-        utm_bounding_box[0] - max_fetch_distance,
-        utm_bounding_box[1] - max_fetch_distance,
-        utm_bounding_box[2] + max_fetch_distance,
-        utm_bounding_box[3] + max_fetch_distance]
+        # extend bounding box for max fetch distance
+        utm_bounding_box = [
+            utm_bounding_box[0] - max_fetch_distance,
+            utm_bounding_box[1] - max_fetch_distance,
+            utm_bounding_box[2] + max_fetch_distance,
+            utm_bounding_box[3] + max_fetch_distance]
 
-    # get lat/lng bounding box of utm projected coordinates
+        # get lat/lng bounding box of utm projected coordinates
 
-    # get global polygon clip of that utm box
-    # transform local box back to lat/lng -> global clipping box
-    base_clipping_box = pygeoprocessing.transform_bounding_box(
-        utm_bounding_box, utm_spatial_reference.ExportToWkt(),
-        base_spatial_reference.ExportToWkt(), edge_samples=11)
-    base_clipping_shapely = shapely.geometry.box(*base_clipping_box)
+        # get global polygon clip of that utm box
+        # transform local box back to lat/lng -> global clipping box
+        lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
+            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+            base_spatial_reference.ExportToWkt(), edge_samples=11)
+        if (base_shore_bounding_box[0] > 0 and
+                lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[2] += 360
+        elif (base_shore_bounding_box[0] < 0 and
+              lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[0] -= 360
+        lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
-    landmass_vector_rtree = rtree.index.Index(
-        os.path.splitext(landmass_bounding_rtree_path)[0])
+        landmass_vector_rtree = rtree.index.Index(
+            os.path.splitext(landmass_bounding_rtree_path)[0])
 
-    landmass_vector = ogr.Open(landmass_vector_path)
-    landmass_layer = landmass_vector.GetLayer()
+        landmass_vector = ogr.Open(landmass_vector_path)
+        landmass_layer = landmass_vector.GetLayer()
 
-    # this will hold the clipped landmass geometry
-    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
-    temp_clipped_vector_path = os.path.join(
-        workspace_dir, 'clipped_geometry_vector.shp')
-    temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
-        temp_clipped_vector_path)
-    temp_clipped_layer = (
-        temp_clipped_vector.CreateLayer(
-            os.path.splitext(temp_clipped_vector_path)[0],
-            base_spatial_reference, ogr.wkbPolygon))
-    temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
+        # this will hold the clipped landmass geometry
+        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        temp_clipped_vector_path = os.path.join(
+            workspace_dir, 'clipped_geometry_vector.shp')
+        temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
+            temp_clipped_vector_path)
+        temp_clipped_layer = (
+            temp_clipped_vector.CreateLayer(
+                os.path.splitext(temp_clipped_vector_path)[0],
+                base_spatial_reference, ogr.wkbPolygon))
+        temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
 
-    # clip global polygon to global clipping box
-    for feature_id in landmass_vector_rtree.intersection(base_clipping_box):
-        landmass_feature = landmass_layer.GetFeature(feature_id)
-        landmass_shapely = shapely.wkb.loads(
-            landmass_feature.GetGeometryRef().ExportToWkb())
-        intersection_shapely = base_clipping_shapely.intersection(
-            landmass_shapely)
-        try:
-            clipped_geometry = ogr.CreateGeometryFromWkt(
-                intersection_shapely.wkt)
-            clipped_feature = ogr.Feature(temp_clipped_defn)
-            clipped_feature.SetGeometry(clipped_geometry)
-            temp_clipped_layer.CreateFeature(clipped_feature)
-            clipped_feature = None
-        except Exception:
-            logger.warn(
-                "Couldn't process this intersection %s", intersection_shapely)
-    temp_clipped_layer.SyncToDisk()
-    temp_clipped_layer = None
-    temp_clipped_vector = None
+        # clip global polygon to global clipping box
+        for feature_id in landmass_vector_rtree.intersection(
+                lat_lng_clipping_box):
+            landmass_feature = landmass_layer.GetFeature(feature_id)
+            landmass_shapely = shapely.wkb.loads(
+                landmass_feature.GetGeometryRef().ExportToWkb())
+            intersection_shapely = lat_lng_clipping_shapely.intersection(
+                landmass_shapely)
+            try:
+                clipped_geometry = ogr.CreateGeometryFromWkt(
+                    intersection_shapely.wkt)
+                clipped_feature = ogr.Feature(temp_clipped_defn)
+                clipped_feature.SetGeometry(clipped_geometry)
+                temp_clipped_layer.CreateFeature(clipped_feature)
+                clipped_feature = None
+            except Exception:
+                logger.warn(
+                    "Couldn't process this intersection %s", intersection_shapely)
+        temp_clipped_layer.SyncToDisk()
+        temp_clipped_layer = None
+        temp_clipped_vector = None
 
-    # project global clipped polygons to UTM
-    logger.debug("reprojecting grid %s", base_shore_point_vector_path)
-    pygeoprocessing.reproject_vector(
-        temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-        utm_clipped_vector_path)
+        # project global clipped polygons to UTM
+        logger.debug("reprojecting grid %s", base_shore_point_vector_path)
+        pygeoprocessing.reproject_vector(
+            temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
+            utm_clipped_vector_path)
 
-    clipped_geometry_shapely_list = []
-    temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
-    temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
-    for tmp_utm_feature in temp_utm_clipped_layer:
-        tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
-        clipped_geometry_shapely_list.append(
-            shapely.wkb.loads(tmp_utm_geometry.ExportToWkb()))
-        tmp_utm_geometry = None
-    temp_utm_clipped_layer = None
-    temp_utm_clipped_vector = None
-    landmass_shapely = shapely.ops.cascaded_union(
-        clipped_geometry_shapely_list)
-    clipped_geometry_shapely_list = None
+        clipped_geometry_shapely_list = []
+        temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
+        temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
+        for tmp_utm_feature in temp_utm_clipped_layer:
+            tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
+            clipped_geometry_shapely_list.append(
+                shapely.wkb.loads(tmp_utm_geometry.ExportToWkb()))
+            tmp_utm_geometry = None
+        temp_utm_clipped_layer = None
+        temp_utm_clipped_vector = None
+        landmass_shapely = shapely.ops.cascaded_union(
+            clipped_geometry_shapely_list)
+        clipped_geometry_shapely_list = None
 
-    # load land geometry into shapely object
-    landmass_shapely_prep = shapely.prepared.prep(landmass_shapely)
+        # load land geometry into shapely object
+        landmass_shapely_prep = shapely.prepared.prep(landmass_shapely)
 
-    # explode landmass into lines for easy intersection
-    temp_polygon_segements_path = os.path.join(
-        workspace_dir, 'polygon_segments.shp')
-    temp_polygon_segments_vector = esri_shapefile_driver.CreateDataSource(
-        temp_polygon_segements_path)
-    temp_polygon_segments_layer = (
-        temp_polygon_segments_vector.CreateLayer(
-            os.path.splitext(temp_clipped_vector_path)[0],
-            utm_spatial_reference, ogr.wkbLineString))
-    temp_polygon_segments_defn = temp_polygon_segments_layer.GetLayerDefn()
+        # explode landmass into lines for easy intersection
+        temp_polygon_segements_path = os.path.join(
+            workspace_dir, 'polygon_segments.shp')
+        temp_polygon_segments_vector = esri_shapefile_driver.CreateDataSource(
+            temp_polygon_segements_path)
+        temp_polygon_segments_layer = (
+            temp_polygon_segments_vector.CreateLayer(
+                os.path.splitext(temp_clipped_vector_path)[0],
+                utm_spatial_reference, ogr.wkbLineString))
+        temp_polygon_segments_defn = temp_polygon_segments_layer.GetLayerDefn()
 
-    polygon_line_rtree = rtree.index.Index()
-    polygon_line_index = []
-    shapely_line_index = []
-    line_id = 0
-    for line in geometry_to_lines(landmass_shapely):
-        segment_feature = ogr.Feature(temp_polygon_segments_defn)
-        segement_geometry = ogr.Geometry(ogr.wkbLineString)
-        segement_geometry.AddPoint(*line.coords[0])
-        segement_geometry.AddPoint(*line.coords[1])
-        segment_feature.SetGeometry(segement_geometry)
-        temp_polygon_segments_layer.CreateFeature(segment_feature)
+        polygon_line_rtree = rtree.index.Index()
+        polygon_line_index = []
+        shapely_line_index = []
+        line_id = 0
+        for line in geometry_to_lines(landmass_shapely):
+            segment_feature = ogr.Feature(temp_polygon_segments_defn)
+            segement_geometry = ogr.Geometry(ogr.wkbLineString)
+            segement_geometry.AddPoint(*line.coords[0])
+            segement_geometry.AddPoint(*line.coords[1])
+            segment_feature.SetGeometry(segement_geometry)
+            temp_polygon_segments_layer.CreateFeature(segment_feature)
 
-        if (line.bounds[0] == line.bounds[2] and
-                line.bounds[1] == line.bounds[3]):
-            continue
-        polygon_line_rtree.insert(line_id, line.bounds)
-        line_id += 1
-        polygon_line_index.append(segement_geometry)
-        shapely_line_index.append(shapely.wkb.loads(
-            segement_geometry.ExportToWkb()))
+            if (line.bounds[0] == line.bounds[2] and
+                    line.bounds[1] == line.bounds[3]):
+                continue
+            polygon_line_rtree.insert(line_id, line.bounds)
+            line_id += 1
+            polygon_line_index.append(segement_geometry)
+            shapely_line_index.append(shapely.wkb.loads(
+                segement_geometry.ExportToWkb()))
 
-    temp_polygon_segments_layer.SyncToDisk()
-    temp_polygon_segments_layer = None
-    temp_polygon_segments_vector = None
+        temp_polygon_segments_layer.SyncToDisk()
+        temp_polygon_segments_layer = None
+        temp_polygon_segments_vector = None
 
-    # create fetch rays
-    temp_fetch_rays_vector = esri_shapefile_driver.CreateDataSource(
-        temp_fetch_rays_path)
-    temp_fetch_rays_layer = (
-        temp_fetch_rays_vector.CreateLayer(
-            os.path.splitext(temp_clipped_vector_path)[0],
-            utm_spatial_reference, ogr.wkbLineString))
-    temp_fetch_rays_defn = temp_fetch_rays_layer.GetLayerDefn()
-    temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
-        'fetch_dist', ogr.OFTReal))
+        # create fetch rays
+        temp_fetch_rays_vector = esri_shapefile_driver.CreateDataSource(
+            temp_fetch_rays_path)
+        temp_fetch_rays_layer = (
+            temp_fetch_rays_vector.CreateLayer(
+                os.path.splitext(temp_clipped_vector_path)[0],
+                utm_spatial_reference, ogr.wkbLineString))
+        temp_fetch_rays_defn = temp_fetch_rays_layer.GetLayerDefn()
+        temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
+            'fetch_dist', ogr.OFTReal))
 
-    target_shore_point_vector = ogr.Open(target_fetch_point_vector_path, 1)
-    target_shore_point_layer = target_shore_point_vector.GetLayer()
-    target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
+        target_shore_point_vector = ogr.Open(target_fetch_point_vector_path, 1)
+        target_shore_point_layer = target_shore_point_vector.GetLayer()
+        target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
 
-    n_fetch_rays = 16
-    shore_point_logger = _make_logger_callback(
-        "Wind exposure %.2f%% complete.", logger)
-    # Iterate over every shore point
-    for shore_point_feature in target_shore_point_layer:
-        shore_point_logger(
-            float(shore_point_feature.GetFID()) /
-            target_shore_point_layer.GetFeatureCount())
-        rei_value = 0.0
-        # Iterate over every ray direction
-        for sample_index in xrange(n_fetch_rays):
-            compass_theta = float(sample_index) / n_fetch_rays * 360
-            rei_pct = shore_point_feature.GetField(
-                'REI_PCT%d' % int(compass_theta))
-            rei_v = shore_point_feature.GetField(
-                'REI_V%d' % int(compass_theta))
-            cartesian_theta = -(compass_theta - 90)
+        n_fetch_rays = 16
+        shore_point_logger = _make_logger_callback(
+            "Wind exposure %.2f%% complete.", logger)
+        # Iterate over every shore point
+        for shore_point_feature in target_shore_point_layer:
+            shore_point_logger(
+                float(shore_point_feature.GetFID()) /
+                target_shore_point_layer.GetFeatureCount())
+            rei_value = 0.0
+            # Iterate over every ray direction
+            for sample_index in xrange(n_fetch_rays):
+                compass_theta = float(sample_index) / n_fetch_rays * 360
+                rei_pct = shore_point_feature.GetField(
+                    'REI_PCT%d' % int(compass_theta))
+                rei_v = shore_point_feature.GetField(
+                    'REI_V%d' % int(compass_theta))
+                cartesian_theta = -(compass_theta - 90)
 
-            # Determine the direction the ray will point
-            delta_x = math.cos(cartesian_theta * math.pi / 180)
-            delta_y = math.sin(cartesian_theta * math.pi / 180)
+                # Determine the direction the ray will point
+                delta_x = math.cos(cartesian_theta * math.pi / 180)
+                delta_y = math.sin(cartesian_theta * math.pi / 180)
 
-            shore_point_geometry = shore_point_feature.GetGeometryRef()
-            point_a_x = (
-                shore_point_geometry.GetX() + delta_x * smallest_feature_size)
-            point_a_y = (
-                shore_point_geometry.GetY() + delta_y * smallest_feature_size)
-            point_b_x = point_a_x + delta_x * (
-                max_fetch_distance - smallest_feature_size)
-            point_b_y = point_a_y + delta_y * (
-                max_fetch_distance - smallest_feature_size)
-            shore_point_geometry = None
+                shore_point_geometry = shore_point_feature.GetGeometryRef()
+                point_a_x = (
+                    shore_point_geometry.GetX() + delta_x * smallest_feature_size)
+                point_a_y = (
+                    shore_point_geometry.GetY() + delta_y * smallest_feature_size)
+                point_b_x = point_a_x + delta_x * (
+                    max_fetch_distance - smallest_feature_size)
+                point_b_y = point_a_y + delta_y * (
+                    max_fetch_distance - smallest_feature_size)
+                shore_point_geometry = None
 
-            # build ray geometry so we can intersect it later
-            ray_geometry = ogr.Geometry(ogr.wkbLineString)
-            ray_geometry.AddPoint(point_a_x, point_a_y)
-            ray_geometry.AddPoint(point_b_x, point_b_y)
+                # build ray geometry so we can intersect it later
+                ray_geometry = ogr.Geometry(ogr.wkbLineString)
+                ray_geometry.AddPoint(point_a_x, point_a_y)
+                ray_geometry.AddPoint(point_b_x, point_b_y)
 
-            # keep a shapely version of the ray so we can do fast intersection
-            # with it and the entire landmass
-            ray_point_origin_shapely = shapely.geometry.Point(
-                point_a_x, point_a_y)
+                # keep a shapely version of the ray so we can do fast intersection
+                # with it and the entire landmass
+                ray_point_origin_shapely = shapely.geometry.Point(
+                    point_a_x, point_a_y)
 
-            ray_length = 0.0
-            if not landmass_shapely_prep.intersects(
-                    ray_point_origin_shapely):
-                # the origin is in ocean
+                ray_length = 0.0
+                if not landmass_shapely_prep.intersects(
+                        ray_point_origin_shapely):
+                    # the origin is in ocean
 
-                # This algorithm searches for intersections, if one is found
-                # the ray updates and a smaller intersection set is determined
-                # by experimentation I've found this is significant, but not
-                # an order of magnitude, faster than looping through all
-                # original possible intersections.  Since this algorithm
-                # will be run for a long time, it's worth the additional
-                # complexity
-                tested_indexes = set()
-                while True:
-                    intersection = False
-                    ray_envelope = ray_geometry.GetEnvelope()
-                    for poly_line_index in polygon_line_rtree.intersection(
-                            [ray_envelope[i] for i in [0, 2, 1, 3]]):
-                        if poly_line_index in tested_indexes:
-                            continue
-                        tested_indexes.add(poly_line_index)
-                        line_segment = (
-                            polygon_line_index[poly_line_index])
-                        if ray_geometry.Intersects(line_segment):
-                            # if the ray intersects the poly line, test if
-                            # the intersection is closer than any known
-                            # intersection so far
-                            intersection_point = ray_geometry.Intersection(
-                                line_segment)
-                            # offset the dist with smallest_feature_size
-                            # update the endpoint of the ray
-                            ray_geometry = ogr.Geometry(ogr.wkbLineString)
-                            ray_geometry.AddPoint(point_a_x, point_a_y)
-                            ray_geometry.AddPoint(
-                                intersection_point.GetX(),
-                                intersection_point.GetY())
-                            intersection = True
+                    # This algorithm searches for intersections, if one is found
+                    # the ray updates and a smaller intersection set is determined
+                    # by experimentation I've found this is significant, but not
+                    # an order of magnitude, faster than looping through all
+                    # original possible intersections.  Since this algorithm
+                    # will be run for a long time, it's worth the additional
+                    # complexity
+                    tested_indexes = set()
+                    while True:
+                        intersection = False
+                        ray_envelope = ray_geometry.GetEnvelope()
+                        for poly_line_index in polygon_line_rtree.intersection(
+                                [ray_envelope[i] for i in [0, 2, 1, 3]]):
+                            if poly_line_index in tested_indexes:
+                                continue
+                            tested_indexes.add(poly_line_index)
+                            line_segment = (
+                                polygon_line_index[poly_line_index])
+                            if ray_geometry.Intersects(line_segment):
+                                # if the ray intersects the poly line, test if
+                                # the intersection is closer than any known
+                                # intersection so far
+                                intersection_point = ray_geometry.Intersection(
+                                    line_segment)
+                                # offset the dist with smallest_feature_size
+                                # update the endpoint of the ray
+                                ray_geometry = ogr.Geometry(ogr.wkbLineString)
+                                ray_geometry.AddPoint(point_a_x, point_a_y)
+                                ray_geometry.AddPoint(
+                                    intersection_point.GetX(),
+                                    intersection_point.GetY())
+                                intersection = True
+                                break
+                        if not intersection:
                             break
-                    if not intersection:
-                        break
-                # when we get here `min_point` and `ray_length` are the
-                # minimum intersection points for the ray and the landmass
-                ray_feature = ogr.Feature(temp_fetch_rays_defn)
-                ray_length = ray_geometry.Length()
-                ray_feature.SetField('fetch_dist', ray_length)
-                ray_feature.SetGeometry(ray_geometry)
-                temp_fetch_rays_layer.CreateFeature(ray_feature)
-            ray_feature = None
-            ray_geometry = None
-            # TODO: normalize by ray length?
-            rei_value += ray_length * rei_pct * rei_v
-        shore_point_feature.SetField('REI', rei_value)
-        target_shore_point_layer.SetFeature(shore_point_feature)
+                    # when we get here `min_point` and `ray_length` are the
+                    # minimum intersection points for the ray and the landmass
+                    ray_feature = ogr.Feature(temp_fetch_rays_defn)
+                    ray_length = ray_geometry.Length()
+                    ray_feature.SetField('fetch_dist', ray_length)
+                    ray_feature.SetGeometry(ray_geometry)
+                    temp_fetch_rays_layer.CreateFeature(ray_feature)
+                ray_feature = None
+                ray_geometry = None
+                # TODO: normalize by ray length?
+                rei_value += ray_length * rei_pct * rei_v
+            shore_point_feature.SetField('REI', rei_value)
+            target_shore_point_layer.SetFeature(shore_point_feature)
 
-    target_shore_point_layer.SyncToDisk()
-    target_shore_point_layer = None
-    target_shore_point_vector = None
-    temp_fetch_rays_layer.SyncToDisk()
-    temp_fetch_rays_layer = None
-    temp_fetch_rays_vector = None
+        target_shore_point_layer.SyncToDisk()
+        target_shore_point_layer = None
+        target_shore_point_vector = None
+        temp_fetch_rays_layer.SyncToDisk()
+        temp_fetch_rays_layer = None
+        temp_fetch_rays_vector = None
+    except Exception as e:
+        traceback.print_exc()
+        raise
+
 
 
 def create_shore_points(
@@ -631,10 +645,10 @@ def create_shore_points(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
         landmass_spatial_reference.ExportToWkt(), edge_samples=11)
     # see if we're wrapped on the dateline
-    if (lat_lng_clipping_box[0] < 0 and
+    if (grid_shapely.bounds[0] > 0 and
             lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
         lat_lng_clipping_box[2] += 360
-    elif (lat_lng_clipping_box[0] > 0 and
+    elif (grid_shapely.bounds[0] < 0 and
           lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
         lat_lng_clipping_box[0] -= 360
     lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
