@@ -116,7 +116,7 @@ def main():
     local_rei_point_path_list = []
     wind_exposure_task_list = []
     local_fetch_ray_path_list = []
-    for grid_id in xrange(200):# xrange(grid_count):
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -1124,9 +1124,8 @@ def geometry_to_lines(geometry):
 
 def polygon_to_lines(geometry):
     """Return a list of shapely lines given higher order shapely geometry."""
-    #print geometry.exterior.coords[0]
-    last_point = geometry.exterior.coords[0]
     line_list = []
+    last_point = geometry.exterior.coords[0]
     for point in geometry.exterior.coords[1::]:
         if point == last_point:
             continue
@@ -1134,6 +1133,15 @@ def polygon_to_lines(geometry):
         last_point = point
     line_list.append(shapely.geometry.LineString([
         last_point, geometry.exterior.coords[0]]))
+    for interior in geometry.interiors:
+        last_point = interior.coords[0]
+        for point in interior.coords[1::]:
+            if point == last_point:
+                continue
+            line_list.append(shapely.geometry.LineString([last_point, point]))
+            last_point = point
+        line_list.append(shapely.geometry.LineString([
+            last_point, interior.coords[0]]))
     return line_list
 
 if __name__ == '__main__':
