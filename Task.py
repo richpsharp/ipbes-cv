@@ -136,7 +136,6 @@ class Task(object):
             target.__name__, pickle.dumps(args),
             json.dumps(kwargs, sort_keys=True),
             inspect.getsource(target))
-        LOGGER.debug(inspect.getsource(target))
         self.task_id = '%s_%s' % (
             target.__name__, hashlib.sha1(task_string).hexdigest())
 
