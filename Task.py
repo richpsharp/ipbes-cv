@@ -9,6 +9,7 @@ import multiprocessing
 import threading
 import errno
 import Queue
+import inspect
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
@@ -131,9 +132,11 @@ class Task(object):
         # Make a unique hash of the input parameters of the function call
         # TODO: consider file date/time, dependent tasks,
         # TODO: new implementations (code versions)')
-        task_string = '%s:%s:%s' % (
+        task_string = '%s:%s:%s:%s' % (
             target.__name__, pickle.dumps(args),
-            json.dumps(kwargs, sort_keys=True))
+            json.dumps(kwargs, sort_keys=True),
+            inspect.getsource(target))
+        LOGGER.debug(inspect.getsource(target))
         self.task_id = '%s_%s' % (
             target.__name__, hashlib.sha1(task_string).hexdigest())
 

@@ -297,6 +297,10 @@ def calculate_wind_exposure(
         elif (base_shore_bounding_box[0] < 0 and
               lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
             lat_lng_clipping_box[0] -= 360
+        elif base_shore_bounding_box == [0, 0, 0, 0]:
+            # this case guards for an empty shore point in case there are
+            # very tiny islands or such
+            lat_lng_clipping_box = (0, 0, 0, 0)
         lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
         landmass_vector_rtree = rtree.index.Index(
@@ -340,7 +344,7 @@ def calculate_wind_exposure(
         temp_clipped_vector = None
 
         # project global clipped polygons to UTM
-        logger.debug("reprojecting grid %s", base_shore_point_vector_path)
+        logger.info("reprojecting grid %s", base_shore_point_vector_path)
         pygeoprocessing.reproject_vector(
             temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
             utm_clipped_vector_path)
@@ -350,8 +354,10 @@ def calculate_wind_exposure(
         temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
         for tmp_utm_feature in temp_utm_clipped_layer:
             tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
-            clipped_geometry_shapely_list.append(
-                shapely.wkb.loads(tmp_utm_geometry.ExportToWkb()))
+            shapely_geometry = shapely.wkb.loads(
+                tmp_utm_geometry.ExportToWkb())
+            if shapely_geometry.is_valid:
+                clipped_geometry_shapely_list.append(shapely_geometry)
             tmp_utm_geometry = None
         temp_utm_clipped_layer = None
         temp_utm_clipped_vector = None
@@ -1120,6 +1126,8 @@ def geometry_to_lines(geometry):
         for geom in geometry.geoms:
             line_list.extend(geometry_to_lines(geom))
         return line_list
+    else:
+        return []
 
 
 def polygon_to_lines(geometry):
