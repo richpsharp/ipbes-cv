@@ -630,9 +630,13 @@ def create_shore_points(
     lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
         utm_bounding_box, utm_spatial_reference.ExportToWkt(),
         landmass_spatial_reference.ExportToWkt(), edge_samples=11)
-    if lat_lng_clipping_box[0] > lat_lng_clipping_box[2]:
-        # we wrapped on the dateline
+    # see if we're wrapped on the dateline
+    if (lat_lng_clipping_box[0] < 0 and
+            lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
         lat_lng_clipping_box[2] += 360
+    elif (lat_lng_clipping_box[0] > 0 and
+          lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+        lat_lng_clipping_box[0] -= 360
     lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
     # clip global polygon to utm clipping box
