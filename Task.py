@@ -1,4 +1,5 @@
 """Task graph framework."""
+import types
 import datetime
 import hashlib
 import json
@@ -136,6 +137,11 @@ class Task(object):
             target.__name__, pickle.dumps(args),
             json.dumps(kwargs, sort_keys=True),
             inspect.getsource(target))
+        for param in tuple(args) + tuple(kwargs.values()):
+            if (isinstance(param, types.StringTypes) and
+                    os.path.exists(param)):
+                modification_stamp = os.path.getmtime(param)
+                task_string += ':%s' % str(modification_stamp)
         self.task_id = '%s_%s' % (
             target.__name__, hashlib.sha1(task_string).hexdigest())
 

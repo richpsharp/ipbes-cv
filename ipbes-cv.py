@@ -45,6 +45,11 @@ _WGS84_GRID_SIZE = 3.0
 # square grid cell size
 _UTM_GRID_SIZE = 250
 
+# Wave Watch III data does not cover the planet.  Make sure we don't deal
+# with a point that's not in range of said point.  I'm picking 160km since
+# that's double the diagonal distance between two WWIII points
+_MAX_WWIII_DISTANCE = 160000.0
+
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
@@ -116,7 +121,8 @@ def main():
     local_rei_point_path_list = []
     wind_exposure_task_list = []
     local_fetch_ray_path_list = []
-    for grid_id in xrange(grid_count):
+    #for grid_id in xrange(grid_count):
+    for grid_id in [2]:
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -797,8 +803,13 @@ def create_shore_points(
                         (shore_point_geometry.GetX(),
                          shore_point_geometry.GetY())))
 
+                # make sure we're within a valid data distance
+                if distance > _MAX_WWIII_DISTANCE:
+                    continue
+
                 wwiii_values *= distance
                 wwiii_values = numpy.mean(wwiii_values, axis=0)
+                wwiii_values /= numpy.sum(distance)
 
                 for field_name_index, field_name in enumerate(field_names):
                     shore_point_feature.SetField(
