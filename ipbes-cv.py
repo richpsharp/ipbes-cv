@@ -75,7 +75,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)# multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -226,6 +226,28 @@ def simplify_geometry(
     target_simplified_layer.SyncToDisk()
     target_simplified_layer = None
     target_simplified_vector = None
+
+
+def calculate_wave_exposure(
+        base_fetch_point_vector_path, max_fetch_distance,
+        target_wave_exposure_point_vector_path):
+    """Calculate the wave exposure index.
+
+    Parameters:
+        base_fetch_point_vector_path (string): path to a point shapefile that
+            contains 16 'WavP_[direction]' fields, 'WavPPCT[direction]'
+            fields, and 'fdist_[direction]' fields.
+        max_fetch_distance (float): max fetch distance before a wind fetch ray
+            is terminated
+        target_wave_exposure_point_vector_path (string): path to an output
+            shapefile that will contain a field called 'Ew' which is the
+            maximum of ocean or wind waves occurring at that point.
+
+    Returns:
+        None
+    """
+
+    pass
 
 
 def calculate_wind_exposure(
@@ -421,11 +443,17 @@ def calculate_wind_exposure(
         temp_fetch_rays_layer.CreateField(ogr.FieldDefn(
             'fetch_dist', ogr.OFTReal))
 
-        target_shore_point_vector = ogr.Open(target_fetch_point_vector_path, 1)
+        target_shore_point_vector = ogr.Open(
+            target_fetch_point_vector_path, 1)
         target_shore_point_layer = target_shore_point_vector.GetLayer()
-        target_shore_point_layer.CreateField(ogr.FieldDefn('REI', ogr.OFTReal))
-
+        target_shore_point_layer.CreateField(
+            ogr.FieldDefn('REI', ogr.OFTReal))
         n_fetch_rays = 16
+        for ray_index in xrange(n_fetch_rays):
+            compass_degree = int(ray_index * 360 / 16.)
+            target_shore_point_layer.CreateField(
+                ogr.FieldDefn('fdist_%d' % compass_degree, ogr.OFTReal))
+
         shore_point_logger = _make_logger_callback(
             "Wind exposure %.2f%% complete.", logger)
         # Iterate over every shore point
@@ -436,6 +464,7 @@ def calculate_wind_exposure(
             rei_value = 0.0
             # Iterate over every ray direction
             for sample_index in xrange(n_fetch_rays):
+                compass_degree = int(sample_index * 360 / 16.)
                 compass_theta = float(sample_index) / n_fetch_rays * 360
                 rei_pct = shore_point_feature.GetField(
                     'REI_PCT%d' % int(compass_theta))
@@ -515,9 +544,10 @@ def calculate_wind_exposure(
                     ray_feature.SetField('fetch_dist', ray_length)
                     ray_feature.SetGeometry(ray_geometry)
                     temp_fetch_rays_layer.CreateFeature(ray_feature)
+                shore_point_feature.SetField(
+                    'fdist_%d' % compass_degree, ray_length)
                 ray_feature = None
                 ray_geometry = None
-                # TODO: normalize by ray length?
                 rei_value += ray_length * rei_pct * rei_v
             shore_point_feature.SetField('REI', rei_value)
             target_shore_point_layer.SetFeature(shore_point_feature)
@@ -531,7 +561,6 @@ def calculate_wind_exposure(
     except Exception as e:
         traceback.print_exc()
         raise
-
 
 
 def create_shore_points(
