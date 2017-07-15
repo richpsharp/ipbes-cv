@@ -50,17 +50,23 @@ _UTM_GRID_SIZE = 250
 # that's double the diagonal distance between two WWIII points
 _MAX_WWIII_DISTANCE = 160000.0
 
+_N_FETCH_RAYS = 16
+
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
 _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
+_WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
+_GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'wind_exposure_workspaces')
+_WAVE_EXPOSURE_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'wave_exposure_workspaces')
 _GRID_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'grid_workspaces')
 
@@ -120,7 +126,9 @@ def main():
 
     local_rei_point_path_list = []
     wind_exposure_task_list = []
+    wave_exposure_task_list = []
     local_fetch_ray_path_list = []
+    local_wave_point_path_list = []
     #for grid_id in xrange(grid_count):
     for grid_id in [2]:
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
@@ -157,6 +165,22 @@ def main():
         local_fetch_ray_path_list.append(
             os.path.join(wind_exposure_workspace, 'fetch_rays.shp'))
 
+        wave_exposure_workspace = os.path.join(
+            _WAVE_EXPOSURE_WORKSPACES, 'wave_exposure_%d' % grid_id)
+        target_wave_exposure_point_path = os.path.join(
+            wave_exposure_workspace,
+            _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+        wave_exposure_task = task_graph.add_task(
+            target=calculate_wave_exposure, args=(
+                target_wind_exposure_point_path, _MAX_FETCH_DISTANCE,
+                wave_exposure_workspace,
+                target_wave_exposure_point_path),
+            dependent_task_list=[wind_exposure_task])
+        wave_exposure_task_list.append(
+            wave_exposure_task)
+        local_wave_point_path_list.append(
+            target_wave_exposure_point_path)
+
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
@@ -168,6 +192,16 @@ def main():
             target_merged_rei_points_path,
             ['REI']),
         dependent_task_list=wind_exposure_task_list)
+
+    target_merged_wave_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_WAVE_POINT_FILE_PATTERN)
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_wave_point_path_list,
+            target_spatial_reference_wkt,
+            target_merged_wave_points_path,
+            ['Ew']),
+        dependent_task_list=wave_exposure_task_list)
 
     target_merged_fetch_rays_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
@@ -229,14 +263,15 @@ def simplify_geometry(
 
 
 def calculate_wave_exposure(
-        base_fetch_point_vector_path, max_fetch_distance,
+        base_fetch_point_vector_path, max_fetch_distance, workspace_dir,
         target_wave_exposure_point_vector_path):
     """Calculate the wave exposure index.
 
     Parameters:
         base_fetch_point_vector_path (string): path to a point shapefile that
             contains 16 'WavP_[direction]' fields, 'WavPPCT[direction]'
-            fields, and 'fdist_[direction]' fields.
+            fields, 'fdist_[direction]' fields, a single H, and a single T
+            field.
         max_fetch_distance (float): max fetch distance before a wind fetch ray
             is terminated
         target_wave_exposure_point_vector_path (string): path to an output
@@ -246,8 +281,64 @@ def calculate_wave_exposure(
     Returns:
         None
     """
+    # this will hold the clipped landmass geometry
+    try:
+        if not os.path.exists(os.path.dirname(
+                target_wave_exposure_point_vector_path)):
+            os.makedirs(
+                os.path.dirname(target_wave_exposure_point_vector_path))
+        if os.path.exists(target_wave_exposure_point_vector_path):
+            os.remove(target_wave_exposure_point_vector_path)
 
-    pass
+        base_ref_wkt = pygeoprocessing.get_vector_info(
+            base_fetch_point_vector_path)['projection']
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_ref_wkt)
+
+        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        os.path.dirname(base_fetch_point_vector_path)
+        target_wave_exposure_point_vector = (
+            esri_shapefile_driver.CreateDataSource(
+                target_wave_exposure_point_vector_path))
+        target_wave_exposure_point_layer = (
+            target_wave_exposure_point_vector.CreateLayer(
+                os.path.splitext(target_wave_exposure_point_vector_path)[0],
+                base_spatial_reference, ogr.wkbPoint))
+        target_wave_exposure_point_layer.CreateField(ogr.FieldDefn(
+            'Ew', ogr.OFTReal))
+        target_wave_exposure_point_defn = (
+            target_wave_exposure_point_layer.GetLayerDefn())
+
+        base_fetch_point_vector = ogr.Open(base_fetch_point_vector_path)
+        base_fetch_point_layer = base_fetch_point_vector.GetLayer()
+        for base_fetch_point_feature in base_fetch_point_layer:
+            target_feature = ogr.Feature(target_wave_exposure_point_defn)
+            target_feature.SetGeometry(
+                base_fetch_point_feature.GetGeometryRef().Clone())
+            e_local_wedge = (
+                0.5 *
+                float(base_fetch_point_feature.GetField('H_10PCT'))**2 *
+                float(base_fetch_point_feature.GetField('H_10PCT'))) / float(
+                    _N_FETCH_RAYS)
+            e_ocean = 0.0
+            e_local = 0.0
+            for sample_index in xrange(_N_FETCH_RAYS):
+                compass_degree = int(sample_index * 360 / 16.)
+                fdist = base_fetch_point_feature.GetField(
+                    'fdist_%d' % compass_degree)
+                if numpy.isclose(fdist, max_fetch_distance):
+                    e_ocean += (
+                        base_fetch_point_feature.GetField(
+                            'WavP_%d' % compass_degree) *
+                        base_fetch_point_feature.GetField(
+                            'WavPPCT%d' % compass_degree))
+                elif fdist > 0.0:
+                    e_local += e_local_wedge
+            target_feature.SetField('Ew', max(e_ocean, e_local))
+            target_wave_exposure_point_layer.CreateFeature(target_feature)
+    except Exception as e:
+        traceback.print_exc()
+        raise
 
 
 def calculate_wind_exposure(
@@ -448,8 +539,7 @@ def calculate_wind_exposure(
         target_shore_point_layer = target_shore_point_vector.GetLayer()
         target_shore_point_layer.CreateField(
             ogr.FieldDefn('REI', ogr.OFTReal))
-        n_fetch_rays = 16
-        for ray_index in xrange(n_fetch_rays):
+        for ray_index in xrange(_N_FETCH_RAYS):
             compass_degree = int(ray_index * 360 / 16.)
             target_shore_point_layer.CreateField(
                 ogr.FieldDefn('fdist_%d' % compass_degree, ogr.OFTReal))
@@ -463,9 +553,9 @@ def calculate_wind_exposure(
                 target_shore_point_layer.GetFeatureCount())
             rei_value = 0.0
             # Iterate over every ray direction
-            for sample_index in xrange(n_fetch_rays):
+            for sample_index in xrange(_N_FETCH_RAYS):
                 compass_degree = int(sample_index * 360 / 16.)
-                compass_theta = float(sample_index) / n_fetch_rays * 360
+                compass_theta = float(sample_index) / _N_FETCH_RAYS * 360
                 rei_pct = shore_point_feature.GetField(
                     'REI_PCT%d' % int(compass_theta))
                 rei_v = shore_point_feature.GetField(
