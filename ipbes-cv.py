@@ -72,6 +72,7 @@ _HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
 _RELIEF_POINT_FILE_PATTERN = 'relief_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
+_GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.shp'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
     'global_habitat_protection_points.shp')
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
@@ -1020,8 +1021,6 @@ def calculate_relief(
 
         target_pixel_size = pygeoprocessing.get_raster_info(
             global_dem_path)['pixel_size']
-        logger.debug(target_pixel_size)
-        logger.debug(base_shore_bounding_box)
         pygeoprocessing.warp_raster(
             global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
             'bilinear', target_bb=base_shore_bounding_box)
@@ -1054,8 +1053,6 @@ def calculate_relief(
 
         # convolve over a 5km radius
         radius_in_pixels = 5000.0 / target_pixel_size[0]
-        logger.debug(radius_in_pixels)
-        logger.debug(target_pixel_size)
         kernel_filepath = os.path.join(workspace_dir, 'averaging_kernel.tif')
         create_averaging_kernel_raster(radius_in_pixels, kernel_filepath)
 
@@ -1066,7 +1063,6 @@ def calculate_relief(
         relief_raster = gdal.Open(relief_path)
         relief_band = relief_raster.GetRasterBand(1)
         relief_geotransform = relief_raster.GetGeoTransform()
-        n_rows = relief_band.YSize
         target_relief_point_layer.ResetReading()
         for point_feature in target_relief_point_layer:
             point_geometry = point_feature.GetGeometryRef()
@@ -1083,17 +1079,12 @@ def calculate_relief(
             pixel_value = relief_band.ReadAsArray(
                 xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
             point_feature.SetField('relief', float(pixel_value))
-            logger.debug(pixel_value)
             target_relief_point_layer.SetFeature(point_feature)
 
         target_relief_point_layer.SyncToDisk()
         target_relief_point_layer = None
         target_relief_point_vector = None
 
-        # can i aggregate by point? if so, that's the relief
-        logger.debug(pygeoprocessing.zonal_statistics(
-            (relief_path, 1), target_relief_point_vector_path,
-            'id'))
     except Exception as e:
         traceback.print_exc()
         raise
