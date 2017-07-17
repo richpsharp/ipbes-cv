@@ -1020,6 +1020,25 @@ def calculate_relief(
             clipped_lat_lng_dem_path, target_pixel_size, clipped_utm_dem_path,
             'bilinear', target_sr_wkt=utm_spatial_reference.ExportToWkt())
         # mask out all DEM < 0 to 0
+        nodata = pygeoprocessing.get_raster_info(
+            clipped_utm_dem_path)['nodata'][0]
+
+        def zero_negative_values(depth_array):
+            valid_mask = depth_array != nodata
+            result_array = numpy.empty(
+                depth_array.shape, dtype=numpy.int16)
+            result_array[:] = nodata
+            result_array[valid_mask] = 0
+            result_array[depth_array > 0] = depth_array[depth_array > 0]
+            return result_array
+
+        positive_dem_path = os.path.join(
+            workspace_dir, 'positive_dem.tif')
+
+        pygeoprocessing.raster_calculator(
+            [(clipped_utm_dem_path, 1)], zero_negative_values,
+            positive_dem_path, gdal.GDT_Int16, nodata)
+
         # convolve over a 5km radius
         # can i aggregate by point? if so, that's the relief
     except Exception as e:
