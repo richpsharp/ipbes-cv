@@ -977,6 +977,19 @@ def calculate_relief(
         utm_bounding_box = pygeoprocessing.get_vector_info(
             target_relief_point_vector_path)['bounding_box']
 
+        target_relief_point_vector = ogr.Open(
+            target_relief_point_vector_path, 1)
+        target_relief_point_layer = target_relief_point_vector.GetLayer()
+
+        relief_field = ogr.FieldDefn('relief', ogr.OFTReal)
+        #relief_field.SetWidth(24)
+        target_relief_point_layer.CreateField(relief_field)
+        target_relief_point_layer.CreateField(ogr.FieldDefn(
+            'id', ogr.OFTInteger))
+        for target_feature in target_relief_point_layer:
+            target_feature.SetField('id', target_feature.GetFID())
+            target_relief_point_layer.SetFeature(target_feature)
+
         # extend bounding box for max fetch distance
         utm_bounding_box = [
             utm_bounding_box[0] - _MAX_FETCH_DISTANCE,
@@ -1040,12 +1053,134 @@ def calculate_relief(
             positive_dem_path, gdal.GDT_Int16, nodata)
 
         # convolve over a 5km radius
+        radius_in_pixels = 5000.0 / target_pixel_size[0]
+        logger.debug(radius_in_pixels)
+        logger.debug(target_pixel_size)
+        kernel_filepath = os.path.join(workspace_dir, 'averaging_kernel.tif')
+        create_averaging_kernel_raster(radius_in_pixels, kernel_filepath)
+
+        relief_path = os.path.join(workspace_dir, 'relief.tif')
+        pygeoprocessing.convolve_2d(
+            (positive_dem_path, 1), (kernel_filepath, 1), relief_path)
+
+        relief_raster = gdal.Open(relief_path)
+        relief_band = relief_raster.GetRasterBand(1)
+        relief_geotransform = relief_raster.GetGeoTransform()
+        n_rows = relief_band.YSize
+        target_relief_point_layer.ResetReading()
+        for point_feature in target_relief_point_layer:
+            point_geometry = point_feature.GetGeometryRef()
+            point_x, point_y = point_geometry.GetX(), point_geometry.GetY()
+            point_geometry = None
+
+            pixel_x = int(
+                (point_x - relief_geotransform[0]) / relief_geotransform[1] +
+                0.5)
+            pixel_y = int(
+                (point_y - relief_geotransform[3]) / relief_geotransform[5] +
+                0.5)
+
+            pixel_value = relief_band.ReadAsArray(
+                xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
+            point_feature.SetField('relief', float(pixel_value))
+            logger.debug(pixel_value)
+            target_relief_point_layer.SetFeature(point_feature)
+
+        target_relief_point_layer.SyncToDisk()
+        target_relief_point_layer = None
+        target_relief_point_vector = None
+
         # can i aggregate by point? if so, that's the relief
+        logger.debug(pygeoprocessing.zonal_statistics(
+            (relief_path, 1), target_relief_point_vector_path,
+            'id'))
     except Exception as e:
         traceback.print_exc()
         raise
 
 
+def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
+    """Create a raster kernel with a radius given.
+
+    Parameters:
+        expected_distance (int or float): The distance (in pixels) of the
+            kernel's radius, the distance at which the value of the decay
+            function is equal to `1/e`.
+        kernel_filepath (string): The path to the file on disk where this
+            kernel should be stored.  If this file exists, it will be
+            overwritten.
+
+    Returns:
+        None
+    """
+    driver = gdal.GetDriverByName('GTiff')
+    kernel_dataset = driver.Create(
+        kernel_filepath.encode('utf-8'), int(radius_in_pixels)*2+1,
+        int(radius_in_pixels)*2+1,
+        1, gdal.GDT_Float32, options=[
+            'BIGTIFF=IF_SAFER', 'TILED=YES', 'BLOCKXSIZE=256',
+            'BLOCKYSIZE=256'])
+
+    # Make some kind of geotransform, it doesn't matter what but
+    # will make GIS libraries behave better if it's all defined
+    kernel_dataset.SetGeoTransform([444720, 30, 0, 3751320, 0, -30])
+    srs = osr.SpatialReference()
+    srs.SetUTM(11, 1)
+    srs.SetWellKnownGeogCS('NAD27')
+    kernel_dataset.SetProjection(srs.ExportToWkt())
+
+    kernel_band = kernel_dataset.GetRasterBand(1)
+    kernel_band.SetNoDataValue(-9999)
+
+    cols_per_block, rows_per_block = kernel_band.GetBlockSize()
+
+    n_cols = kernel_dataset.RasterXSize
+    n_rows = kernel_dataset.RasterYSize
+
+    n_col_blocks = int(math.ceil(n_cols / float(cols_per_block)))
+    n_row_blocks = int(math.ceil(n_rows / float(rows_per_block)))
+
+    integration = 0.0
+    for row_block_index in xrange(n_row_blocks):
+        row_offset = row_block_index * rows_per_block
+        row_block_width = n_rows - row_offset
+        if row_block_width > rows_per_block:
+            row_block_width = rows_per_block
+
+        for col_block_index in xrange(n_col_blocks):
+            col_offset = col_block_index * cols_per_block
+            col_block_width = n_cols - col_offset
+            if col_block_width > cols_per_block:
+                col_block_width = cols_per_block
+
+            # Numpy creates index rasters as ints by default, which sometimes
+            # creates problems on 32-bit builds when we try to add Int32
+            # matrices to float64 matrices.
+            row_indices, col_indices = numpy.indices((row_block_width,
+                                                      col_block_width),
+                                                     dtype=numpy.float)
+
+            row_indices += numpy.float(row_offset - radius_in_pixels)
+            col_indices += numpy.float(col_offset - radius_in_pixels)
+
+            kernel_index_distances = numpy.hypot(
+                row_indices, col_indices)
+            kernel = numpy.where(
+                kernel_index_distances > radius_in_pixels, 0.0, 1.0)
+            integration += numpy.sum(kernel)
+
+            kernel_band.WriteArray(kernel, xoff=col_offset,
+                                   yoff=row_offset)
+
+    # Need to flush the kernel's cache to disk before opening up a new Dataset
+    # object in interblocks()
+    kernel_dataset.FlushCache()
+
+    for block_data, kernel_block in pygeoprocessing.iterblocks(
+            kernel_filepath):
+        kernel_block /= integration
+        kernel_band.WriteArray(kernel_block, xoff=block_data['xoff'],
+                               yoff=block_data['yoff'])
 
 
 def create_shore_points(
