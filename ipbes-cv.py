@@ -93,7 +93,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -336,7 +336,49 @@ def calculate_habitat_protection(
     Returns:
         None.
     """
-    pass
+    try:
+        if not os.path.exists(os.path.dirname(
+                target_habitat_protection_point_vector_path)):
+            os.makedirs(
+                os.path.dirname(target_habitat_protection_point_vector_path))
+        if os.path.exists(target_habitat_protection_point_vector_path):
+            os.remove(target_habitat_protection_point_vector_path)
+
+        base_ref_wkt = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)['projection']
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_ref_wkt)
+
+        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        os.path.dirname(base_shore_point_vector_path)
+        target_habitat_protection_point_vector = (
+            esri_shapefile_driver.CreateDataSource(
+                target_habitat_protection_point_vector_path))
+        target_habitat_protection_point_layer = (
+            target_habitat_protection_point_vector.CreateLayer(
+                os.path.splitext(
+                    target_habitat_protection_point_vector_path)[0],
+                base_spatial_reference, ogr.wkbPoint))
+        target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
+            'Rhab', ogr.OFTReal))
+        for habitat_id in habitat_layer_lookup:
+            target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
+                habitat_id, ogr.OFTReal))
+        target_habitat_protection_point_defn = (
+            target_habitat_protection_point_layer.GetLayerDefn())
+
+        base_shore_point_vector = ogr.Open(base_shore_point_vector_path)
+        base_shore_point_layer = base_shore_point_vector.GetLayer()
+        for base_fetch_point_feature in base_shore_point_layer:
+            target_feature = ogr.Feature(target_habitat_protection_point_defn)
+            target_feature.SetGeometry(
+                base_fetch_point_feature.GetGeometryRef().Clone())
+
+            target_habitat_protection_point_layer.CreateFeature(
+                target_feature)
+    except Exception as e:
+        traceback.print_exc()
+        raise
 
 
 def calculate_wave_exposure(
