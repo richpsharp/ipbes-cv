@@ -66,6 +66,7 @@ _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
 _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
+_HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
@@ -122,7 +123,7 @@ def main():
         simplify_habitat_task = task_graph.add_task(
             target=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
-                simplified_habitat_vector_lookup[habitat_id]))
+                simplified_habitat_vector_lookup[habitat_id][0]))
         simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
@@ -158,7 +159,7 @@ def main():
     habitat_protection_task_list = []
     local_habitat_protection_path_list = []
     #for grid_id in xrange(grid_count):
-    for grid_id in xrange(6):
+    for grid_id in [473]:
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -213,7 +214,7 @@ def main():
             _HABITAT_PROTECTION_WORKSPACES, 'habitat_protection_%d' % grid_id)
         target_habitat_protection_point_path = os.path.join(
             habitat_protection_workspace,
-            _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+            _HABITAT_PROTECTION_POINT_FILE_PATTERN % grid_id)
         habitat_protection_task = task_graph.add_task(
             target=calculate_habitat_protection, args=(
                 grid_point_path,
@@ -337,6 +338,7 @@ def calculate_habitat_protection(
         None.
     """
     try:
+        logger = logging.getLogger('ipbes-cv.calculate_habitat_protection')
         if not os.path.exists(os.path.dirname(
                 target_habitat_protection_point_vector_path)):
             os.makedirs(
@@ -349,33 +351,154 @@ def calculate_habitat_protection(
         base_spatial_reference = osr.SpatialReference()
         base_spatial_reference.ImportFromWkt(base_ref_wkt)
 
+        # reproject base_shore_point_vector_path to utm coordinates
+        base_shore_info = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)
+        base_shore_bounding_box = base_shore_info['bounding_box']
+
+        utm_spatial_reference = get_utm_spatial_reference(
+            base_shore_info['bounding_box'])
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
+
+        pygeoprocessing.reproject_vector(
+            base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
+            target_habitat_protection_point_vector_path)
+
+        utm_bounding_box = pygeoprocessing.get_vector_info(
+            target_habitat_protection_point_vector_path)['bounding_box']
+
+        # extend bounding box for max fetch distance
+        utm_bounding_box = [
+            utm_bounding_box[0] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[1] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[2] + _MAX_FETCH_DISTANCE,
+            utm_bounding_box[3] + _MAX_FETCH_DISTANCE]
+
+        # get lat/lng bounding box of utm projected coordinates
+
+        # get global polygon clip of that utm box
+        # transform local box back to lat/lng -> global clipping box
+        lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
+            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+            base_spatial_reference.ExportToWkt(), edge_samples=11)
+        if (base_shore_bounding_box[0] > 0 and
+                lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[2] += 360
+        elif (base_shore_bounding_box[0] < 0 and
+              lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[0] -= 360
+        elif base_shore_bounding_box == [0, 0, 0, 0]:
+            # this case guards for an empty shore point in case there are
+            # very tiny islands or such
+            lat_lng_clipping_box = (0, 0, 0, 0)
+        lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
+        habitat_shapely_lookup = {}
+
+        for habitat_id in habitat_layer_lookup:
+            habitat_vector = ogr.Open(habitat_layer_lookup[habitat_id][0])
+            habitat_layer = habitat_vector.GetLayer()
+
+            # this will hold the clipped landmass geometry
+            esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+            temp_clipped_vector_path = os.path.join(
+                workspace_dir, 'clipped_habitat_%s.shp' % habitat_id)
+            utm_clipped_vector_path = os.path.join(
+                workspace_dir, 'utm_clipped_habitat_%s.shp' % habitat_id)
+            for path in [temp_clipped_vector_path, utm_clipped_vector_path]:
+                if os.path.exists(path):
+                    os.remove(path)
+            temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
+                temp_clipped_vector_path)
+            temp_clipped_layer = (
+                temp_clipped_vector.CreateLayer(
+                    os.path.splitext(temp_clipped_vector_path)[0],
+                    base_spatial_reference, ogr.wkbPolygon))
+            temp_clipped_defn = temp_clipped_layer.GetLayerDefn()
+
+            # clip global polygon to global clipping box
+            for habitat_feature in habitat_layer:
+                habitat_shapely = shapely.wkb.loads(
+                    habitat_feature.GetGeometryRef().ExportToWkb())
+                intersection_shapely = lat_lng_clipping_shapely.intersection(
+                    habitat_shapely)
+                try:
+                    clipped_geometry = ogr.CreateGeometryFromWkt(
+                        intersection_shapely.wkt)
+                    clipped_feature = ogr.Feature(temp_clipped_defn)
+                    clipped_feature.SetGeometry(clipped_geometry)
+                    temp_clipped_layer.CreateFeature(clipped_feature)
+                    clipped_feature = None
+                except Exception:
+                    logger.warn(
+                        "Couldn't process this intersection %s",
+                        intersection_shapely)
+            temp_clipped_layer.SyncToDisk()
+            temp_clipped_layer = None
+            temp_clipped_vector = None
+
+            pygeoprocessing.reproject_vector(
+                temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
+                utm_clipped_vector_path)
+
+            clipped_geometry_shapely_list = []
+            temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
+            temp_utm_clipped_layer = temp_utm_clipped_vector.GetLayer()
+            for tmp_utm_feature in temp_utm_clipped_layer:
+                tmp_utm_geometry = tmp_utm_feature.GetGeometryRef()
+                shapely_geometry = shapely.wkb.loads(
+                    tmp_utm_geometry.ExportToWkb())
+                if shapely_geometry.is_valid:
+                    clipped_geometry_shapely_list.append(shapely_geometry)
+                tmp_utm_geometry = None
+            temp_utm_clipped_layer = None
+            temp_utm_clipped_vector = None
+            habitat_shapely_lookup[habitat_id] = shapely.ops.cascaded_union(
+                clipped_geometry_shapely_list)
+
         esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
         os.path.dirname(base_shore_point_vector_path)
-        target_habitat_protection_point_vector = (
-            esri_shapefile_driver.CreateDataSource(
-                target_habitat_protection_point_vector_path))
+        target_habitat_protection_point_vector = ogr.Open(
+            target_habitat_protection_point_vector_path, 1)
         target_habitat_protection_point_layer = (
-            target_habitat_protection_point_vector.CreateLayer(
-                os.path.splitext(
-                    target_habitat_protection_point_vector_path)[0],
-                base_spatial_reference, ogr.wkbPoint))
+            target_habitat_protection_point_vector.GetLayer())
         target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
             'Rhab', ogr.OFTReal))
         for habitat_id in habitat_layer_lookup:
             target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
                 habitat_id, ogr.OFTReal))
-        target_habitat_protection_point_defn = (
-            target_habitat_protection_point_layer.GetLayerDefn())
 
-        base_shore_point_vector = ogr.Open(base_shore_point_vector_path)
-        base_shore_point_layer = base_shore_point_vector.GetLayer()
-        for base_fetch_point_feature in base_shore_point_layer:
-            target_feature = ogr.Feature(target_habitat_protection_point_defn)
-            target_feature.SetGeometry(
-                base_fetch_point_feature.GetGeometryRef().Clone())
+        for target_feature in target_habitat_protection_point_layer:
+            target_feature_geometry = (
+                target_feature.GetGeometryRef().Clone())
 
-            target_habitat_protection_point_layer.CreateFeature(
+            target_feature_shapely = shapely.wkb.loads(
+                target_feature_geometry.ExportToWkb())
+            min_rank = 5
+            sum_sq_rank = 0.0
+            for habitat_id, (_, rank, protection_distance) in (
+                    habitat_layer_lookup.iteritems()):
+                if (target_feature_shapely.distance(
+                        habitat_shapely_lookup[habitat_id]) >
+                        protection_distance):
+                    # 5 is the worst rank
+                    rank = 5
+                    if rank < min_rank:
+                        min_rank = rank
+                target_feature.SetField(habitat_id, rank)
+                sum_sq_rank += (5 - rank) ** 2
+
+            # Equation 4
+            target_feature.SetField(
+                'Rhab', 4.8 - 0.5 * (
+                    (1.5 * (5-min_rank))**2 +
+                    (sum_sq_rank - (5-min_rank))**2)**0.5)
+            target_feature.SetGeometry(target_feature_geometry)
+            target_habitat_protection_point_layer.SetFeature(
                 target_feature)
+        target_habitat_protection_point_layer.SyncToDisk()
+        target_habitat_protection_point_layer = None
+        target_habitat_protection_point_vector = None
     except Exception as e:
         traceback.print_exc()
         raise
