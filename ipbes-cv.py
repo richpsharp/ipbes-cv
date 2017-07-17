@@ -68,6 +68,8 @@ _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
+_GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
+    'global_habitat_protection_points.shp')
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
@@ -75,6 +77,8 @@ _WIND_EXPOSURE_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'wind_exposure_workspaces')
 _WAVE_EXPOSURE_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'wave_exposure_workspaces')
+_HABITAT_PROTECTION_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'habitat_protection_workspaces')
 _GRID_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'grid_workspaces')
 
@@ -108,16 +112,17 @@ def main():
             simplified_vector_path))
 
     simplify_habitat_task_list = []
-    simplified_habitat_vector_paths = {}
+    simplified_habitat_vector_lookup = {}
     for habitat_id, (habitat_path, habitat_rank, habitat_dist) in (
             _GLOBAL_HABITAT_LAYER_PATHS.iteritems()):
         smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
-        simplified_habitat_vector_paths[habitat_id] = os.path.join(
-            _TARGET_WORKSPACE, '%s.shp' % habitat_id)
+        simplified_habitat_vector_lookup[habitat_id] = (
+            os.path.join(_TARGET_WORKSPACE, '%s.shp' % habitat_id),
+            habitat_rank, habitat_dist)
         simplify_habitat_task = task_graph.add_task(
             target=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
-                simplified_habitat_vector_paths[habitat_id]))
+                simplified_habitat_vector_lookup[habitat_id]))
         simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
@@ -150,6 +155,8 @@ def main():
     wave_exposure_task_list = []
     local_fetch_ray_path_list = []
     local_wave_point_path_list = []
+    habitat_protection_task_list = []
+    local_habitat_protection_path_list = []
     #for grid_id in xrange(grid_count):
     for grid_id in xrange(6):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
@@ -202,6 +209,22 @@ def main():
         local_wave_point_path_list.append(
             target_wave_exposure_point_path)
 
+        habitat_protection_workspace = os.path.join(
+            _HABITAT_PROTECTION_WORKSPACES, 'habitat_protection_%d' % grid_id)
+        target_habitat_protection_point_path = os.path.join(
+            habitat_protection_workspace,
+            _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+        habitat_protection_task = task_graph.add_task(
+            target=calculate_habitat_protection, args=(
+                grid_point_path,
+                simplified_habitat_vector_lookup,
+                habitat_protection_workspace,
+                target_habitat_protection_point_path),
+            dependent_task_list=[create_shore_points_task])
+        habitat_protection_task_list.append(habitat_protection_task)
+        local_habitat_protection_path_list.append(
+            target_habitat_protection_point_path)
+
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
@@ -223,6 +246,16 @@ def main():
             target_merged_wave_points_path,
             ['Ew']),
         dependent_task_list=wave_exposure_task_list)
+
+    target_habitat_protection_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_habitat_protection_path_list,
+            target_spatial_reference_wkt,
+            target_habitat_protection_points_path,
+            ['Rhab']),
+        dependent_task_list=habitat_protection_task_list)
 
     target_merged_fetch_rays_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
@@ -281,6 +314,29 @@ def simplify_geometry(
     target_simplified_layer.SyncToDisk()
     target_simplified_layer = None
     target_simplified_vector = None
+
+
+def calculate_habitat_protection(
+        base_shore_point_vector_path,
+        habitat_layer_lookup, workspace_dir,
+        target_habitat_protection_point_vector_path):
+    """Calculate habitat protection at a set of points.
+
+    Parameters:
+        base_shore_point_vector_path (string):  path to a point shapefile to
+            analyze habitat protection at.
+        habitat_layer_lookup: a dictionary mapping habitat id to a
+            (path, rank, distance) tuple
+        workspace_dir (string): path to a directory to make local calculations
+            in
+        target_habitat_protection_point_vector_path (string): path to desired
+            output vector.  after completion will have a rank for each
+            habitat ID, and a field called Rhab with a value from 1-5
+            indicating relative level of protection of that point.
+    Returns:
+        None.
+    """
+    pass
 
 
 def calculate_wave_exposure(
