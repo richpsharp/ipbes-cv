@@ -483,8 +483,8 @@ def calculate_habitat_protection(
                         protection_distance):
                     # 5 is the worst rank
                     rank = 5
-                    if rank < min_rank:
-                        min_rank = rank
+                if rank < min_rank:
+                    min_rank = rank
                 target_feature.SetField(habitat_id, rank)
                 sum_sq_rank += (5 - rank) ** 2
 
