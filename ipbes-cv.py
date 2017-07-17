@@ -30,6 +30,14 @@ _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\
 
 _GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
+# layer name, (layer path, layer rank, protection distance)
+_GLOBAL_HABITAT_LAYER_PATHS = {
+    'mangrove': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
+    'saltmarsh': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
+    'coralreef': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
+    'seagrass': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+}
+
 # The global bounding box to do the entire analysis
 # This range was roughly picked to avoid the poles
 # [min_lat, min_lng, max_lat, max_lng]
@@ -81,7 +89,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)# multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -98,6 +106,19 @@ def main():
         target=simplify_geometry, args=(
             _GLOBAL_POLYGON_PATH, smallest_feature_size_degrees,
             simplified_vector_path))
+
+    simplify_habitat_task_list = []
+    simplified_habitat_vector_paths = {}
+    for habitat_id, (habitat_path, habitat_rank, habitat_dist) in (
+            _GLOBAL_HABITAT_LAYER_PATHS.iteritems()):
+        smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
+        simplified_habitat_vector_paths[habitat_id] = os.path.join(
+            _TARGET_WORKSPACE, '%s.shp' % habitat_id)
+        simplify_habitat_task = task_graph.add_task(
+            target=simplify_geometry, args=(
+                habitat_path, smallest_feature_size_degrees,
+                simplified_habitat_vector_paths[habitat_id]))
+        simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
@@ -130,7 +151,7 @@ def main():
     local_fetch_ray_path_list = []
     local_wave_point_path_list = []
     #for grid_id in xrange(grid_count):
-    for grid_id in [2]:
+    for grid_id in xrange(6):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
