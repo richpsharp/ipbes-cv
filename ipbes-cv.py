@@ -99,7 +99,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -166,7 +166,7 @@ def main():
     relief_task_list = []
     local_relief_path_list = []
     #for grid_id in xrange(grid_count):
-    for grid_id in xrange(grid_count):
+    for grid_id in [509]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -932,7 +932,14 @@ def calculate_relief(
     """Calculate DEM relief as average coastal land area within 5km.
 
     Parameters:
-    TODO fill in
+        base_shore_point_vector_path (string):  path to a point shapefile to
+            for relief point analysis.
+        global_dem_path (string): path to a DEM raster projected in wgs84.
+        workspace_dir (string): path to a directory to make local calculations
+            in
+        target_relief_point_vector_path (string): path to output vector.
+            after completion will a value for average relief within 5km in
+            a field called 'relief'.
 
     Returns:
         None.
@@ -1000,11 +1007,15 @@ def calculate_relief(
 
         target_pixel_size = pygeoprocessing.get_raster_info(
             global_dem_path)['pixel_size']
+        logger.debug(target_pixel_size)
+        logger.debug(base_shore_bounding_box)
         pygeoprocessing.warp_raster(
             global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
             'bilinear', target_bb=base_shore_bounding_box)
         clipped_utm_dem_path = os.path.join(
             workspace_dir, 'clipped_utm_dem.tif')
+        target_pixel_size = (
+            _SMALLEST_FEATURE_SIZE / 2.0, -_SMALLEST_FEATURE_SIZE / 2.0)
         pygeoprocessing.warp_raster(
             clipped_lat_lng_dem_path, target_pixel_size, clipped_utm_dem_path,
             'bilinear', target_sr_wkt=utm_spatial_reference.ExportToWkt())
