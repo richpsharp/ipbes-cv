@@ -30,6 +30,8 @@ _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\
 
 _GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
+_GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
     'mangrove': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
@@ -67,6 +69,7 @@ _GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
 _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
 _HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
+_RELIEF_POINT_FILE_PATTERN = 'relief_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
@@ -80,6 +83,8 @@ _WAVE_EXPOSURE_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'wave_exposure_workspaces')
 _HABITAT_PROTECTION_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'habitat_protection_workspaces')
+_RELIEF_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'relief_workspaces')
 _GRID_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'grid_workspaces')
 
@@ -94,7 +99,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -158,8 +163,10 @@ def main():
     local_wave_point_path_list = []
     habitat_protection_task_list = []
     local_habitat_protection_path_list = []
+    relief_task_list = []
+    local_relief_path_list = []
     #for grid_id in xrange(grid_count):
-    for grid_id in [473]:
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -226,6 +233,20 @@ def main():
         local_habitat_protection_path_list.append(
             target_habitat_protection_point_path)
 
+        relief_workspace = os.path.join(
+            _RELIEF_WORKSPACES, 'relief_%d' % grid_id)
+        target_relief_point_vector_path = os.path.join(
+            relief_workspace, _RELIEF_POINT_FILE_PATTERN % grid_id)
+        relief_task = task_graph.add_task(
+            target=calculate_relief, args=(
+                grid_point_path, _GLOBAL_DEM_PATH,
+                relief_workspace,
+                target_relief_point_vector_path),
+            dependent_task_list=[create_shore_points_task])
+        relief_task_list.append(relief_task)
+        local_relief_path_list.append(
+            target_relief_point_vector_path)
+
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
@@ -247,6 +268,16 @@ def main():
             target_merged_wave_points_path,
             ['Ew']),
         dependent_task_list=wave_exposure_task_list)
+
+    target_merged_relief_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_RELIEF_POINT_FILE_PATTERN)
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_relief_path_list,
+            target_spatial_reference_wkt,
+            target_merged_relief_points_path,
+            ['relief']),
+        dependent_task_list=relief_task_list)
 
     target_habitat_protection_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
@@ -893,6 +924,98 @@ def calculate_wind_exposure(
     except Exception as e:
         traceback.print_exc()
         raise
+
+
+def calculate_relief(
+        base_shore_point_vector_path, global_dem_path, workspace_dir,
+        target_relief_point_vector_path):
+    """Calculate DEM relief as average coastal land area within 5km.
+
+    Parameters:
+    TODO fill in
+
+    Returns:
+        None.
+    """
+    try:
+        logger = logging.getLogger('ipbes-cv.calculate_relief')
+        if not os.path.exists(os.path.dirname(
+                target_relief_point_vector_path)):
+            os.makedirs(
+                os.path.dirname(target_relief_point_vector_path))
+        if not os.path.exists(workspace_dir):
+            os.makedirs(workspace_dir)
+        if os.path.exists(target_relief_point_vector_path):
+            os.remove(target_relief_point_vector_path)
+
+        base_ref_wkt = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)['projection']
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_ref_wkt)
+
+        # reproject base_shore_point_vector_path to utm coordinates
+        base_shore_info = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)
+        base_shore_bounding_box = base_shore_info['bounding_box']
+
+        utm_spatial_reference = get_utm_spatial_reference(
+            base_shore_info['bounding_box'])
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
+
+        pygeoprocessing.reproject_vector(
+            base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
+            target_relief_point_vector_path)
+
+        utm_bounding_box = pygeoprocessing.get_vector_info(
+            target_relief_point_vector_path)['bounding_box']
+
+        # extend bounding box for max fetch distance
+        utm_bounding_box = [
+            utm_bounding_box[0] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[1] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[2] + _MAX_FETCH_DISTANCE,
+            utm_bounding_box[3] + _MAX_FETCH_DISTANCE]
+
+        # get lat/lng bounding box of utm projected coordinates
+
+        # get global polygon clip of that utm box
+        # transform local box back to lat/lng -> global clipping box
+        lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
+            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+            base_spatial_reference.ExportToWkt(), edge_samples=11)
+        if (base_shore_bounding_box[0] > 0 and
+                lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[2] += 360
+        elif (base_shore_bounding_box[0] < 0 and
+              lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[0] -= 360
+        elif base_shore_bounding_box == [0, 0, 0, 0]:
+            # this case guards for an empty shore point in case there are
+            # very tiny islands or such
+            lat_lng_clipping_box = (0, 0, 0, 0)
+
+        clipped_lat_lng_dem_path = os.path.join(
+            workspace_dir, 'clipped_lat_lng_dem.tif')
+
+        target_pixel_size = pygeoprocessing.get_raster_info(
+            global_dem_path)['pixel_size']
+        pygeoprocessing.warp_raster(
+            global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
+            'bilinear', target_bb=base_shore_bounding_box)
+        clipped_utm_dem_path = os.path.join(
+            workspace_dir, 'clipped_utm_dem.tif')
+        pygeoprocessing.warp_raster(
+            clipped_lat_lng_dem_path, target_pixel_size, clipped_utm_dem_path,
+            'bilinear', target_sr_wkt=utm_spatial_reference.ExportToWkt())
+        # mask out all DEM < 0 to 0
+        # convolve over a 5km radius
+        # can i aggregate by point? if so, that's the relief
+    except Exception as e:
+        traceback.print_exc()
+        raise
+
+
 
 
 def create_shore_points(
