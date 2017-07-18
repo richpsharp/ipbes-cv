@@ -104,7 +104,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -173,7 +173,7 @@ def main():
     surge_task_list = []
     local_surge_path_list = []
     #for grid_id in xrange(grid_count):
-    for grid_id in [509]:#xrange(grid_count):
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -556,7 +556,7 @@ def calculate_habitat_protection(
             target_feature.SetField(
                 'Rhab', 4.8 - 0.5 * (
                     (1.5 * (5-min_rank))**2 +
-                    (sum_sq_rank - (5-min_rank))**2)**0.5)
+                    sum_sq_rank - (5-min_rank)**2)**0.5)
             target_feature.SetGeometry(target_feature_geometry)
             target_habitat_protection_point_layer.SetFeature(
                 target_feature)
@@ -1094,6 +1094,7 @@ def calculate_relief(
 
         relief_raster = gdal.Open(relief_path)
         relief_band = relief_raster.GetRasterBand(1)
+        n_rows = relief_band.YSize
         relief_geotransform = relief_raster.GetGeoTransform()
         target_relief_point_layer.ResetReading()
         for point_feature in target_relief_point_layer:
@@ -1108,6 +1109,8 @@ def calculate_relief(
                 (point_y - relief_geotransform[3]) / relief_geotransform[5] +
                 0.5)
 
+            if pixel_y >= n_rows:
+                pixel_y = n_rows - 1
             pixel_value = relief_band.ReadAsArray(
                 xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
             point_feature.SetField('relief', float(pixel_value))
@@ -1305,10 +1308,11 @@ def calculate_surge(
                      point_geometry.GetY(),
                      point_geometry.GetX(),
                      point_geometry.GetY()),
-                    objects='raw', num_results=1))[0]
-            distance = nearest_point.distance(point_shapely)
-            point_feature.SetField('surge', float(distance))
-            target_relief_point_layer.SetFeature(point_feature)
+                    objects='raw', num_results=1))
+            if len(nearest_point) > 0:
+                distance = nearest_point[0].distance(point_shapely)
+                point_feature.SetField('surge', float(distance))
+                target_relief_point_layer.SetFeature(point_feature)
 
         target_relief_point_layer.SyncToDisk()
         target_relief_point_layer = None
