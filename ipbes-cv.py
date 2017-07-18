@@ -70,11 +70,13 @@ _WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
 _WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
 _HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
 _RELIEF_POINT_FILE_PATTERN = 'relief_%d.shp'
+_SURGE_POINT_FILE_PATTERN = 'surge_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
 _GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.shp'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
     'global_habitat_protection_points.shp')
+_GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
@@ -88,6 +90,8 @@ _RELIEF_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'relief_workspaces')
 _GRID_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'grid_workspaces')
+_SURGE_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'surge_workspaces')
 
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
@@ -166,6 +170,8 @@ def main():
     local_habitat_protection_path_list = []
     relief_task_list = []
     local_relief_path_list = []
+    surge_task_list = []
+    local_surge_path_list = []
     #for grid_id in xrange(grid_count):
     for grid_id in [509]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
@@ -236,17 +242,33 @@ def main():
 
         relief_workspace = os.path.join(
             _RELIEF_WORKSPACES, 'relief_%d' % grid_id)
-        target_relief_point_vector_path = os.path.join(
+        target_relief_point_path = os.path.join(
             relief_workspace, _RELIEF_POINT_FILE_PATTERN % grid_id)
         relief_task = task_graph.add_task(
             target=calculate_relief, args=(
-                grid_point_path, _GLOBAL_DEM_PATH,
+                grid_point_path,
+                _GLOBAL_DEM_PATH,
                 relief_workspace,
-                target_relief_point_vector_path),
+                target_relief_point_path),
             dependent_task_list=[create_shore_points_task])
         relief_task_list.append(relief_task)
         local_relief_path_list.append(
-            target_relief_point_vector_path)
+            target_relief_point_path)
+
+        surge_workspace = os.path.join(
+            _SURGE_WORKSPACES, 'surge_%d' % grid_id)
+        target_surge_point_vector_path = os.path.join(
+            surge_workspace, _SURGE_POINT_FILE_PATTERN % grid_id)
+        surge_task = task_graph.add_task(
+            target=calculate_surge, args=(
+                grid_point_path,
+                _GLOBAL_DEM_PATH,
+                surge_workspace,
+                target_surge_point_vector_path),
+            dependent_task_list=[create_shore_points_task])
+        surge_task_list.append(surge_task)
+        local_surge_path_list.append(
+            target_surge_point_vector_path)
 
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
@@ -289,6 +311,16 @@ def main():
             target_habitat_protection_points_path,
             ['Rhab']),
         dependent_task_list=habitat_protection_task_list)
+
+    target_merged_surge_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
+    _ = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_surge_path_list,
+            target_spatial_reference_wkt,
+            target_merged_surge_points_path,
+            ['surge']),
+        dependent_task_list=surge_task_list)
 
     target_merged_fetch_rays_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
@@ -1079,6 +1111,203 @@ def calculate_relief(
             pixel_value = relief_band.ReadAsArray(
                 xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
             point_feature.SetField('relief', float(pixel_value))
+            target_relief_point_layer.SetFeature(point_feature)
+
+        target_relief_point_layer.SyncToDisk()
+        target_relief_point_layer = None
+        target_relief_point_vector = None
+
+    except Exception as e:
+        traceback.print_exc()
+        raise
+
+
+def calculate_surge(
+        base_shore_point_vector_path, global_dem_path, workspace_dir,
+        target_surge_point_vector_path):
+    """Calculate surge potential as distance to continental shelf (-150m).
+
+    Parameters:
+        base_shore_point_vector_path (string):  path to a point shapefile to
+            for relief point analysis.
+        global_dem_path (string): path to a DEM raster projected in wgs84.
+        workspace_dir (string): path to a directory to make local calculations
+            in
+        target_surge_point_vector_path (string): path to output vector.
+            after completion will a value for closest distance to continental
+            shelf called 'surge'.
+
+    Returns:
+        None.
+    """
+    try:
+        logger = logging.getLogger('ipbes-cv.calculate_surge')
+        if not os.path.exists(os.path.dirname(
+                target_surge_point_vector_path)):
+            os.makedirs(
+                os.path.dirname(target_surge_point_vector_path))
+        if not os.path.exists(workspace_dir):
+            os.makedirs(workspace_dir)
+        if os.path.exists(target_surge_point_vector_path):
+            os.remove(target_surge_point_vector_path)
+
+        base_ref_wkt = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)['projection']
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_ref_wkt)
+
+        # reproject base_shore_point_vector_path to utm coordinates
+        base_shore_info = pygeoprocessing.get_vector_info(
+            base_shore_point_vector_path)
+        base_shore_bounding_box = base_shore_info['bounding_box']
+
+        utm_spatial_reference = get_utm_spatial_reference(
+            base_shore_info['bounding_box'])
+        base_spatial_reference = osr.SpatialReference()
+        base_spatial_reference.ImportFromWkt(base_shore_info['projection'])
+
+        pygeoprocessing.reproject_vector(
+            base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
+            target_surge_point_vector_path)
+
+        utm_bounding_box = pygeoprocessing.get_vector_info(
+            target_surge_point_vector_path)['bounding_box']
+
+        target_relief_point_vector = ogr.Open(
+            target_surge_point_vector_path, 1)
+        target_relief_point_layer = target_relief_point_vector.GetLayer()
+
+        relief_field = ogr.FieldDefn('surge', ogr.OFTReal)
+        target_relief_point_layer.CreateField(relief_field)
+
+        # extend bounding box for max fetch distance
+        utm_bounding_box = [
+            utm_bounding_box[0] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[1] - _MAX_FETCH_DISTANCE,
+            utm_bounding_box[2] + _MAX_FETCH_DISTANCE,
+            utm_bounding_box[3] + _MAX_FETCH_DISTANCE]
+
+        # get lat/lng bounding box of utm projected coordinates
+
+        # get global polygon clip of that utm box
+        # transform local box back to lat/lng -> global clipping box
+        lat_lng_clipping_box = pygeoprocessing.transform_bounding_box(
+            utm_bounding_box, utm_spatial_reference.ExportToWkt(),
+            base_spatial_reference.ExportToWkt(), edge_samples=11)
+        if (base_shore_bounding_box[0] > 0 and
+                lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[2] += 360
+        elif (base_shore_bounding_box[0] < 0 and
+              lat_lng_clipping_box[0] > lat_lng_clipping_box[2]):
+            lat_lng_clipping_box[0] -= 360
+        elif base_shore_bounding_box == [0, 0, 0, 0]:
+            # this case guards for an empty shore point in case there are
+            # very tiny islands or such
+            lat_lng_clipping_box = (0, 0, 0, 0)
+
+        clipped_lat_lng_dem_path = os.path.join(
+            workspace_dir, 'clipped_lat_lng_dem.tif')
+
+        target_pixel_size = pygeoprocessing.get_raster_info(
+            global_dem_path)['pixel_size']
+        pygeoprocessing.warp_raster(
+            global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
+            'bilinear', target_bb=base_shore_bounding_box)
+        clipped_utm_dem_path = os.path.join(
+            workspace_dir, 'clipped_utm_dem.tif')
+        target_pixel_size = (
+            _SMALLEST_FEATURE_SIZE / 2.0, -_SMALLEST_FEATURE_SIZE / 2.0)
+        pygeoprocessing.warp_raster(
+            clipped_lat_lng_dem_path, target_pixel_size, clipped_utm_dem_path,
+            'bilinear', target_sr_wkt=utm_spatial_reference.ExportToWkt())
+        # mask out all DEM < 0 to 0
+        nodata = pygeoprocessing.get_raster_info(
+            clipped_utm_dem_path)['nodata'][0]
+
+        shelf_nodata = 2
+        def mask_shelf(depth_array):
+            valid_mask = depth_array != nodata
+            result_array = numpy.empty(
+                depth_array.shape, dtype=numpy.int16)
+            result_array[:] = shelf_nodata
+            result_array[valid_mask] = 0
+            result_array[depth_array < -150] = 1
+            return result_array
+
+        shelf_mask_path = os.path.join(
+            workspace_dir, 'shelf_mask.tif')
+
+        pygeoprocessing.raster_calculator(
+            [(clipped_utm_dem_path, 1)], mask_shelf,
+            shelf_mask_path, gdal.GDT_Byte, shelf_nodata)
+
+        # convolve to find edges
+        # grid shoreline from raster
+        shelf_kernel_path = os.path.join(workspace_dir, 'shelf_kernel.tif')
+        shelf_convoultion_raster_path = os.path.join(
+            workspace_dir, 'shelf_convolution.tif')
+        make_shore_kernel(shelf_kernel_path)
+        pygeoprocessing.convolve_2d(
+            (shelf_mask_path, 1), (shelf_kernel_path, 1),
+            shelf_convoultion_raster_path, target_datatype=gdal.GDT_Byte)
+
+        nodata = pygeoprocessing.get_raster_info(
+            shelf_convoultion_raster_path)['nodata'][0]
+
+        def _shelf_mask_op(shelf_convolution):
+            """Mask values on land that border the continental shelf."""
+            result = numpy.empty(shelf_convolution.shape, dtype=numpy.uint8)
+            result[:] = nodata
+            valid_mask = shelf_convolution != nodata
+            # If a pixel is on land, it gets at least a 9, but if it's all on
+            # land it gets an 17 (8 neighboring pixels), so we search between 9
+            # and 17 to determine a shore pixel
+            result[valid_mask] = numpy.where(
+                (shelf_convolution[valid_mask] >= 9) &
+                (shelf_convolution[valid_mask] < 17), 1, nodata)
+            return result
+
+        shelf_edge_raster_path = os.path.join(workspace_dir, 'shelf_edge.tif')
+        pygeoprocessing.raster_calculator(
+            [(shelf_convoultion_raster_path, 1)], _shelf_mask_op,
+            shelf_edge_raster_path, gdal.GDT_Byte, nodata)
+
+        shore_geotransform = pygeoprocessing.get_raster_info(
+            shelf_edge_raster_path)['geotransform']
+
+        shelf_rtree = rtree.index.Index()
+
+        for offset_info, data_block in pygeoprocessing.iterblocks(
+                shelf_edge_raster_path):
+            row_indexes, col_indexes = numpy.mgrid[
+                offset_info['yoff']:offset_info['yoff']+offset_info['win_ysize'],
+                offset_info['xoff']:offset_info['xoff']+offset_info['win_xsize']]
+            valid_mask = data_block == 1
+            x_coordinates = (
+                shore_geotransform[0] +
+                shore_geotransform[1] * (col_indexes[valid_mask] + 0.5) +
+                shore_geotransform[2] * (row_indexes[valid_mask] + 0.5))
+            y_coordinates = (
+                shore_geotransform[3] +
+                shore_geotransform[4] * (col_indexes[valid_mask] + 0.5) +
+                shore_geotransform[5] * (row_indexes[valid_mask] + 0.5))
+
+            for x_coord, y_coord in zip(x_coordinates, y_coordinates):
+                shelf_rtree.insert(
+                    0, [x_coord, y_coord, x_coord, y_coord],
+                    obj=shapely.geometry.Point(x_coord, y_coord))
+
+        for point_feature in target_relief_point_layer:
+            point_geometry = point_feature.GetGeometryRef()
+            point_shapely = shapely.wkb.loads(point_geometry.ExportToWkb())
+            nearest_point = list(shelf_rtree.nearest(
+                    (point_geometry.GetX(),
+                     point_geometry.GetY(),
+                     point_geometry.GetX(),
+                     point_geometry.GetY()),
+                    objects='raw', num_results=1))[0]
+            distance = nearest_point.distance(point_shapely)
+            point_feature.SetField('surge', float(distance))
             target_relief_point_layer.SetFeature(point_feature)
 
         target_relief_point_layer.SyncToDisk()
