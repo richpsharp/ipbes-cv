@@ -6,6 +6,7 @@ import os
 import math
 import logging
 import multiprocessing
+import re
 
 import numpy
 from osgeo import gdal
@@ -31,6 +32,8 @@ _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\
 _GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
 _GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+
+_GLOBAL_SEA_LEVEL_PATH = r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
@@ -71,6 +74,7 @@ _WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
 _HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
 _RELIEF_POINT_FILE_PATTERN = 'relief_%d.shp'
 _SURGE_POINT_FILE_PATTERN = 'surge_%d.shp'
+_SEA_LEVEL_POINT_FILE_PATTERN = 'sea_level_%d.shp'
 _GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
 _GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
 _GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.shp'
@@ -92,6 +96,8 @@ _GRID_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'grid_workspaces')
 _SURGE_WORKSPACES = os.path.join(
     _TARGET_WORKSPACE, 'surge_workspaces')
+_SEA_LEVEL_WORKSPACES = os.path.join(
+    _TARGET_WORKSPACE, 'sea_level_workspaces')
 
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
@@ -172,8 +178,10 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
+    sea_level_task_list = []
+    local_sea_level_path = []
     #for grid_id in xrange(grid_count):
-    for grid_id in xrange(grid_count):
+    for grid_id in [10, 15, 20]:#xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -269,6 +277,19 @@ def main():
         surge_task_list.append(surge_task)
         local_surge_path_list.append(
             target_surge_point_vector_path)
+
+        sea_level_workspaces = os.path.join(
+            _SEA_LEVEL_WORKSPACES, 'sea_level_%d' % grid_id)
+        target_sea_level_point_vector_path = os.path.join(
+            sea_level_workspaces, _SEA_LEVEL_WORKSPACES)
+        sea_level_task = task_graph.add_task(
+            target=calculate_sea_level_rise, args=(
+                grid_point_path,
+                _GLOBAL_SEA_LEVEL_PATH,
+                sea_level_workspaces,
+                target_sea_level_point_vector_path))
+        sea_level_task_list.append(sea_level_task)
+        local_sea_level_path.append(target_sea_level_point_vector_path)
 
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
@@ -1407,6 +1428,24 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
                                yoff=block_data['yoff'])
 
 
+def calculate_sea_level_rise(
+        grid_point_path, global_sea_level_path, sea_level_workspaces,
+        target_sea_level_point_vector_path):
+    """Assign a local sea level rise value to the incoming grid point.
+
+    Parameters:
+        grid_point_path (string):  path to a point shapefile to analyze
+            sea level rise.
+        global_sea_level_path (string): path to a set of points that have a
+            "MSLTrends_" field in them
+        workspace_dir (string): path to a directory to make local calculations
+            in
+        target_sea_level_point_vector_path (string): path to output vector.
+            after completion will a value for "MSLTrends_" in the nearest
+            sea level measurement."""
+    pass
+
+
 def create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
@@ -1976,6 +2015,8 @@ def merge_vectors(
         target_layer.CreateField(
             base_layer_defn.GetFieldDefn(
                 base_layer_defn.GetFieldIndex(field_name)))
+    target_layer.CreateField(ogr.FieldDefn('grid_id', ogr.OFTInteger))
+    target_layer.CreateField(ogr.FieldDefn('point_id', ogr.OFTInteger))
 
     base_layer = None
     base_vector = None
@@ -1983,6 +2024,9 @@ def merge_vectors(
     for base_vector_path in base_vector_path_list:
         base_vector = ogr.Open(base_vector_path)
         base_layer = base_vector.GetLayer()
+        grid_id = int(
+            re.search('.*(\d+)', os.path.split(
+                os.path.dirname(base_vector_path))[1]).group(1))
 
         base_spatial_reference = base_layer.GetSpatialRef()
         base_to_target_transform = osr.CoordinateTransformation(
@@ -1995,6 +2039,8 @@ def merge_vectors(
             target_feat.SetGeometry(target_geometry)
             for field_name in field_list_to_copy:
                 target_feat.SetField(field_name, feature.GetField(field_name))
+            target_feat.SetField('point_id', feature.GetFID())
+            target_feat.SetField('grid_id', grid_id)
             target_layer.CreateFeature(target_feat)
             target_feat = None
     target_layer.SyncToDisk()
