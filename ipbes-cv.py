@@ -110,7 +110,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -281,7 +281,7 @@ def main():
         sea_level_workspaces = os.path.join(
             _SEA_LEVEL_WORKSPACES, 'sea_level_%d' % grid_id)
         target_sea_level_point_vector_path = os.path.join(
-            sea_level_workspaces, _SEA_LEVEL_WORKSPACES)
+            sea_level_workspaces, _SEA_LEVEL_POINT_FILE_PATTERN % grid_id)
         sea_level_task = task_graph.add_task(
             target=calculate_sea_level_rise, args=(
                 grid_point_path,
@@ -1429,7 +1429,7 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
 
 
 def calculate_sea_level_rise(
-        grid_point_path, global_sea_level_path, sea_level_workspaces,
+        grid_point_path, global_sea_level_path, workspace_dir,
         target_sea_level_point_vector_path):
     """Assign a local sea level rise value to the incoming grid point.
 
@@ -1443,7 +1443,57 @@ def calculate_sea_level_rise(
         target_sea_level_point_vector_path (string): path to output vector.
             after completion will a value for "MSLTrends_" in the nearest
             sea level measurement."""
-    pass
+    logger = logging.getLogger('ipbes-cv.calculate_sea_level_rise')
+
+    if os.path.exists(workspace_dir):
+        shutil.rmtree(workspace_dir)
+    os.makedirs(workspace_dir)
+
+    if os.path.exists(target_sea_level_point_vector_path):
+        os.remove(target_sea_level_point_vector_path)
+
+    global_sea_level_point_vector = ogr.Open(global_sea_level_path)
+    global_sea_level_point_layer = global_sea_level_point_vector.GetLayer()
+
+    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+    target_sea_level_point_vector = esri_shapefile_driver.CreateDataSource(
+        target_sea_level_point_vector_path)
+    target_sea_level_point_layer = (
+        target_sea_level_point_vector.CreateLayer(
+            os.path.splitext(target_sea_level_point_vector_path)[0],
+            global_sea_level_point_layer.GetSpatialRef(), ogr.wkbPoint))
+    target_sea_level_point_layer.CreateField(
+        ogr.FieldDefn('MSLTrends_', ogr.OFTReal))
+    target_sea_level_point_defn = target_sea_level_point_layer.GetLayerDefn()
+
+    global_sea_level_rise_point_rtree = rtree.index.Index()
+
+    for global_sea_level_point in global_sea_level_point_layer:
+        global_sea_level_geometry = global_sea_level_point.GetGeometryRef()
+        global_sea_level_rise_point_rtree.insert(
+            0, [global_sea_level_geometry.GetX(),
+                global_sea_level_geometry.GetY(),
+                global_sea_level_geometry.GetX(),
+                global_sea_level_geometry.GetY()],
+            obj=float(global_sea_level_point.GetField('MSLTrends_')))
+
+    grid_point_vector = ogr.Open(grid_point_path)
+    grid_point_layer = grid_point_vector.GetLayer()
+    for grid_point_feature in grid_point_layer:
+        grid_point_geometry = grid_point_feature.GetGeometryRef()
+
+        target_sea_level_feature = ogr.Feature(target_sea_level_point_defn)
+        nearest_point_msl = list(global_sea_level_rise_point_rtree.nearest(
+            (grid_point_geometry.GetX(),
+             grid_point_geometry.GetY(),
+             grid_point_geometry.GetX(),
+             grid_point_geometry.GetY()), 1, objects=True))[0].object
+
+        target_sea_level_feature.SetGeometry(grid_point_geometry.Clone())
+        target_sea_level_feature.SetField('MSLTrends_', float(
+            nearest_point_msl))
+        target_sea_level_point_layer.CreateFeature(target_sea_level_feature)
+    target_sea_level_point_layer.SyncToDisk()
 
 
 def create_shore_points(
