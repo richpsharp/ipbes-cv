@@ -81,7 +81,9 @@ _GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.shp'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
     'global_habitat_protection_points.shp')
 _GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
+_GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
+_GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -110,7 +112,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)#multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)# multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -179,9 +181,8 @@ def main():
     surge_task_list = []
     local_surge_path_list = []
     sea_level_task_list = []
-    local_sea_level_path = []
-    #for grid_id in xrange(grid_count):
-    for grid_id in [10, 15, 20]:#xrange(grid_count):
+    local_sea_level_path_list = []
+    for grid_id in [0, 1, 2]: #xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -289,59 +290,89 @@ def main():
                 sea_level_workspaces,
                 target_sea_level_point_vector_path))
         sea_level_task_list.append(sea_level_task)
-        local_sea_level_path.append(target_sea_level_point_vector_path)
+        local_sea_level_path_list.append(target_sea_level_point_vector_path)
 
+    merge_vectors_task_list = []
+    risk_factor_vector_list = []
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
-    _ = task_graph.add_task(
+    merge_rei_point_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_rei_point_path_list,
             target_spatial_reference_wkt,
             target_merged_rei_points_path,
             ['REI']),
         dependent_task_list=wind_exposure_task_list)
+    merge_vectors_task_list.append(merge_rei_point_task)
+    risk_factor_vector_list.append(
+        (target_merged_rei_points_path, 'REI', 'Rwind'))
 
     target_merged_wave_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WAVE_POINT_FILE_PATTERN)
-    _ = task_graph.add_task(
+    merge_wave_point_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_wave_point_path_list,
             target_spatial_reference_wkt,
             target_merged_wave_points_path,
             ['Ew']),
         dependent_task_list=wave_exposure_task_list)
+    risk_factor_vector_list.append(
+        (target_merged_wave_points_path, 'Ew', 'Rwave'))
+    merge_vectors_task_list.append(merge_wave_point_task)
 
     target_merged_relief_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_RELIEF_POINT_FILE_PATTERN)
-    _ = task_graph.add_task(
+    merge_relief_point_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_relief_path_list,
             target_spatial_reference_wkt,
             target_merged_relief_points_path,
             ['relief']),
         dependent_task_list=relief_task_list)
+    risk_factor_vector_list.append(
+        (target_merged_relief_points_path, 'relief', 'Rrelief'))
+    merge_vectors_task_list.append(merge_relief_point_task)
+
+    target_merged_relief_sea_level_rise_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN)
+    merge_sea_level_point_task = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_sea_level_path_list,
+            target_spatial_reference_wkt,
+            target_merged_relief_sea_level_rise_path,
+            ['MSLTrends_']),
+        dependent_task_list=sea_level_task_list)
+    risk_factor_vector_list.append(
+        (target_merged_relief_sea_level_rise_path, 'MSLTrends_', 'Rsea_rise'))
+    merge_vectors_task_list.append(merge_sea_level_point_task)
 
     target_habitat_protection_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
-    _ = task_graph.add_task(
+    merge_habitat_protection_point_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_habitat_protection_path_list,
             target_spatial_reference_wkt,
             target_habitat_protection_points_path,
             ['Rhab']),
         dependent_task_list=habitat_protection_task_list)
+    risk_factor_vector_list.append(
+        (target_habitat_protection_points_path, 'Rhab', 'Rhab'))
+    merge_vectors_task_list.append(merge_habitat_protection_point_task)
 
     target_merged_surge_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
-    _ = task_graph.add_task(
+    merge_surge_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_surge_path_list,
             target_spatial_reference_wkt,
             target_merged_surge_points_path,
             ['surge']),
         dependent_task_list=surge_task_list)
+    risk_factor_vector_list.append(
+        (target_merged_surge_points_path, 'surge', 'Rsurge'))
+    merge_vectors_task_list.append(merge_surge_task)
 
     target_merged_fetch_rays_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
@@ -355,7 +386,98 @@ def main():
             []),
         dependent_task_list=wind_exposure_task_list)
 
+    target_result_point_vector_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN)
+    _ = task_graph.add_task(
+        target=summarize_results, args=(
+            risk_factor_vector_list, target_result_point_vector_path),
+        dependent_task_list=merge_vectors_task_list)
+
     task_graph.join()
+
+
+def summarize_results(
+        risk_factor_vector_list, target_result_point_vector_path):
+    """Aggregate the sub factors into a global one.
+
+    This includes sub risk factors into risk factors by percentile.
+
+        risk_factor_vector_list (list): a list of (path, field_id, risk_id)
+            global vectors that have at least the fields 'grid_id',
+            'point_id', and a `field_id`.  The value `risk_id` is a field
+            that will be added to `target_result_point_vector_path` and be
+            a risk value between 1 and 5 calculated in most cases from
+            the total histogram of the base `field_id` values in the
+            point shapefile.
+
+        target_result_point_vector_path (string): path to target point vector
+            with risks and other things I'll write soon.
+
+    Returns:
+        None
+    """
+    logger = logging.getLogger('ipbes-cv.summarize_results')
+    if os.path.exists(target_result_point_vector_path):
+        os.remove(target_result_point_vector_path)
+
+    base_point_vector_path = risk_factor_vector_list[0][0]
+    base_ref_wkt = pygeoprocessing.get_vector_info(
+        base_point_vector_path)['projection']
+    base_spatial_reference = osr.SpatialReference()
+    base_spatial_reference.ImportFromWkt(base_ref_wkt)
+
+    esri_driver = ogr.GetDriverByName("ESRI Shapefile")
+    target_result_point_vector = esri_driver.CreateDataSource(
+        target_result_point_vector_path)
+    target_result_point_layer = target_result_point_vector.CreateLayer(
+        os.path.splitext(os.path.basename(
+            target_result_point_vector_path))[0],
+        base_spatial_reference, ogr.wkbPoint)
+    for _, _, risk_id in risk_factor_vector_list:
+        target_result_point_layer.CreateField(ogr.FieldDefn(
+            risk_id, ogr.OFTReal))
+    target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
+
+    base_point_vector = ogr.Open(base_point_vector_path)
+    base_point_layer = base_point_vector.GetLayer()
+    fid_lookup = {}
+    for base_point_feature in base_point_layer:
+        grid_id = base_point_feature.GetField('grid_id')
+        point_id = base_point_feature.GetField('point_id')
+        target_fid = target_result_point_layer.GetFeatureCount()
+        fid_lookup[(grid_id, point_id)] = target_fid
+        target_feature = ogr.Feature(target_result_point_layer_defn)
+        target_feature.SetGeometry(
+            base_point_feature.GetGeometryRef().Clone())
+        target_result_point_layer.CreateFeature(target_feature)
+
+    for risk_factor_path, field_id, risk_id in risk_factor_vector_list:
+        risk_vector = ogr.Open(risk_factor_path)
+        risk_layer = risk_vector.GetLayer()
+        base_risk_values = numpy.empty(
+            target_result_point_layer.GetFeatureCount())
+        risk_feature = None
+        logger.debug(risk_factor_path)
+        for risk_feature in risk_layer:
+            risk_value = risk_feature.GetField(field_id)
+            point_id = risk_feature.GetField('point_id')
+            grid_id = risk_feature.GetField('grid_id')
+            target_fid = fid_lookup[(grid_id, point_id)]
+            base_risk_values[target_fid] = risk_value
+        # use the last feature to get the grid_id
+        if field_id != risk_id:
+            # convert to risk
+            target_risk_array = numpy.searchsorted(
+                numpy.percentile(base_risk_values, [0, 20, 40, 60, 80, 100]),
+                base_risk_values)
+        else:
+            # it's already a risk
+            target_risk_array = base_risk_values
+        for target_fid in xrange(len(target_risk_array)):
+            target_feature = target_result_point_layer.GetFeature(target_fid)
+            target_feature.SetField(risk_id, target_risk_array[target_fid])
+            target_result_point_layer.SetFeature(target_feature)
+    target_result_point_layer.SyncToDisk()
 
 
 def simplify_geometry(
