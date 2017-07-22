@@ -436,9 +436,19 @@ def summarize_results(
         os.path.splitext(os.path.basename(
             target_result_point_vector_path))[0],
         base_spatial_reference, ogr.wkbPoint)
+    risk_id_list = []
     for _, _, risk_id in risk_factor_vector_list:
         target_result_point_layer.CreateField(ogr.FieldDefn(
             risk_id, ogr.OFTReal))
+        risk_id_list.append(risk_id)
+    target_result_point_layer.CreateField(ogr.FieldDefn(
+        'Rt', ogr.OFTReal))
+    target_result_point_layer.CreateField(ogr.FieldDefn(
+        'Rtnohab', ogr.OFTReal))
+    target_result_point_layer.CreateField(ogr.FieldDefn(
+        'Rt_p', ogr.OFTReal))
+    target_result_point_layer.CreateField(ogr.FieldDefn(
+        'Rtnohab_p', ogr.OFTReal))
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
     base_point_vector = ogr.Open(base_point_vector_path)
@@ -471,8 +481,8 @@ def summarize_results(
         if field_id != risk_id:
             # convert to risk
             target_risk_array = numpy.searchsorted(
-                numpy.percentile(base_risk_values, [0, 20, 40, 60, 80, 100]),
-                base_risk_values)
+                numpy.percentile(base_risk_values, [20, 40, 60, 80, 100]),
+                base_risk_values) + 1
         else:
             # it's already a risk
             target_risk_array = base_risk_values
@@ -480,6 +490,39 @@ def summarize_results(
             target_feature = target_result_point_layer.GetFeature(target_fid)
             target_feature.SetField(risk_id, target_risk_array[target_fid])
             target_result_point_layer.SetFeature(target_feature)
+
+    target_result_point_layer.ResetReading()
+    r_target_array = numpy.empty(target_result_point_layer.GetFeatureCount())
+    r_no_hab_target_array = numpy.empty(
+        target_result_point_layer.GetFeatureCount())
+    for target_feature in target_result_point_layer:
+        r_list = [
+            target_feature.GetField(risk_id) for risk_id in risk_id_list]
+        r_tot = numpy.prod(r_list)**(1./len(r_list))
+        # calculate risk with no habitat
+        r_no_hab_list = [
+            target_feature.GetField(risk_id) for risk_id in risk_id_list
+            if risk_id != 'Rhab'] + [5]
+        r_no_hab = numpy.prod(r_no_hab_list)**(1./len(r_no_hab_list))
+        r_target_array[target_feature.GetFID()] = r_tot
+        r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
+
+    r_target_percentile = (numpy.searchsorted(
+        numpy.percentile(r_target_array, [25, 50, 75, 100]),
+        r_target_array) + 1) * 25
+
+    r_no_hab_target_percentile = (numpy.searchsorted(
+        numpy.percentile(r_no_hab_target_array, [0, 25, 50, 75]),
+        r_no_hab_target_array) + 1) * 25
+
+    for fid in xrange(r_target_array.size):
+        target_feature = target_result_point_layer.GetFeature(fid)
+        target_feature.SetField('Rt', r_target_array[fid])
+        target_feature.SetField('Rtnohab', r_no_hab_target_array[fid])
+        target_feature.SetField('Rt_p', r_target_percentile[fid])
+        target_feature.SetField('Rtnohab_p', r_no_hab_target_percentile[fid])
+        target_result_point_layer.SetFeature(target_feature)
+
     target_result_point_layer.SyncToDisk()
 
 
