@@ -115,7 +115,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)# multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -185,7 +185,7 @@ def main():
     local_surge_path_list = []
     sea_level_task_list = []
     local_sea_level_path_list = []
-    for grid_id in [2]: #xrange(grid_count):
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -451,10 +451,11 @@ def summarize_results(
         'Rtnohab_p', ogr.OFTReal))
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
-    base_point_vector = ogr.Open(base_point_vector_path)
-    base_point_layer = base_point_vector.GetLayer()
+    # define initial geometry and fid lookup
     fid_lookup = {}
-    for base_point_feature in base_point_layer:
+    risk_factor_vector = ogr.Open(risk_factor_vector_list[0][0])
+    risk_factor_layer = risk_factor_vector.GetLayer()
+    for base_point_feature in risk_factor_layer:
         grid_id = base_point_feature.GetField('grid_id')
         point_id = base_point_feature.GetField('point_id')
         target_fid = target_result_point_layer.GetFeatureCount()
