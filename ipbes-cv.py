@@ -107,6 +107,9 @@ _MAX_FETCH_DISTANCE = 60000
 
 def main():
     """Entry point."""
+    logging.basicConfig(
+        format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
+        level=logging.WARN, datefmt='%m/%d/%Y %H:%M:%S ')
     logger = logging.getLogger('ipbes-cv.main')
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
@@ -182,7 +185,7 @@ def main():
     local_surge_path_list = []
     sea_level_task_list = []
     local_sea_level_path_list = []
-    for grid_id in [0, 1, 2]: #xrange(grid_count):
+    for grid_id in [2]: #xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -1158,7 +1161,8 @@ def calculate_relief(
         target_relief_point_layer = target_relief_point_vector.GetLayer()
 
         relief_field = ogr.FieldDefn('relief', ogr.OFTReal)
-        #relief_field.SetWidth(24)
+        relief_field.SetPrecision(5)
+        relief_field.SetWidth(24)
         target_relief_point_layer.CreateField(relief_field)
         target_relief_point_layer.CreateField(ogr.FieldDefn(
             'id', ogr.OFTInteger))
@@ -1198,7 +1202,7 @@ def calculate_relief(
             global_dem_path)['pixel_size']
         pygeoprocessing.warp_raster(
             global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
-            'bilinear', target_bb=base_shore_bounding_box)
+            'bilinear', target_bb=lat_lng_clipping_box)
         clipped_utm_dem_path = os.path.join(
             workspace_dir, 'clipped_utm_dem.tif')
         target_pixel_size = (
@@ -1246,16 +1250,20 @@ def calculate_relief(
             point_geometry = None
 
             pixel_x = int(
-                (point_x - relief_geotransform[0]) / relief_geotransform[1] +
-                0.5)
+                (point_x - relief_geotransform[0]) / relief_geotransform[1])
             pixel_y = int(
-                (point_y - relief_geotransform[3]) / relief_geotransform[5] +
-                0.5)
+                (point_y - relief_geotransform[3]) / relief_geotransform[5])
 
             if pixel_y >= n_rows:
                 pixel_y = n_rows - 1
-            pixel_value = relief_band.ReadAsArray(
-                xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
+            try:
+                pixel_value = relief_band.ReadAsArray(
+                    xoff=pixel_x, yoff=pixel_y, win_xsize=1, win_ysize=1)[0, 0]
+            except Exception:
+                logger.error(
+                    'relief_band size %d %d', relief_band.XSize,
+                    relief_band.YSize)
+                raise
             point_feature.SetField('relief', float(pixel_value))
             target_relief_point_layer.SetFeature(point_feature)
 
@@ -1358,7 +1366,7 @@ def calculate_surge(
             global_dem_path)['pixel_size']
         pygeoprocessing.warp_raster(
             global_dem_path, target_pixel_size, clipped_lat_lng_dem_path,
-            'bilinear', target_bb=base_shore_bounding_box)
+            'bilinear', target_bb=lat_lng_clipping_box)
         clipped_utm_dem_path = os.path.join(
             workspace_dir, 'clipped_utm_dem.tif')
         target_pixel_size = (

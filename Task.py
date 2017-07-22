@@ -12,10 +12,7 @@ import errno
 import Queue
 import inspect
 
-logging.basicConfig(
-    format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
-    level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
-LOGGER = logging.getLogger('ipbes-cv')
+LOGGER = logging.getLogger('Task')
 
 
 def _worker(work_queue):
