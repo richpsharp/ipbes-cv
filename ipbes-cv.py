@@ -164,7 +164,7 @@ def main():
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
 
-    task_graph.join()
+    grid_edges_of_vector_task.join()
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
@@ -295,12 +295,25 @@ def main():
         sea_level_task_list.append(sea_level_task)
         local_sea_level_path_list.append(target_sea_level_point_vector_path)
 
-    merge_vectors_task_list = []
-    risk_factor_vector_list = []
-    target_merged_rei_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
+    merge_vectors_task_list = []
+    risk_factor_vector_list = []
+    target_habitat_protection_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
+    merge_habitat_protection_point_task = task_graph.add_task(
+        target=merge_vectors, args=(
+            local_habitat_protection_path_list,
+            target_spatial_reference_wkt,
+            target_habitat_protection_points_path,
+            ['Rhab']),
+        dependent_task_list=habitat_protection_task_list)
+    risk_factor_vector_list.append(
+        (target_habitat_protection_points_path, 'Rhab', 'Rhab'))
+    merge_vectors_task_list.append(merge_habitat_protection_point_task)
+
+    target_merged_rei_points_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     merge_rei_point_task = task_graph.add_task(
         target=merge_vectors, args=(
             local_rei_point_path_list,
@@ -351,19 +364,6 @@ def main():
         (target_merged_relief_sea_level_rise_path, 'MSLTrends_', 'Rsea_rise'))
     merge_vectors_task_list.append(merge_sea_level_point_task)
 
-    target_habitat_protection_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
-    merge_habitat_protection_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
-            local_habitat_protection_path_list,
-            target_spatial_reference_wkt,
-            target_habitat_protection_points_path,
-            ['Rhab']),
-        dependent_task_list=habitat_protection_task_list)
-    risk_factor_vector_list.append(
-        (target_habitat_protection_points_path, 'Rhab', 'Rhab'))
-    merge_vectors_task_list.append(merge_habitat_protection_point_task)
-
     target_merged_surge_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
     merge_surge_task = task_graph.add_task(
@@ -396,6 +396,7 @@ def main():
             risk_factor_vector_list, target_result_point_vector_path),
         dependent_task_list=merge_vectors_task_list)
 
+    task_graph.close()
     task_graph.join()
 
 

@@ -1,4 +1,5 @@
 """Task graph framework."""
+import traceback
 import time
 import datetime
 import hashlib
@@ -44,18 +45,43 @@ class TaskGraph(object):
             if exception.errno != errno.EEXIST:
                 raise
         self.token_storage_path = token_storage_path
+        self.work_queue = Queue.Queue()
+        self.n_workers = n_workers
+        for thread_id in xrange(n_workers):
+            threading.Thread(
+                target=TaskGraph.worker, args=(self.work_queue,)).start()
+
         if n_workers > 0:
             self.worker_pool = multiprocessing.Pool(n_workers)
-            self.global_thread_semaphore = threading.Semaphore(n_workers * 2)
         else:
             self.worker_pool = None
-            self.global_thread_semaphore = threading.Semaphore(1)
 
         # used to lock global resources
         self.global_lock = threading.Lock()
 
         # if a Task pair is in here, it's been previously created
         self.global_working_task_dict = {}
+
+        self.closed = False
+
+    def __del__(self):
+        """Clean up task graph by injecting STOP sentinels."""
+        self.close()
+
+    @staticmethod
+    def worker(work_queue):
+        """Worker taking (func, args, kwargs) tuple from `work_queue`."""
+        for func, args, kwargs in iter(work_queue.get, 'STOP'):
+            try:
+                func(*args, **kwargs)
+            except Exception as e:
+                LOGGER.error(traceback.format_exc())
+
+    def close(self):
+        """Prevent future tasks from being added to the work queue."""
+        self.closed = True
+        for thread_id in xrange(self.n_workers):
+            self.work_queue.put('STOP')
 
     def add_task(
             self, target=None, args=None, kwargs=None,
@@ -72,6 +98,9 @@ class TaskGraph(object):
         Returns:
             Task which was just added to the graph.
         """
+        if self.closed:
+            raise ValueError(
+                "The task graph is closed and cannot accept more tasks.")
         if args is None:
             args = []
         if kwargs is None:
@@ -86,13 +115,17 @@ class TaskGraph(object):
 
         with self.global_lock:
             self.global_working_task_dict[task.task_id] = task
-        self.global_thread_semaphore.acquire()
-        threading.Thread(
-            target=task, args=(
-                self.global_lock,
-                self.global_working_task_dict,
-                self.worker_pool,
-                self.global_thread_semaphore)).start()
+        if self.n_workers > 0:
+            self.work_queue.put(
+                (task,
+                 (self.global_lock,
+                  self.global_working_task_dict,
+                  self.worker_pool),
+                 {}))
+        else:
+            task(
+                self.global_lock, self.global_working_task_dict,
+                self.worker_pool)
         return task
 
     def join(self):
@@ -156,7 +189,7 @@ class Task(object):
 
     def __call__(
             self, global_lock, global_working_task_dict,
-            global_worker_pool, global_thread_semaphore):
+            global_worker_pool):
         """Invoke this method when ready to execute task.
 
         Parameters:
@@ -167,9 +200,6 @@ class Task(object):
                 should acquire lock before modifying it.
             global_worker_pool (multiprocessing.Pool): a process pool used to
                 execute subprocesses.  If None, use current process.
-            global_thread_semaphore (threading.Semaphore): a semaphore to
-                throttle the total number of global threads that are
-                spun up.  This task releases a semaphore when complete.
 
         Returns:
             None
@@ -206,7 +236,6 @@ class Task(object):
             with open(self.token_path, 'w') as token_file:
                 token_file.write(str(datetime.datetime.now()))
         finally:
-            global_thread_semaphore.release()
             self.lock.release()
 
     def is_complete(self):
