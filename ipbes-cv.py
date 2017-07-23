@@ -27,20 +27,20 @@ logging.basicConfig(
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
-_GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
+_GLOBAL_POLYGON_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
 
-_GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
+_GLOBAL_WWIII_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
-_GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+_GLOBAL_DEM_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
 
-_GLOBAL_SEA_LEVEL_PATH = r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+_GLOBAL_SEA_LEVEL_PATH = r"D:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
-    'saltmarsh': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
-    'coralreef': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
-    'seagrass': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+    'mangrove': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
+    'saltmarsh': (r"D:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
+    'coralreef': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
+    'seagrass': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
 }
 
 # The global bounding box to do the entire analysis
@@ -115,7 +115,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 2 + multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -455,11 +455,12 @@ def summarize_results(
     fid_lookup = {}
     risk_factor_vector = ogr.Open(risk_factor_vector_list[0][0])
     risk_factor_layer = risk_factor_vector.GetLayer()
+    target_fid = 0
     for base_point_feature in risk_factor_layer:
         grid_id = base_point_feature.GetField('grid_id')
         point_id = base_point_feature.GetField('point_id')
-        target_fid = target_result_point_layer.GetFeatureCount()
         fid_lookup[(grid_id, point_id)] = target_fid
+        target_fid += 1
         target_feature = ogr.Feature(target_result_point_layer_defn)
         target_feature.SetGeometry(
             base_point_feature.GetGeometryRef().Clone())
@@ -486,11 +487,13 @@ def summarize_results(
                 base_risk_values) + 1
         else:
             # it's already a risk
-            target_risk_array = base_risk_values
+            target_risk_array = numpy.copy(base_risk_values)
         for target_fid in xrange(len(target_risk_array)):
             target_feature = target_result_point_layer.GetFeature(target_fid)
             target_feature.SetField(risk_id, target_risk_array[target_fid])
             target_result_point_layer.SetFeature(target_feature)
+            target_feature = None
+        target_result_point_layer.SyncToDisk()
 
     target_result_point_layer.ResetReading()
     r_target_array = numpy.empty(target_result_point_layer.GetFeatureCount())
