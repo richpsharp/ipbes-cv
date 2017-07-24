@@ -79,7 +79,7 @@ _UTM_GRID_SIZE = 250
 # Wave Watch III data does not cover the planet.  Make sure we don't deal
 # with a point that's not in range of said point.  I'm picking 1 degree since
 # that's double the diagonal distance between two WWIII points
-_MAX_WWIII_DISTANCE = 2.0
+_MAX_WWIII_DISTANCE = 5.0
 
 _N_FETCH_RAYS = 16
 
@@ -103,7 +103,7 @@ _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
 _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_risk_population.shp')
+    'global_cv_risk_population_v2.shp')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -417,7 +417,7 @@ def main():
         dependent_task_list=merge_vectors_task_list)
 
     target_population_result_point_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
+        r"D:\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
     summarize_results_task = task_graph.add_task(
         target=aggregate_population_scenarios, args=(
             _GLOBAL_POPULATION_SCENARIOS, target_result_point_vector_path,
