@@ -551,6 +551,9 @@ def summarize_results(
         'Rt_p', ogr.OFTReal))
     target_result_point_layer.CreateField(ogr.FieldDefn(
         'Rtnohab_p', ogr.OFTReal))
+    target_result_point_layer.CreateField(ogr.FieldDefn(
+        'Rtnohab-Rt', ogr.OFTReal))
+
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
     # define initial geometry and fid lookup
@@ -616,13 +619,15 @@ def summarize_results(
         r_target_array[target_feature.GetFID()] = r_tot
         r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
 
+    combined_percentile = numpy.percentile(
+        numpy.concatenate((r_target_array, r_no_hab_target_array)),
+        [25, 50, 75, 100])
+
     r_target_percentile = (numpy.searchsorted(
-        numpy.percentile(r_target_array, [25, 50, 75, 100]),
-        r_target_array) + 1) * 25
+        combined_percentile, r_target_array) + 1) * 25
 
     r_no_hab_target_percentile = (numpy.searchsorted(
-        numpy.percentile(r_no_hab_target_array, [0, 25, 50, 75]),
-        r_no_hab_target_array) + 1) * 25
+        combined_percentile, r_no_hab_target_array) + 1) * 25
 
     for fid in xrange(r_target_array.size):
         target_feature = target_result_point_layer.GetFeature(fid)
@@ -630,6 +635,8 @@ def summarize_results(
         target_feature.SetField('Rtnohab', r_no_hab_target_array[fid])
         target_feature.SetField('Rt_p', r_target_percentile[fid])
         target_feature.SetField('Rtnohab_p', r_no_hab_target_percentile[fid])
+        target_feature.SetField(
+            'Rtnohab-Rt', r_no_hab_target_array[fid]-r_target_array[fid])
         target_result_point_layer.SetFeature(target_feature)
 
     target_result_point_layer.SyncToDisk()
