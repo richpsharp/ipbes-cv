@@ -115,7 +115,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 2 + multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 2 * multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -467,6 +467,8 @@ def summarize_results(
             base_point_feature.GetGeometryRef().Clone())
         target_result_point_layer.CreateFeature(target_feature)
 
+    target_result_point_layer.SyncToDisk()
+
     for risk_factor_path, field_id, risk_id in risk_factor_vector_list:
         risk_vector = ogr.Open(risk_factor_path)
         risk_layer = risk_vector.GetLayer()
@@ -479,7 +481,7 @@ def summarize_results(
             point_id = risk_feature.GetField('point_id')
             grid_id = risk_feature.GetField('grid_id')
             target_fid = fid_lookup[(grid_id, point_id)]
-            base_risk_values[target_fid] = risk_value
+            base_risk_values[target_fid] = float(risk_value)
         # use the last feature to get the grid_id
         if field_id != risk_id:
             # convert to risk
@@ -488,10 +490,11 @@ def summarize_results(
                 base_risk_values) + 1
         else:
             # it's already a risk
-            target_risk_array = numpy.copy(base_risk_values)
+            target_risk_array = base_risk_values
         for target_fid in xrange(len(target_risk_array)):
             target_feature = target_result_point_layer.GetFeature(target_fid)
-            target_feature.SetField(risk_id, target_risk_array[target_fid])
+            target_feature.SetField(
+                risk_id, float(target_risk_array[target_fid]))
             target_result_point_layer.SetFeature(target_feature)
             target_feature = None
         target_result_point_layer.SyncToDisk()
@@ -2253,7 +2256,7 @@ def merge_vectors(
         base_vector = ogr.Open(base_vector_path)
         base_layer = base_vector.GetLayer()
         grid_id = int(
-            re.search('.*(\d+)', os.path.split(
+            re.search('.*_(\d+)', os.path.split(
                 os.path.dirname(base_vector_path))[1]).group(1))
 
         base_spatial_reference = base_layer.GetSpatialRef()

@@ -1,4 +1,5 @@
 """Task graph framework."""
+import psutil
 import traceback
 import time
 import datetime
@@ -53,6 +54,10 @@ class TaskGraph(object):
 
         if n_workers > 0:
             self.worker_pool = multiprocessing.Pool(n_workers)
+            parent = psutil.Process()
+            parent.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+            for child in parent.children():
+                child.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
         else:
             self.worker_pool = None
 
