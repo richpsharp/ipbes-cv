@@ -79,7 +79,7 @@ _UTM_GRID_SIZE = 250
 # Wave Watch III data does not cover the planet.  Make sure we don't deal
 # with a point that's not in range of said point.  I'm picking 1 degree since
 # that's double the diagonal distance between two WWIII points
-_MAX_WWIII_DISTANCE = 1.0
+_MAX_WWIII_DISTANCE = 2.0
 
 _N_FETCH_RAYS = 16
 
