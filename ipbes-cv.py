@@ -43,6 +43,24 @@ _GLOBAL_HABITAT_LAYER_PATHS = {
     'seagrass': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
 }
 
+_GLOBAL_POPULATION_SCENARIOS = {
+    'ssp1_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif",
+    'ssp1_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif",
+    'ssp1_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif",
+    'ssp2_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif",
+    'ssp2_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif",
+    'ssp2_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif",
+    'ssp3_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif",
+    'ssp3_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif",
+    'ssp3_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif",
+    'ssp4_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif",
+    'ssp4_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif",
+    'ssp4_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif",
+    'ssp5_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif",
+    'ssp5_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif",
+    'ssp5_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif",
+}
+
 # The global bounding box to do the entire analysis
 # This range was roughly picked to avoid the poles
 # [min_lat, min_lng, max_lat, max_lng]
@@ -59,9 +77,9 @@ _WGS84_GRID_SIZE = 3.0
 _UTM_GRID_SIZE = 250
 
 # Wave Watch III data does not cover the planet.  Make sure we don't deal
-# with a point that's not in range of said point.  I'm picking 160km since
+# with a point that's not in range of said point.  I'm picking 1 degree since
 # that's double the diagonal distance between two WWIII points
-_MAX_WWIII_DISTANCE = 160000.0
+_MAX_WWIII_DISTANCE = 1.0
 
 _N_FETCH_RAYS = 16
 
@@ -84,6 +102,8 @@ _GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
 _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
+_GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN = (
+    'global_cv_risk_population.shp')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -391,13 +411,94 @@ def main():
 
     target_result_point_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN)
-    _ = task_graph.add_task(
+    summarize_results_task = task_graph.add_task(
         target=summarize_results, args=(
             risk_factor_vector_list, target_result_point_vector_path),
         dependent_task_list=merge_vectors_task_list)
 
+    target_population_result_point_vector_path = os.path.join(
+        _TARGET_WORKSPACE, _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
+    summarize_results_task = task_graph.add_task(
+        target=aggregate_population_scenarios, args=(
+            _GLOBAL_POPULATION_SCENARIOS, target_result_point_vector_path,
+            target_population_result_point_vector_path),
+        dependent_task_list=[summarize_results_task])
+
     task_graph.close()
     task_graph.join()
+
+
+def aggregate_population_scenarios(
+        population_scenarios, base_result_point_vector_path,
+        target_result_point_vector_path):
+    """Add population scenarios and aggregate under each point.
+
+    Parameters:
+        population_scenarios (dict): a dictionary of population scenario id
+            path pairs.
+        base_result_point_vector_path (path): a global point vector path
+            that is to be used for the base of the result
+        target_result_point_vector_path (path): will contain all the points
+            in base_result_point_vector_path with additional fields mapping
+            to the `population_scenarios` keys.
+
+    Returns:
+        None.
+    """
+    if os.path.exists(target_result_point_vector_path):
+        os.remove(target_result_point_vector_path)
+    base_vector = ogr.Open(base_result_point_vector_path)
+    ogr.GetDriverByName(
+        'ESRI Shapefile').CopyDataSource(
+            base_vector, target_result_point_vector_path)
+    target_result_point_vector = ogr.Open(
+        target_result_point_vector_path, 1)
+
+    target_result_point_layer = target_result_point_vector.GetLayer()
+    for simulation_id in population_scenarios:
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn(simulation_id, ogr.OFTReal))
+
+    for simulation_id, population_path in population_scenarios.iteritems():
+        population_raster = gdal.Open(population_path)
+        population_band = population_raster.GetRasterBand(1)
+        n_rows = population_band.YSize
+        n_cols = population_band.XSize
+        population_geotransform = population_raster.GetGeoTransform()
+        nodata = population_band.GetNoDataValue()
+
+        for point_feature_id in xrange(
+                target_result_point_layer.GetFeatureCount()):
+            point_feature = target_result_point_layer.GetFeature(
+                point_feature_id)
+            point_geometry = point_feature.GetGeometryRef()
+            point_x, point_y = point_geometry.GetX(), point_geometry.GetY()
+            point_geometry = None
+
+            pixel_x = int(
+                (point_x - population_geotransform[0]) /
+                population_geotransform[1])
+            pixel_y = int(
+                (point_y - population_geotransform[3]) /
+                population_geotransform[5])
+
+            if (pixel_x < 0 or pixel_x >= n_cols or
+                    pixel_y < 0 or pixel_y >= n_rows):
+                pixel_value = 0
+            else:
+                try:
+                    pixel_value = population_band.ReadAsArray(
+                        xoff=pixel_x, yoff=pixel_y, win_xsize=1,
+                        win_ysize=1)[0, 0]
+                    if pixel_value == nodata:
+                        pixel_value = 0
+                except Exception:
+                    logger.error(
+                        'population_band size %d %d', population_band.XSize,
+                        population_band.YSize)
+                    raise
+            point_feature.SetField(simulation_id, float(pixel_value))
+            target_result_point_layer.SetFeature(point_feature)
 
 
 def summarize_results(
