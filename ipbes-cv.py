@@ -205,7 +205,7 @@ def main():
     local_surge_path_list = []
     sea_level_task_list = []
     local_sea_level_path_list = []
-    for grid_id in xrange(grid_count):
+    for grid_id in xrange(5):#$xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -428,6 +428,7 @@ def main():
     task_graph.join()
 
 
+@profile
 def aggregate_population_scenarios(
         population_scenarios, base_result_point_vector_path,
         target_result_point_vector_path):
@@ -500,7 +501,7 @@ def aggregate_population_scenarios(
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
-
+@profile
 def summarize_results(
         risk_factor_vector_list, target_result_point_vector_path):
     """Aggregate the sub factors into a global one.
@@ -641,7 +642,7 @@ def summarize_results(
 
     target_result_point_layer.SyncToDisk()
 
-
+@profile
 def simplify_geometry(
         base_vector_path, tolerance, target_simplified_vector_path):
     """Simplify all the geometry in the vector.
@@ -685,7 +686,7 @@ def simplify_geometry(
     target_simplified_layer = None
     target_simplified_vector = None
 
-
+@profile
 def calculate_habitat_protection(
         base_shore_point_vector_path,
         habitat_layer_lookup, workspace_dir,
@@ -872,7 +873,7 @@ def calculate_habitat_protection(
         traceback.print_exc()
         raise
 
-
+@profile
 def calculate_wave_exposure(
         base_fetch_point_vector_path, max_fetch_distance, workspace_dir,
         target_wave_exposure_point_vector_path):
@@ -951,7 +952,7 @@ def calculate_wave_exposure(
         traceback.print_exc()
         raise
 
-
+@profile
 def calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
@@ -1263,7 +1264,7 @@ def calculate_wind_exposure(
         traceback.print_exc()
         raise
 
-
+@profile
 def calculate_relief(
         base_shore_point_vector_path, global_dem_path, workspace_dir,
         target_relief_point_vector_path):
@@ -1434,7 +1435,7 @@ def calculate_relief(
         traceback.print_exc()
         raise
 
-
+@profile
 def calculate_surge(
         base_shore_point_vector_path, global_dem_path, workspace_dir,
         target_surge_point_vector_path):
@@ -1632,7 +1633,7 @@ def calculate_surge(
         traceback.print_exc()
         raise
 
-
+@profile
 def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
     """Create a raster kernel with a radius given.
 
@@ -1716,7 +1717,7 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
         kernel_band.WriteArray(kernel_block, xoff=block_data['xoff'],
                                yoff=block_data['yoff'])
 
-
+@profile
 def calculate_sea_level_rise(
         grid_point_path, global_sea_level_path, workspace_dir,
         target_sea_level_point_vector_path):
@@ -1784,7 +1785,7 @@ def calculate_sea_level_rise(
         target_sea_level_point_layer.CreateFeature(target_sea_level_feature)
     target_sea_level_point_layer.SyncToDisk()
 
-
+@profile
 def create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
@@ -1968,7 +1969,6 @@ def create_shore_points(
 
     temp_grid_nodata = pygeoprocessing.get_raster_info(
         grid_raster_path)['nodata'][0]
-
     def _shore_mask_op(shore_convolution):
         """Mask values on land that border water."""
         result = numpy.empty(shore_convolution.shape, dtype=numpy.uint8)
@@ -2071,7 +2071,7 @@ def create_shore_points(
     del feature_lookup
     logger.info("All done with shore points for grid %s", grid_id)
 
-
+@profile
 def grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
@@ -2186,7 +2186,7 @@ def grid_edges_of_vector(
     target_grid_layer = None
     target_grid_vector = None
 
-
+@profile
 def get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
 
@@ -2213,7 +2213,7 @@ def get_utm_spatial_reference(bounding_box):
     utm_sr.ImportFromEPSG(epsg_code)
     return utm_sr
 
-
+@profile
 def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     """Builds an r-tree index of the global feature envelopes.
 
@@ -2255,7 +2255,7 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
 
-
+@profile
 def make_shore_kernel(kernel_path):
     """Make a 3x3 raster with a 9 in the middle and 1s on the outside."""
     driver = gdal.GetDriverByName('GTiff')
@@ -2274,7 +2274,7 @@ def make_shore_kernel(kernel_path):
     kernel_band.SetNoDataValue(127)
     kernel_band.WriteArray(numpy.array([[1, 1, 1], [1, 9, 1], [1, 1, 1]]))
 
-
+@profile
 def _make_logger_callback(message, logger):
     """Build a timed logger callback that prints `message` replaced.
 
@@ -2285,7 +2285,7 @@ def _make_logger_callback(message, logger):
     Returns:
         Function with signature:
             logger_callback(proportion_complete, psz_message, p_progress_arg)
-    """
+    @profile"""
     def logger_callback(proportion_complete):
         """The argument names come from the GDAL API for callbacks."""
         try:
@@ -2302,7 +2302,7 @@ def _make_logger_callback(message, logger):
 
     return logger_callback
 
-
+@profile
 def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     """Build RTree indexed by FID for points in `wwwiii_vector_path`."""
     wwiii_rtree = rtree.index.Index(os.path.splitext(wwiii_rtree_path)[0])
@@ -2318,7 +2318,7 @@ def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     wwiii_layer = None
     wwiii_vector = None
 
-
+@profile
 def merge_vectors(
         base_vector_path_list, target_spatial_reference_wkt,
         target_merged_vector_path, field_list_to_copy):
@@ -2387,6 +2387,7 @@ def merge_vectors(
     target_vector = None
 
 
+@profile
 def geometry_to_lines(geometry):
     if geometry.type == 'Polygon':
         return polygon_to_lines(geometry)
@@ -2398,7 +2399,7 @@ def geometry_to_lines(geometry):
     else:
         return []
 
-
+@profile
 def polygon_to_lines(geometry):
     """Return a list of shapely lines given higher order shapely geometry."""
     line_list = []
