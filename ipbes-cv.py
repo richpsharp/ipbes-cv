@@ -23,42 +23,44 @@ import Task
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
-    level=logging.INFO, datefmt='%m/%d/%Y %H:%M:%S ')
+    level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
+
+_N_CPUS = 0#2 * multiprocessing.cpu_count())
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
-_GLOBAL_POLYGON_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
+_GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
 
-_GLOBAL_WWIII_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
+_GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
-_GLOBAL_DEM_PATH = r"E:\repositories\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+_GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
 
-_GLOBAL_SEA_LEVEL_PATH = r"D:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+_GLOBAL_SEA_LEVEL_PATH = r"E:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
-    'saltmarsh': (r"D:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
-    'coralreef': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
-    'seagrass': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+    'mangrove': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
+    'saltmarsh': (r"E:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
+    'coralreef': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
+    'seagrass': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
 }
 
 _GLOBAL_POPULATION_SCENARIOS = {
-    'ssp1_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif",
-    'ssp1_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif",
-    'ssp1_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif",
-    'ssp2_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif",
-    'ssp2_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif",
-    'ssp2_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif",
-    'ssp3_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif",
-    'ssp3_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif",
-    'ssp3_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif",
-    'ssp4_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif",
-    'ssp4_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif",
-    'ssp4_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif",
-    'ssp5_2010': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif",
-    'ssp5_2050': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif",
-    'ssp5_2090': r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif",
+    'ssp1_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif",
+    'ssp1_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif",
+    'ssp1_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif",
+    'ssp2_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif",
+    'ssp2_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif",
+    'ssp2_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif",
+    'ssp3_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif",
+    'ssp3_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif",
+    'ssp3_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif",
+    'ssp4_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif",
+    'ssp4_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif",
+    'ssp4_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif",
+    'ssp5_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif",
+    'ssp5_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif",
+    'ssp5_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif",
 }
 
 # The global bounding box to do the entire analysis
@@ -124,7 +126,6 @@ _SEA_LEVEL_WORKSPACES = os.path.join(
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
 
-@profile
 def main():
     """Entry point."""
     logging.basicConfig(
@@ -135,7 +136,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 0)#2 * multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, _N_CPUS)
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
@@ -164,7 +165,9 @@ def main():
         simplify_habitat_task = task_graph.add_task(
             target=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
-                simplified_habitat_vector_lookup[habitat_id][0]))
+                simplified_habitat_vector_lookup[habitat_id][0]),
+            expected_target_path_list=[
+                simplified_habitat_vector_lookup[habitat_id][0]])
         simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
@@ -173,7 +176,8 @@ def main():
     build_rtree_task = task_graph.add_task(
         target=build_feature_bounding_box_rtree,
         args=(simplified_vector_path, landmass_bounding_rtree_path),
-        dependent_task_list=[simplify_geometry_task])
+        dependent_task_list=[simplify_geometry_task],
+        expected_target_path_list=[landmass_bounding_rtree_path])
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
@@ -182,7 +186,9 @@ def main():
         target=grid_edges_of_vector, args=(
             _GLOBAL_BOUNDING_BOX_WGS84, simplified_vector_path,
             landmass_bounding_rtree_path, global_grid_vector_path,
-            _WGS84_GRID_SIZE), dependent_task_list=[build_rtree_task])
+            _WGS84_GRID_SIZE),
+        dependent_task_list=[build_rtree_task],
+        expected_target_path_list=[global_grid_vector_path])
 
     grid_edges_of_vector_task.join()
 
@@ -417,7 +423,7 @@ def main():
         dependent_task_list=merge_vectors_task_list)
 
     target_population_result_point_vector_path = os.path.join(
-        r"D:\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
+        r"E:\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
     summarize_results_task = task_graph.add_task(
         target=aggregate_population_scenarios, args=(
             _GLOBAL_POPULATION_SCENARIOS, target_result_point_vector_path,
@@ -428,7 +434,6 @@ def main():
     task_graph.join()
 
 
-@profile
 def aggregate_population_scenarios(
         population_scenarios, base_result_point_vector_path,
         target_result_point_vector_path):
@@ -501,7 +506,6 @@ def aggregate_population_scenarios(
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
-@profile
 def summarize_results(
         risk_factor_vector_list, target_result_point_vector_path):
     """Aggregate the sub factors into a global one.
@@ -642,7 +646,6 @@ def summarize_results(
 
     target_result_point_layer.SyncToDisk()
 
-@profile
 def simplify_geometry(
         base_vector_path, tolerance, target_simplified_vector_path):
     """Simplify all the geometry in the vector.
@@ -686,7 +689,6 @@ def simplify_geometry(
     target_simplified_layer = None
     target_simplified_vector = None
 
-@profile
 def calculate_habitat_protection(
         base_shore_point_vector_path,
         habitat_layer_lookup, workspace_dir,
@@ -873,7 +875,6 @@ def calculate_habitat_protection(
         traceback.print_exc()
         raise
 
-@profile
 def calculate_wave_exposure(
         base_fetch_point_vector_path, max_fetch_distance, workspace_dir,
         target_wave_exposure_point_vector_path):
@@ -952,7 +953,6 @@ def calculate_wave_exposure(
         traceback.print_exc()
         raise
 
-@profile
 def calculate_wind_exposure(
         base_shore_point_vector_path,
         landmass_bounding_rtree_path, landmass_vector_path, workspace_dir,
@@ -1264,7 +1264,6 @@ def calculate_wind_exposure(
         traceback.print_exc()
         raise
 
-@profile
 def calculate_relief(
         base_shore_point_vector_path, global_dem_path, workspace_dir,
         target_relief_point_vector_path):
@@ -1435,7 +1434,6 @@ def calculate_relief(
         traceback.print_exc()
         raise
 
-@profile
 def calculate_surge(
         base_shore_point_vector_path, global_dem_path, workspace_dir,
         target_surge_point_vector_path):
@@ -1633,7 +1631,6 @@ def calculate_surge(
         traceback.print_exc()
         raise
 
-@profile
 def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
     """Create a raster kernel with a radius given.
 
@@ -1717,7 +1714,6 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
         kernel_band.WriteArray(kernel_block, xoff=block_data['xoff'],
                                yoff=block_data['yoff'])
 
-@profile
 def calculate_sea_level_rise(
         grid_point_path, global_sea_level_path, workspace_dir,
         target_sea_level_point_vector_path):
@@ -1785,7 +1781,6 @@ def calculate_sea_level_rise(
         target_sea_level_point_layer.CreateFeature(target_sea_level_feature)
     target_sea_level_point_layer.SyncToDisk()
 
-@profile
 def create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
@@ -2071,7 +2066,6 @@ def create_shore_points(
     del feature_lookup
     logger.info("All done with shore points for grid %s", grid_id)
 
-@profile
 def grid_edges_of_vector(
         base_bounding_box, base_vector_path,
         base_feature_bounding_box_rtree_path, target_grid_vector_path,
@@ -2186,7 +2180,6 @@ def grid_edges_of_vector(
     target_grid_layer = None
     target_grid_vector = None
 
-@profile
 def get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
 
@@ -2213,7 +2206,6 @@ def get_utm_spatial_reference(bounding_box):
     utm_sr.ImportFromEPSG(epsg_code)
     return utm_sr
 
-@profile
 def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     """Builds an r-tree index of the global feature envelopes.
 
@@ -2233,7 +2225,8 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
         target_rtree_path)[0]
     logger.info("Building rtree index at %s", global_feature_index_base)
     if os.path.exists(target_rtree_path):
-        raise ValueError("rtree storage path %s already exists.")
+        for ext in ['.dat', '.idx']:
+            os.remove(global_feature_index_base + ext)
     global_feature_index = rtree.index.Index(global_feature_index_base)
 
     global_vector = ogr.Open(vector_path)
@@ -2255,7 +2248,6 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
 
-@profile
 def make_shore_kernel(kernel_path):
     """Make a 3x3 raster with a 9 in the middle and 1s on the outside."""
     driver = gdal.GetDriverByName('GTiff')
@@ -2274,7 +2266,6 @@ def make_shore_kernel(kernel_path):
     kernel_band.SetNoDataValue(127)
     kernel_band.WriteArray(numpy.array([[1, 1, 1], [1, 9, 1], [1, 1, 1]]))
 
-@profile
 def _make_logger_callback(message, logger):
     """Build a timed logger callback that prints `message` replaced.
 
@@ -2302,10 +2293,13 @@ def _make_logger_callback(message, logger):
 
     return logger_callback
 
-@profile
 def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     """Build RTree indexed by FID for points in `wwwiii_vector_path`."""
-    wwiii_rtree = rtree.index.Index(os.path.splitext(wwiii_rtree_path)[0])
+    base_wwiii_rtree_path = os.path.splitext(wwiii_rtree_path)[0]
+    if os.path.exists(wwiii_rtree_path):
+        for ext in ['.dat', '.idx']:
+            os.remove(base_wwiii_rtree_path+ext)
+    wwiii_rtree = rtree.index.Index(base_wwiii_rtree_path)
 
     wwiii_vector = ogr.Open(wwiii_vector_path)
     wwiii_layer = wwiii_vector.GetLayer()
@@ -2318,7 +2312,6 @@ def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     wwiii_layer = None
     wwiii_vector = None
 
-@profile
 def merge_vectors(
         base_vector_path_list, target_spatial_reference_wkt,
         target_merged_vector_path, field_list_to_copy):
@@ -2387,7 +2380,6 @@ def merge_vectors(
     target_vector = None
 
 
-@profile
 def geometry_to_lines(geometry):
     if geometry.type == 'Polygon':
         return polygon_to_lines(geometry)
@@ -2399,7 +2391,6 @@ def geometry_to_lines(geometry):
     else:
         return []
 
-@profile
 def polygon_to_lines(geometry):
     """Return a list of shapely lines given higher order shapely geometry."""
     line_list = []
