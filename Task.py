@@ -26,6 +26,7 @@ def _worker(work_queue):
 class TaskGraph(object):
     """Encapsulates the worker and tasks states for parallel processing."""
 
+    @profile
     def __init__(self, token_storage_path, n_workers):
         """Create a task graph.
 
@@ -82,12 +83,14 @@ class TaskGraph(object):
             except Exception as e:
                 LOGGER.error(traceback.format_exc())
 
+    @profile
     def close(self):
         """Prevent future tasks from being added to the work queue."""
         self.closed = True
         for thread_id in xrange(self.n_workers):
             self.work_queue.put('STOP')
 
+    @profile
     def add_task(
             self, target=None, args=None, kwargs=None,
             dependent_task_list=None):
@@ -133,6 +136,7 @@ class TaskGraph(object):
                 self.worker_pool)
         return task
 
+    @profile
     def join(self):
         """Join all threads in the graph."""
         for task in self.global_working_task_dict.itervalues():
@@ -142,6 +146,7 @@ class TaskGraph(object):
 class Task(object):
     """Encapsulates work/task state for multiprocessing."""
 
+    @profile
     def __init__(
             self, target, args, kwargs, dependent_task_list,
             token_storage_path):
@@ -172,7 +177,11 @@ class Task(object):
 
         # Make a unique hash of the call
         try:
-            source_code = inspect.getsource(target)
+            if not hasattr(Task, 'target_source_map'):
+                Task.target_source_map = {}
+            if target not in Task.target_source_map:
+                Task.target_source_map[target] = inspect.getsource(target)
+            source_code = Task.target_source_map[target]
         except IOError:
             # we might be in a frozen binary, so just leave blank
             source_code = ''
@@ -192,6 +201,7 @@ class Task(object):
         # The following file will be written when work is complete
         self.token_path = os.path.join(token_storage_path, self.task_id)
 
+    @profile
     def __call__(
             self, global_lock, global_working_task_dict,
             global_worker_pool):
@@ -212,7 +222,7 @@ class Task(object):
         try:
             LOGGER.debug("Starting task %s", self.task_id)
             if self.is_complete():
-                LOGGER.info(
+                LOGGER.debug(
                     "Completion token exists for %s so not executing",
                     self.task_id)
                 return
@@ -243,10 +253,12 @@ class Task(object):
         finally:
             self.lock.release()
 
+    @profile
     def is_complete(self):
         """Return true if complete token exists."""
         return os.path.exists(self.token_path)
 
+    @profile
     def join(self):
         """Block until task is complete."""
         with self.lock:

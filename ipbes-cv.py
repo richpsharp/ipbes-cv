@@ -23,7 +23,7 @@ import Task
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
-    level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
+    level=logging.INFO, datefmt='%m/%d/%Y %H:%M:%S ')
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 
@@ -124,7 +124,7 @@ _SEA_LEVEL_WORKSPACES = os.path.join(
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
 
-
+@profile
 def main():
     """Entry point."""
     logging.basicConfig(
@@ -135,7 +135,7 @@ def main():
         os.makedirs(_TARGET_WORKSPACE)
 
     task_graph = Task.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, 2 * multiprocessing.cpu_count())
+        _WORK_COMPLETE_TOKEN_PATH, 0)#2 * multiprocessing.cpu_count())
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
