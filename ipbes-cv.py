@@ -28,6 +28,7 @@ logging.basicConfig(
 _N_CPUS = 2*multiprocessing.cpu_count()
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
+_TARGET_NODATA = -1
 
 _GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
 
@@ -471,57 +472,114 @@ def main():
     # nldi is at 30km
     nldi_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_NLDI_PATH)
 
+    poverty_raster_info = pygeoprocessing.get_raster_info(
+        _GLOBAL_POVERTY_PATH)
+
+    # GPW x NLDI (at 30 km resolution)
     # align_gpw_nldi_task
     aligned_gpw_nldi_path_band_list = [
         os.path.join(_TARGET_WORKSPACE, 'gpw_nldi_aligned.tif'),
         os.path.join(_TARGET_WORKSPACE, 'nldi_gpw_aligned.tif'),
         ]
 
-    pygeoprocessing.align_and_resize_raster_stack(
-        [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH],
-        aligned_gpw_nldi_path_band_list, ['lanczos'] * 2,
-        nldi_raster_info['pixel_size'], 'intersection',
-        base_vector_path_list=[target_result_point_vector_path],
-        raster_align_index=0)
+    align_gpw_nldi_task = task_graph.add_task(
+        target=pygeoprocessing.align_and_resize_raster_stack,
+        args=(
+            [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH],
+            aligned_gpw_nldi_path_band_list, ['lanczos'] * 2,
+            nldi_raster_info['pixel_size'], 'intersection'),
+        kwargs={
+            'base_vector_path_list': [target_result_point_vector_path],
+            'raster_align_index': 0},
+        dependent_task_list=[summarize_results_task])
 
-    # align_gpw_poverty_1km_task
+    mult_gpw_nldi_op = _MultRasters(
+        gpw_raster_info['nodata'][0],
+        nldi_raster_info['nodata'][0],
+        _TARGET_NODATA)
+
+    target_gpw_nldi_path = os.path.join(_TARGET_WORKSPACE, 'gpw_nldi.tif')
+    mult_gpw_nldi_task = task_graph.add_task(
+        target=pygeoprocessing.raster_calculator,
+        args=(
+            [(x, 1) for x in aligned_gpw_nldi_path_band_list],
+            mult_gpw_nldi_op, target_gpw_nldi_path, gdal.GDT_Float32,
+            _TARGET_NODATA),
+        dependent_task_list=[align_gpw_nldi_task])
+
+    # GPW x Poverty (at 1 km resolution)
     aligned_gpw_poverty_1km_path_list = [
         os.path.join(_TARGET_WORKSPACE, 'gpw_poverty_1km_aligned.tif'),
         os.path.join(_TARGET_WORKSPACE, 'poverty_gpw_1km_aligned.tif'),
         ]
 
-    pygeoprocessing.align_and_resize_raster_stack(
-        [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
-        aligned_gpw_poverty_1km_path_list, ['lanczos'] * 2,
-        gpw_raster_info['pixel_size'], 'intersection',
-        base_vector_path_list=[target_result_point_vector_path],
-        raster_align_index=0)
+    align_gpw_poverty_1km_task = task_graph.add_task(
+        target=pygeoprocessing.align_and_resize_raster_stack,
+        args=(
+            [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
+            aligned_gpw_poverty_1km_path_list, ['lanczos'] * 2,
+            gpw_raster_info['pixel_size'], 'intersection'),
+        kwargs={
+            'base_vector_path_list': [target_result_point_vector_path],
+            'raster_align_index': 0},
+        dependent_task_list=[summarize_results_task])
 
+    mult_gpw_poverty_op = _MultRasters(
+        gpw_raster_info['nodata'][0],
+        poverty_raster_info['nodata'][0],
+        _TARGET_NODATA)
 
+    target_gpw_poverty_1km_path = os.path.join(
+        _TARGET_WORKSPACE, 'gpw_poverty_1km.tif')
+    mult_gwp_poverty_1km_task = task_graph.add_task(
+        target=pygeoprocessing.raster_calculator,
+        args=(
+            [(x, 1) for x in aligned_gpw_poverty_1km_path_list],
+            mult_gpw_poverty_op, target_gpw_poverty_1km_path,
+            gdal.GDT_Float32, _TARGET_NODATA),
+        dependent_task_list=[align_gpw_poverty_1km_task])
+
+    # GPW x Poverty (at 30 km resolution)
     # align_gpw_poverty_30km_task
     aligned_gpw_poverty_30km_path_list = [
         os.path.join(_TARGET_WORKSPACE, 'gpw_poverty_30km_aligned.tif'),
         os.path.join(_TARGET_WORKSPACE, 'poverty_gpw_30km_aligned.tif'),
         ]
 
-    pygeoprocessing.align_and_resize_raster_stack(
-        [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
-        aligned_gpw_poverty_30km_path_list, ['lanczos'] * 2,
-        nldi_raster_info['pixel_size'], 'intersection',
-        base_vector_path_list=[target_result_point_vector_path],
-        raster_align_index=0)
+    align_gpw_poverty_30km_task = task_graph.add_task(
+        target=pygeoprocessing.align_and_resize_raster_stack,
+        args=(
+            [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
+            aligned_gpw_poverty_30km_path_list, ['lanczos'] * 2,
+            nldi_raster_info['pixel_size'], 'intersection'),
+        kwargs={
+            'base_vector_path_list': [target_result_point_vector_path],
+            'raster_align_index': 0},
+        dependent_task_list=[summarize_results_task])
 
-    # GPW x NLDI (at 30 km resolution)
-    # GPW x Poverty (at 1 km resolution)
-    # GPW x Poverty (at 30 km resolution)
+    target_gpw_poverty_30km_path = os.path.join(
+        _TARGET_WORKSPACE, 'gpw_poverty_30km.tif')
+    mult_gwp_poverty_30km_task = task_graph.add_task(
+        target=pygeoprocessing.raster_calculator,
+        args=(
+            [(x, 1) for x in aligned_gpw_poverty_30km_path_list],
+            mult_gpw_poverty_op, target_gpw_poverty_30km_path,
+            gdal.GDT_Float32, _TARGET_NODATA),
+        dependent_task_list=[align_gpw_poverty_30km_task])
 
+    aggregate_dict = _GLOBAL_POPULATION_SCENARIOS.copy()
+    aggregate_dict['gpw_nldi'] = target_gpw_nldi_path
+    aggregate_dict['gpw_pov1km'] = target_gpw_poverty_1km_path
+    aggregate_dict['gpw_pov30km'] = target_gpw_poverty_30km_path
 
-    summarize_results_task = task_graph.add_task(
+    aggregate_data_task = task_graph.add_task(
         target=aggregate_population_scenarios, args=(
-            _GLOBAL_POPULATION_SCENARIOS, target_result_point_vector_path,
+            aggregate_dict, target_result_point_vector_path,
             target_population_result_point_vector_path),
         target_path_list=[target_population_result_point_vector_path],
-        dependent_task_list=[summarize_results_task])
+        dependent_task_list=[
+            summarize_results_task, mult_gpw_nldi_task,
+            mult_gwp_poverty_1km_task, mult_gwp_poverty_30km_task])
 
     task_graph.close()
     task_graph.join()
@@ -1660,7 +1718,8 @@ def calculate_surge(
         make_shore_kernel(shelf_kernel_path)
         pygeoprocessing.convolve_2d(
             (shelf_mask_path, 1), (shelf_kernel_path, 1),
-            shelf_convoultion_raster_path, target_datatype=gdal.GDT_Byte)
+            shelf_convoultion_raster_path, target_datatype=gdal.GDT_Byte,
+            target_nodata=255)
 
         nodata = pygeoprocessing.get_raster_info(
             shelf_convoultion_raster_path)['nodata'][0]
@@ -2059,7 +2118,8 @@ def create_shore_points(
     make_shore_kernel(shore_kernel_path)
     pygeoprocessing.convolve_2d(
         (grid_raster_path, 1), (shore_kernel_path, 1),
-        convolution_raster_path, target_datatype=gdal.GDT_Byte)
+        convolution_raster_path, target_datatype=gdal.GDT_Byte,
+        target_nodata=255)
 
     temp_grid_nodata = pygeoprocessing.get_raster_info(
         grid_raster_path)['nodata'][0]
@@ -2484,6 +2544,7 @@ def merge_vectors(
 
 
 def geometry_to_lines(geometry):
+    """Converts a geometry object to a list of lines."""
     if geometry.type == 'Polygon':
         return polygon_to_lines(geometry)
     elif geometry.type == 'MultiPolygon':
@@ -2493,6 +2554,7 @@ def geometry_to_lines(geometry):
         return line_list
     else:
         return []
+
 
 def polygon_to_lines(geometry):
     """Return a list of shapely lines given higher order shapely geometry."""
@@ -2515,6 +2577,35 @@ def polygon_to_lines(geometry):
         line_list.append(shapely.geometry.LineString([
             last_point, interior.coords[0]]))
     return line_list
+
+
+class _MultRasters(object):
+    """Calculate a raster * raster but ignore nodata."""
+
+    def __init__(self, nodata_a, nodata_b, target_nodata):
+        self.nodata_a = nodata_a
+        self.nodata_b = nodata_b
+        self.target_nodata = target_nodata
+        # try to get the source code of __call__ so task graph will recompute
+        # if the function has changed
+        try:
+            self.__name__ = hashlib.sha1(
+                inspect.getsource(
+                    _MultRasters.__call__
+                )).hexdigest()
+        except IOError:
+            # default to the classname if it doesn't work
+            self.__name__ = (
+                _MultRasters.__name__)
+        self.__name__ += ','.join(
+            [str(x) for x in [nodata_a, nodata_b, target_nodata]])
+
+    def __call__(self, array_a, array_b):
+        result = numpy.empty_like(array_a)
+        result[:] = self.target_nodata
+        valid_mask = (array_a != self.nodata_a) & (array_b != self.nodata_b)
+        result[valid_mask] = array_a[valid_mask] * array_b[valid_mask]
+        return result
 
 if __name__ == '__main__':
     main()
