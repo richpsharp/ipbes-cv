@@ -35,32 +35,38 @@ _GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\in
 
 _GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
 
-_GLOBAL_SEA_LEVEL_PATH = r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+_GLOBAL_SEA_LEVEL_PATH = r"E:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+
+_GLOBAL_GPW_PATH = r"E:\Dropbox\ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"
+
+_GLOBAL_NLDI_PATH = r"E:\Dropbox\ipbes-data\NLDI_2006_0p25_rev20111230.tif"
+
+_GLOBAL_POVERTY_PATH = r"E:\Dropbox\ipbes-data\poverty_pct_1.tif"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
-    'saltmarsh': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
-    'coralreef': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
-    'seagrass': (r"C:\Users\rpsharp\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+    'mangrove': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
+    'saltmarsh': (r"E:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
+    'coralreef': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
+    'seagrass': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
 }
 
 _GLOBAL_POPULATION_SCENARIOS = {
-    'ssp1_2010': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif",
-    'ssp1_2050': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif",
-    'ssp1_2090': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif",
-    'ssp2_2010': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif",
-    'ssp2_2050': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif",
-    'ssp2_2090': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif",
-    'ssp3_2010': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif",
-    'ssp3_2050': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif",
-    'ssp3_2090': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif",
-    'ssp4_2010': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif",
-    'ssp4_2050': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif",
-    'ssp4_2090': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif",
-    'ssp5_2010': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif",
-    'ssp5_2050': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif",
-    'ssp5_2090': r"C:\Users\rpsharp\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif",
+    'ssp1_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif",
+    'ssp1_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif",
+    'ssp1_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif",
+    'ssp2_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif",
+    'ssp2_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif",
+    'ssp2_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif",
+    'ssp3_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif",
+    'ssp3_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif",
+    'ssp3_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif",
+    'ssp4_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif",
+    'ssp4_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif",
+    'ssp4_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif",
+    'ssp5_2010': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif",
+    'ssp5_2050': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif",
+    'ssp5_2090': r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif",
 }
 
 # The global bounding box to do the entire analysis
@@ -165,6 +171,8 @@ def main():
         simplified_habitat_vector_lookup[habitat_id] = (
             os.path.join(_TARGET_WORKSPACE, '%s.shp' % habitat_id),
             habitat_rank, habitat_dist)
+        logger.debug(habitat_path)
+        logger.debug(simplified_habitat_vector_lookup[habitat_id][0])
         simplify_habitat_task = task_graph.add_task(
             target=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
@@ -215,7 +223,7 @@ def main():
     local_surge_path_list = []
     sea_level_task_list = []
     local_sea_level_path_list = []
-    for grid_id in xrange(2):#$xrange(grid_count):
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -451,7 +459,63 @@ def main():
         dependent_task_list=merge_vectors_task_list)
 
     target_population_result_point_vector_path = os.path.join(
-        r"C:\Users\rpsharp\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
+        r"E:\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
+
+
+    _GLOBAL_GPW_PATH
+    _GLOBAL_NLDI_PATH
+    _GLOBAL_POVERTY_PATH
+
+    # gwp is at 1km
+    gpw_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_GPW_PATH)
+    # nldi is at 30km
+    nldi_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_NLDI_PATH)
+
+    # align_gpw_nldi_task
+    aligned_gpw_nldi_path_band_list = [
+        os.path.join(_TARGET_WORKSPACE, 'gpw_nldi_aligned.tif'),
+        os.path.join(_TARGET_WORKSPACE, 'nldi_gpw_aligned.tif'),
+        ]
+
+    pygeoprocessing.align_and_resize_raster_stack(
+        [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH],
+        aligned_gpw_nldi_path_band_list, ['lanczos'] * 2,
+        nldi_raster_info['pixel_size'], 'intersection',
+        base_vector_path_list=[target_result_point_vector_path],
+        raster_align_index=0)
+
+    # align_gpw_poverty_1km_task
+    aligned_gpw_poverty_1km_path_list = [
+        os.path.join(_TARGET_WORKSPACE, 'gpw_poverty_1km_aligned.tif'),
+        os.path.join(_TARGET_WORKSPACE, 'poverty_gpw_1km_aligned.tif'),
+        ]
+
+    pygeoprocessing.align_and_resize_raster_stack(
+        [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
+        aligned_gpw_poverty_1km_path_list, ['lanczos'] * 2,
+        gpw_raster_info['pixel_size'], 'intersection',
+        base_vector_path_list=[target_result_point_vector_path],
+        raster_align_index=0)
+
+
+    # align_gpw_poverty_30km_task
+    aligned_gpw_poverty_30km_path_list = [
+        os.path.join(_TARGET_WORKSPACE, 'gpw_poverty_30km_aligned.tif'),
+        os.path.join(_TARGET_WORKSPACE, 'poverty_gpw_30km_aligned.tif'),
+        ]
+
+    pygeoprocessing.align_and_resize_raster_stack(
+        [_GLOBAL_GPW_PATH, _GLOBAL_POVERTY_PATH],
+        aligned_gpw_poverty_30km_path_list, ['lanczos'] * 2,
+        nldi_raster_info['pixel_size'], 'intersection',
+        base_vector_path_list=[target_result_point_vector_path],
+        raster_align_index=0)
+
+    # GPW x NLDI (at 30 km resolution)
+    # GPW x Poverty (at 1 km resolution)
+    # GPW x Poverty (at 30 km resolution)
+
+
     summarize_results_task = task_graph.add_task(
         target=aggregate_population_scenarios, args=(
             _GLOBAL_POPULATION_SCENARIOS, target_result_point_vector_path,
