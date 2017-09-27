@@ -7,6 +7,8 @@ import math
 import logging
 import multiprocessing
 import re
+import hashlib
+import inspect
 
 import numpy
 from osgeo import gdal
@@ -25,7 +27,7 @@ logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
 
-_N_CPUS = 2*multiprocessing.cpu_count()
+_N_CPUS = 8
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -462,11 +464,6 @@ def main():
     target_population_result_point_vector_path = os.path.join(
         r"E:\Dropbox\shared_with_users\jess_global_cv_pop", _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
 
-
-    _GLOBAL_GPW_PATH
-    _GLOBAL_NLDI_PATH
-    _GLOBAL_POVERTY_PATH
-
     # gwp is at 1km
     gpw_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_GPW_PATH)
     # nldi is at 30km
@@ -491,6 +488,7 @@ def main():
         kwargs={
             'base_vector_path_list': [target_result_point_vector_path],
             'raster_align_index': 0},
+        target_path_list=aligned_gpw_nldi_path_band_list,
         dependent_task_list=[summarize_results_task])
 
     mult_gpw_nldi_op = _MultRasters(
@@ -505,6 +503,7 @@ def main():
             [(x, 1) for x in aligned_gpw_nldi_path_band_list],
             mult_gpw_nldi_op, target_gpw_nldi_path, gdal.GDT_Float32,
             _TARGET_NODATA),
+        target_path_list=[target_gpw_nldi_path],
         dependent_task_list=[align_gpw_nldi_task])
 
     # GPW x Poverty (at 1 km resolution)
@@ -522,6 +521,7 @@ def main():
         kwargs={
             'base_vector_path_list': [target_result_point_vector_path],
             'raster_align_index': 0},
+        target_path_list=aligned_gpw_poverty_1km_path_list,
         dependent_task_list=[summarize_results_task])
 
     mult_gpw_poverty_op = _MultRasters(
@@ -537,6 +537,7 @@ def main():
             [(x, 1) for x in aligned_gpw_poverty_1km_path_list],
             mult_gpw_poverty_op, target_gpw_poverty_1km_path,
             gdal.GDT_Float32, _TARGET_NODATA),
+        target_path_list=[target_gpw_poverty_1km_path],
         dependent_task_list=[align_gpw_poverty_1km_task])
 
     # GPW x Poverty (at 30 km resolution)
@@ -555,6 +556,7 @@ def main():
         kwargs={
             'base_vector_path_list': [target_result_point_vector_path],
             'raster_align_index': 0},
+        target_path_list=aligned_gpw_poverty_30km_path_list,
         dependent_task_list=[summarize_results_task])
 
     target_gpw_poverty_30km_path = os.path.join(
@@ -565,12 +567,13 @@ def main():
             [(x, 1) for x in aligned_gpw_poverty_30km_path_list],
             mult_gpw_poverty_op, target_gpw_poverty_30km_path,
             gdal.GDT_Float32, _TARGET_NODATA),
+        target_path_list=[target_gpw_poverty_30km_path],
         dependent_task_list=[align_gpw_poverty_30km_task])
 
     aggregate_dict = _GLOBAL_POPULATION_SCENARIOS.copy()
-    aggregate_dict['gpw_nldi'] = target_gpw_nldi_path
-    aggregate_dict['gpw_pov1km'] = target_gpw_poverty_1km_path
-    aggregate_dict['gpw_pov30km'] = target_gpw_poverty_30km_path
+    aggregate_dict['gpwnldi'] = target_gpw_nldi_path
+    aggregate_dict['gpwpov1km'] = target_gpw_poverty_1km_path
+    aggregate_dict['gpwpov30km'] = target_gpw_poverty_30km_path
 
     aggregate_data_task = task_graph.add_task(
         target=aggregate_population_scenarios, args=(
@@ -2603,7 +2606,12 @@ class _MultRasters(object):
     def __call__(self, array_a, array_b):
         result = numpy.empty_like(array_a)
         result[:] = self.target_nodata
-        valid_mask = (array_a != self.nodata_a) & (array_b != self.nodata_b)
+        valid_mask = numpy.empty(array_a.shape, dtype=numpy.bool)
+        valid_mask[:] = True
+        if self.nodata_a is not None:
+            valid_mask &= (array_a != self.nodata_a)
+        if self.nodata_b is not None:
+            valid_mask &= (array_b != self.nodata_b)
         result[valid_mask] = array_a[valid_mask] * array_b[valid_mask]
         return result
 
