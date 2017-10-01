@@ -28,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger('ipbes-cv')
 logger.setLevel(logging.DEBUG)
 
-_N_CPUS = 0
+_N_CPUS = 8
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -480,10 +480,10 @@ def main():
     # Resample everything to an aligned 1km square
     # GPW x NLDI (at 30 km resolution)
     # align_gpw_nldi_task
-    gpw_nldi_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, 'gpw_nldi_aligned.tif')
-    nldi_gpw_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, 'nldi_gpw_aligned.tif')
+    gpw_aligned_path = os.path.join(
+        _TARGET_WORKSPACE, 'gpw_aligned.tif')
+    nldi_aligned_path = os.path.join(
+        _TARGET_WORKSPACE, 'nldi_aligned.tif')
     poverty_aligned_path = os.path.join(
         _TARGET_WORKSPACE, 'poverty_aligned.tif')
     pop0to14_aligned_path = os.path.join(
@@ -492,8 +492,8 @@ def main():
         _TARGET_WORKSPACE, '80plus_aligned.tif')
 
     aligned_gpw_nldi_path_list = [
-        gpw_nldi_aligned_path,
-        nldi_gpw_aligned_path,
+        gpw_aligned_path,
+        nldi_aligned_path,
         poverty_aligned_path,
         pop0to14_aligned_path,
         pop80plus_aligned_path,
@@ -515,7 +515,7 @@ def main():
     target_gpw_nldi_path = os.path.join(_TARGET_WORKSPACE, 'gpw_nldi.tif')
     mult_gpw_nldi_op = _MultiplyRasters(
         _TARGET_NODATA, target_gpw_nldi_path,
-        [nldi_gpw_aligned_path, gpw_nldi_aligned_path])
+        [nldi_aligned_path, gpw_aligned_path])
 
     mult_gpw_nldi_task = task_graph.add_task(
         func=mult_gpw_nldi_op,
@@ -527,7 +527,7 @@ def main():
         _TARGET_WORKSPACE, 'gpw_poverty_1km.tif')
     mult_gpw_poverty_op = _MultiplyRasters(
         _TARGET_NODATA, target_gpw_nldi_path,
-        [nldi_gpw_aligned_path, poverty_aligned_path])
+        [nldi_aligned_path, poverty_aligned_path])
 
     mult_gpw_poverty_task = task_graph.add_task(
         func=mult_gpw_poverty_op,
@@ -2595,14 +2595,14 @@ class _MultiplyRasters(object):
                 _MultiplyRasters.__name__)
         self.raster_path_list = raster_path_list
         self.target_path = target_path
-        self.nodata_list = [
-            pygeoprocessing.get_raster_info(x)['nodata'][0]
-            for x in raster_path_list]
         self.target_nodata = target_nodata
-        print self.nodata_list
 
     def __call__(self):
         print 'calling %s' % self.raster_path_list
+
+        nodata_list = [
+            pygeoprocessing.get_raster_info(x)['nodata'][0]
+            for x in self.raster_path_list]
 
         def local_op(*array_list):
             """Mult array list together."""
@@ -2610,7 +2610,7 @@ class _MultiplyRasters(object):
             result[:] = self.target_nodata
             valid_mask = numpy.empty(array_list[0].shape, dtype=numpy.bool)
             valid_mask[:] = True
-            for nodata, array in zip(self.nodata_list, array_list):
+            for nodata, array in zip(nodata_list, array_list):
                 if nodata is not None:
                     valid_mask &= array != nodata
                 valid_mask &= array >= 0.0
@@ -2661,11 +2661,11 @@ class _GPWPovAgeCalculator(object):
             valid_mask = numpy.empty(base_array.shape, dtype=numpy.bool)
             valid_mask[:] = True
             if nodata_list[0] is not None:
-                valid_mask &= base_array != nodata_list[0]
+                valid_mask &= (base_array != nodata_list[0])
             if nodata_list[1] is not None:
-                valid_mask &= add_a_array != nodata_list[1]
+                valid_mask &= (add_a_array != nodata_list[1])
             if nodata_list[2] is not None:
-                valid_mask &= add_b_array != nodata_list[2]
+                valid_mask &= (add_b_array != nodata_list[2])
             result[valid_mask] = (
                 base_array[valid_mask] * (
                     add_a_array[valid_mask] + add_b_array[valid_mask]))
