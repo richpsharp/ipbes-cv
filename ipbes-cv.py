@@ -10,6 +10,7 @@ import re
 import hashlib
 import inspect
 
+import taskgraph
 import numpy
 from osgeo import gdal
 from osgeo import osr
@@ -21,11 +22,11 @@ import shapely.ops
 import shapely.speedups
 import pygeoprocessing
 
-import Task
-
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
+logger = logging.getLogger('ipbes-cv')
+logger.setLevel(logging.DEBUG)
 
 _N_CPUS = 0
 
@@ -45,6 +46,10 @@ _GLOBAL_GPW_PATH = r"E:\Dropbox\ipbes-data\gpw-v4-population-count-2015\gpw-v4-p
 _GLOBAL_NLDI_PATH = r"E:\Dropbox\ipbes-data\NLDI_2006_0p25_rev20111230.tif"
 
 _GLOBAL_POVERTY_PATH = r"E:\Dropbox\ipbes-data\poverty_pct_1.tif"
+
+_GLOBAL_0t14_PATH = r"E:\Dropbox\ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"
+
+_GLOBAL_80plus_PATH = r"E:\Dropbox\ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
@@ -114,7 +119,7 @@ _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
 _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_population_poverty_and_more.shp')
+    'global_cv_population_poverty_and_more_v3.shp')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -144,23 +149,22 @@ def main():
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
-    task_graph = Task.TaskGraph(
+    task_graph = taskgraph.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, _N_CPUS)
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
 
     build_wwiii_task = task_graph.add_task(
-        target=build_wwiii_rtree,
-        args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path),
-        target_path_list=[wwiii_rtree_path])
+        func=build_wwiii_rtree,
+        args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path))
 
     simplified_vector_path = os.path.join(
         _TARGET_WORKSPACE, 'simplified_geometry.shp')
     # make an approximation of smallest feature size in degrees
     smallest_feature_size_degrees = 1. / 111000 * _SMALLEST_FEATURE_SIZE / 2.0
     simplify_geometry_task = task_graph.add_task(
-        target=simplify_geometry,
+        func=simplify_geometry,
         args=(
             _GLOBAL_POLYGON_PATH, smallest_feature_size_degrees,
             simplified_vector_path),
@@ -177,7 +181,7 @@ def main():
         logger.debug(habitat_path)
         logger.debug(simplified_habitat_vector_lookup[habitat_id][0])
         simplify_habitat_task = task_graph.add_task(
-            target=simplify_geometry, args=(
+            func=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
                 simplified_habitat_vector_lookup[habitat_id][0]),
             target_path_list=[
@@ -188,7 +192,7 @@ def main():
         _TARGET_WORKSPACE, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
 
     build_rtree_task = task_graph.add_task(
-        target=build_feature_bounding_box_rtree,
+        func=build_feature_bounding_box_rtree,
         args=(simplified_vector_path, landmass_bounding_rtree_path),
         dependent_task_list=[simplify_geometry_task],
         target_path_list=[landmass_bounding_rtree_path])
@@ -197,7 +201,7 @@ def main():
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
 
     grid_edges_of_vector_task = task_graph.add_task(
-        target=grid_edges_of_vector, args=(
+        func=grid_edges_of_vector, args=(
             _GLOBAL_BOUNDING_BOX_WGS84, simplified_vector_path,
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE),
@@ -235,7 +239,7 @@ def main():
             shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
 
         create_shore_points_task = task_graph.add_task(
-            target=create_shore_points, args=(
+            func=create_shore_points, args=(
                 global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
                 simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
@@ -251,7 +255,7 @@ def main():
             wind_exposure_workspace,
             _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         wind_exposure_task = task_graph.add_task(
-            target=calculate_wind_exposure, args=(
+            func=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
                 simplified_vector_path, wind_exposure_workspace,
                 _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
@@ -272,7 +276,7 @@ def main():
             wave_exposure_workspace,
             _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_id)
         wave_exposure_task = task_graph.add_task(
-            target=calculate_wave_exposure, args=(
+            func=calculate_wave_exposure, args=(
                 target_wind_exposure_point_path, _MAX_FETCH_DISTANCE,
                 wave_exposure_workspace,
                 target_wave_exposure_point_path),
@@ -289,7 +293,7 @@ def main():
             habitat_protection_workspace,
             _HABITAT_PROTECTION_POINT_FILE_PATTERN % grid_id)
         habitat_protection_task = task_graph.add_task(
-            target=calculate_habitat_protection, args=(
+            func=calculate_habitat_protection, args=(
                 grid_point_path,
                 simplified_habitat_vector_lookup,
                 habitat_protection_workspace,
@@ -309,7 +313,7 @@ def main():
         target_relief_point_path = os.path.join(
             relief_workspace, _RELIEF_POINT_FILE_PATTERN % grid_id)
         relief_task = task_graph.add_task(
-            target=calculate_relief, args=(
+            func=calculate_relief, args=(
                 grid_point_path,
                 _GLOBAL_DEM_PATH,
                 relief_workspace,
@@ -325,7 +329,7 @@ def main():
         target_surge_point_vector_path = os.path.join(
             surge_workspace, _SURGE_POINT_FILE_PATTERN % grid_id)
         surge_task = task_graph.add_task(
-            target=calculate_surge, args=(
+            func=calculate_surge, args=(
                 grid_point_path,
                 _GLOBAL_DEM_PATH,
                 surge_workspace,
@@ -341,7 +345,7 @@ def main():
         target_sea_level_point_vector_path = os.path.join(
             sea_level_workspaces, _SEA_LEVEL_POINT_FILE_PATTERN % grid_id)
         sea_level_task = task_graph.add_task(
-            target=calculate_sea_level_rise, args=(
+            func=calculate_sea_level_rise, args=(
                 grid_point_path,
                 _GLOBAL_SEA_LEVEL_PATH,
                 sea_level_workspaces,
@@ -359,7 +363,7 @@ def main():
         _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
     logger.debug(local_habitat_protection_path_list)
     merge_habitat_protection_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_habitat_protection_path_list,
             target_spatial_reference_wkt,
             target_habitat_protection_points_path,
@@ -373,7 +377,7 @@ def main():
     target_merged_rei_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
     merge_rei_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_rei_point_path_list,
             target_spatial_reference_wkt,
             target_merged_rei_points_path,
@@ -387,7 +391,7 @@ def main():
     target_merged_wave_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WAVE_POINT_FILE_PATTERN)
     merge_wave_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_wave_point_path_list,
             target_spatial_reference_wkt,
             target_merged_wave_points_path,
@@ -401,7 +405,7 @@ def main():
     target_merged_relief_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_RELIEF_POINT_FILE_PATTERN)
     merge_relief_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_relief_path_list,
             target_spatial_reference_wkt,
             target_merged_relief_points_path,
@@ -415,7 +419,7 @@ def main():
     target_merged_relief_sea_level_rise_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN)
     merge_sea_level_point_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_sea_level_path_list,
             target_spatial_reference_wkt,
             target_merged_relief_sea_level_rise_path,
@@ -429,7 +433,7 @@ def main():
     target_merged_surge_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
     merge_surge_task = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_surge_path_list,
             target_spatial_reference_wkt,
             target_merged_surge_points_path,
@@ -445,7 +449,7 @@ def main():
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     _ = task_graph.add_task(
-        target=merge_vectors, args=(
+        func=merge_vectors, args=(
             local_fetch_ray_path_list,
             target_spatial_reference_wkt,
             target_merged_fetch_rays_path,
@@ -456,7 +460,7 @@ def main():
     target_result_point_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN)
     summarize_results_task = task_graph.add_task(
-        target=summarize_results, args=(
+        func=summarize_results, args=(
             risk_factor_vector_list, target_result_point_vector_path),
         target_path_list=[target_result_point_vector_path],
         dependent_task_list=merge_vectors_task_list)
@@ -482,17 +486,25 @@ def main():
         _TARGET_WORKSPACE, 'nldi_gpw_aligned.tif')
     poverty_aligned_path = os.path.join(
         _TARGET_WORKSPACE, 'poverty_aligned.tif')
+    pop0to14_aligned_path = os.path.join(
+        _TARGET_WORKSPACE, '0to14_aligned.tif')
+    pop80plus_aligned_path = os.path.join(
+        _TARGET_WORKSPACE, '80plus_aligned.tif')
+
     aligned_gpw_nldi_path_list = [
         gpw_nldi_aligned_path,
         nldi_gpw_aligned_path,
-        poverty_aligned_path
+        poverty_aligned_path,
+        pop0to14_aligned_path,
+        pop80plus_aligned_path,
         ]
 
     align_gpw_nldi_poverty_task = task_graph.add_task(
-        target=pygeoprocessing.align_and_resize_raster_stack,
+        func=pygeoprocessing.align_and_resize_raster_stack,
         args=(
-            [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH, _GLOBAL_POVERTY_PATH],
-            aligned_gpw_nldi_path_list, ['nearest'] * 3,
+            [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH, _GLOBAL_POVERTY_PATH,
+             _GLOBAL_0t14_PATH, _GLOBAL_80plus_PATH],
+            aligned_gpw_nldi_path_list, ['nearest'] * 5,
             gpw_raster_info['pixel_size'], 'intersection'),
         kwargs={
             'base_vector_path_list': [target_result_point_vector_path],
@@ -506,7 +518,7 @@ def main():
         [nldi_gpw_aligned_path, gpw_nldi_aligned_path])
 
     mult_gpw_nldi_task = task_graph.add_task(
-        target=mult_gpw_nldi_op,
+        func=mult_gpw_nldi_op,
         target_path_list=[target_gpw_nldi_path],
         dependent_task_list=[align_gpw_nldi_poverty_task])
 
@@ -518,24 +530,39 @@ def main():
         [nldi_gpw_aligned_path, poverty_aligned_path])
 
     mult_gpw_poverty_task = task_graph.add_task(
-        target=mult_gpw_poverty_op,
+        func=mult_gpw_poverty_op,
         target_path_list=[target_gpw_poverty_path],
         dependent_task_list=[align_gpw_nldi_poverty_task])
 
+    age_population_weighted_path = os.path.join(
+        _TARGET_WORKSPACE, 'gpwpovage.tif')
+
     aggregate_dict = _GLOBAL_POPULATION_SCENARIOS.copy()
+
+    gpwpovage_op = _GPWPovAgeCalculator(
+        _TARGET_NODATA, age_population_weighted_path,
+        target_gpw_nldi_path, pop0to14_aligned_path,
+        pop80plus_aligned_path)
+
+    gpwpovage_task = task_graph.add_task(
+        func=gpwpovage_op,
+        target_path_list=[age_population_weighted_path],
+        dependent_task_list=[
+            mult_gpw_poverty_task, align_gpw_nldi_poverty_task])
 
     aggregate_dict['gpwnldi'] = (target_gpw_nldi_path, 1)
     aggregate_dict['gpwpov1km'] = (poverty_aligned_path, 1)
     aggregate_dict['gpwpov30km'] = (poverty_aligned_path, 30)
+    aggregate_dict['gpwpovage'] = (age_population_weighted_path, 1)
 
     aggregate_data_task = task_graph.add_task(
-        target=aggregate_population_scenarios, args=(
+        func=aggregate_population_scenarios, args=(
             aggregate_dict, target_result_point_vector_path,
             target_population_result_point_vector_path),
         target_path_list=[target_population_result_point_vector_path],
         dependent_task_list=[
             summarize_results_task, mult_gpw_nldi_task,
-            mult_gpw_poverty_task])
+            mult_gpw_poverty_task, gpwpovage_task])
 
     task_graph.close()
     task_graph.join()
@@ -609,10 +636,16 @@ def aggregate_population_scenarios(
                 pixel_value = 0
             else:
                 try:
-                    pixel_value = population_band.ReadAsArray(
+                    array = population_band.ReadAsArray(
                         xoff=pixel_x, yoff=pixel_y, win_xsize=win_xsize,
-                        win_ysize=win_ysize)[0, 0]
-                    if pixel_value == nodata:
+                        win_ysize=win_ysize)
+                    if nodata is not None:
+                        mask = array != nodata
+                    else:
+                        mask = numpy.ones(array.shape, dtype=numpy.bool)
+                    if numpy.count_nonzero(mask) > 0:
+                        pixel_value = numpy.max(array[mask])
+                    else:
                         pixel_value = 0
                 except Exception:
                     logger.error(
@@ -2464,7 +2497,6 @@ def merge_vectors(
     esri_driver = ogr.GetDriverByName('ESRI Shapefile')
     if os.path.exists(target_merged_vector_path):
         esri_driver.DeleteDataSource(target_merged_vector_path)
-    logger.debug(base_vector_path_list)
     base_vector = ogr.Open(base_vector_path_list[0])
     base_layer = base_vector.GetLayer()
     base_layer_defn = base_layer.GetLayerDefn()
@@ -2579,10 +2611,64 @@ class _MultiplyRasters(object):
             valid_mask = numpy.empty(array_list[0].shape, dtype=numpy.bool)
             valid_mask[:] = True
             for nodata, array in zip(self.nodata_list, array_list):
-                valid_mask &= array != nodata
+                if nodata is not None:
+                    valid_mask &= array != nodata
+                valid_mask &= array >= 0.0
             result[valid_mask] = array_list[0][valid_mask]
             for array in array_list[1::]:
                 result[valid_mask] *= array[valid_mask]
+            return result
+
+        pygeoprocessing.raster_calculator(
+            [(x, 1) for x in self.raster_path_list], local_op,
+            self.target_path, gdal.GDT_Float32, self.target_nodata)
+        print 'done calling %s' % self.raster_path_list
+
+
+class _GPWPovAgeCalculator(object):
+    """Multiply rasters and ignore their nodata."""
+
+    def __init__(
+            self, target_nodata, target_path, base_path, add_a_path,
+            add_b_path):
+        # try to get the source code of __call__ so task graph will recompute
+        # if the function has changed
+        try:
+            self.__name__ = hashlib.sha1(
+                inspect.getsource(
+                    _GPWPovAgeCalculator.__call__
+                )).hexdigest()
+        except IOError:
+            # default to the classname if it doesn't work
+            self.__name__ = (
+                _GPWPovAgeCalculator.__name__)
+        self.raster_path_list = [base_path, add_a_path, add_b_path]
+        self.target_path = target_path
+        self.target_nodata = target_nodata
+
+    def __call__(self):
+        print 'calling %s' % self.raster_path_list
+
+        nodata_list = [
+            pygeoprocessing.get_raster_info(x)['nodata'][0]
+            for x in self.raster_path_list]
+        print nodata_list
+
+        def local_op(base_array, add_a_array, add_b_array):
+            """Mult array list together."""
+            result = numpy.empty_like(base_array)
+            result[:] = self.target_nodata
+            valid_mask = numpy.empty(base_array.shape, dtype=numpy.bool)
+            valid_mask[:] = True
+            if nodata_list[0] is not None:
+                valid_mask &= base_array != nodata_list[0]
+            if nodata_list[1] is not None:
+                valid_mask &= add_a_array != nodata_list[1]
+            if nodata_list[2] is not None:
+                valid_mask &= add_b_array != nodata_list[2]
+            result[valid_mask] = (
+                base_array[valid_mask] * (
+                    add_a_array[valid_mask] + add_b_array[valid_mask]))
             return result
 
         pygeoprocessing.raster_calculator(
