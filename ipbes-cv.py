@@ -5,7 +5,6 @@ import time
 import os
 import math
 import logging
-import multiprocessing
 import re
 import hashlib
 import inspect
@@ -139,6 +138,7 @@ _SEA_LEVEL_WORKSPACES = os.path.join(
 
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
+
 
 def main():
     """Entry point."""
@@ -471,11 +471,6 @@ def main():
 
     # gwp is at 1km
     gpw_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_GPW_PATH)
-    # nldi is at 30km
-    nldi_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_NLDI_PATH)
-
-    poverty_raster_info = pygeoprocessing.get_raster_info(
-        _GLOBAL_POVERTY_PATH)
 
     # Resample everything to an aligned 1km square
     # GPW x NLDI (at 30 km resolution)
@@ -541,7 +536,7 @@ def main():
 
     gpwpovage_op = _GPWPovAgeCalculator(
         _TARGET_NODATA, age_population_weighted_path,
-        target_gpw_nldi_path, pop0to14_aligned_path,
+        target_gpw_poverty_path, pop0to14_aligned_path,
         pop80plus_aligned_path)
 
     gpwpovage_task = task_graph.add_task(
@@ -550,10 +545,24 @@ def main():
         dependent_task_list=[
             mult_gpw_poverty_task, align_gpw_nldi_poverty_task])
 
+    gpwnldi_population_weighted_path = os.path.join(
+        _TARGET_WORKSPACE, 'gpwnldiage.tif')
+    gpwnldiage_op = _GPWPovAgeCalculator(
+        _TARGET_NODATA, gpwnldi_population_weighted_path,
+        target_gpw_nldi_path, pop0to14_aligned_path,
+        pop80plus_aligned_path)
+
+    gpwnldiage_task = task_graph.add_task(
+        func=gpwnldiage_op,
+        target_path_list=[gpwnldi_population_weighted_path],
+        dependent_task_list=[
+            mult_gpw_nldi_task, align_gpw_nldi_poverty_task])
+
     aggregate_dict['gpwnldi'] = (target_gpw_nldi_path, 1)
     aggregate_dict['gpwpov1km'] = (poverty_aligned_path, 1)
     aggregate_dict['gpwpov30km'] = (poverty_aligned_path, 30)
     aggregate_dict['gpwpovage'] = (age_population_weighted_path, 1)
+    aggregate_dict['gpwndliage'] = (gpwnldi_population_weighted_path, 1)
 
     aggregate_data_task = task_graph.add_task(
         func=aggregate_population_scenarios, args=(
@@ -562,7 +571,7 @@ def main():
         target_path_list=[target_population_result_point_vector_path],
         dependent_task_list=[
             summarize_results_task, mult_gpw_nldi_task,
-            mult_gpw_poverty_task, gpwpovage_task])
+            mult_gpw_poverty_task, gpwpovage_task, gpwnldiage_task])
 
     task_graph.close()
     task_graph.join()
