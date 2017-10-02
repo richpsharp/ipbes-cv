@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger('ipbes-cv')
 logger.setLevel(logging.DEBUG)
 
-_N_CPUS = 8
+_N_CPUS = 0
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -178,8 +178,6 @@ def main():
         simplified_habitat_vector_lookup[habitat_id] = (
             os.path.join(_TARGET_WORKSPACE, '%s.shp' % habitat_id),
             habitat_rank, habitat_dist)
-        logger.debug(habitat_path)
-        logger.debug(simplified_habitat_vector_lookup[habitat_id][0])
         simplify_habitat_task = task_graph.add_task(
             func=simplify_geometry, args=(
                 habitat_path, smallest_feature_size_degrees,
@@ -302,9 +300,6 @@ def main():
             dependent_task_list=[
                 create_shore_points_task] + simplify_habitat_task_list)
         habitat_protection_task_list.append(habitat_protection_task)
-        logger.debug(
-            "appending %s to local_habitat_protection_path_list",
-            target_habitat_protection_point_path)
         local_habitat_protection_path_list.append(
             target_habitat_protection_point_path)
 
@@ -361,7 +356,6 @@ def main():
     risk_factor_vector_list = []
     target_habitat_protection_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
-    logger.debug(local_habitat_protection_path_list)
     merge_habitat_protection_point_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_habitat_protection_path_list,
@@ -521,8 +515,8 @@ def main():
     target_gpw_poverty_path = os.path.join(
         _TARGET_WORKSPACE, 'gpw_poverty_1km.tif')
     mult_gpw_poverty_op = _MultiplyRasters(
-        _TARGET_NODATA, target_gpw_nldi_path,
-        [nldi_aligned_path, poverty_aligned_path])
+        _TARGET_NODATA, target_gpw_poverty_path,
+        [gpw_aligned_path, poverty_aligned_path])
 
     mult_gpw_poverty_task = task_graph.add_task(
         func=mult_gpw_poverty_op,
@@ -744,7 +738,6 @@ def summarize_results(
             continue
         base_risk_values = numpy.empty(n_features)
         risk_feature = None
-        logger.debug(risk_factor_path)
         for risk_feature in risk_layer:
             risk_value = risk_feature.GetField(field_id)
             point_id = risk_feature.GetField('point_id')
