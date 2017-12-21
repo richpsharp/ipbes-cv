@@ -24,56 +24,59 @@ import pygeoprocessing
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
-logger = logging.getLogger('ipbes-cv')
-logger.setLevel(logging.DEBUG)
+LOGGER = logging.getLogger('ipbes-cv')
+LOGGER.setLevel(logging.DEBUG)
+
+POSSIBLE_DROPBOX_LOCATIONS = [
+    r'D:\Dropbox',
+    r'C:\Users\Rich\Dropbox',
+    r'C:\Users\rpsharp\Dropbox',
+    r'E:\Dropbox']
+
+LOGGER.info("checking dropbox locations")
+for path in POSSIBLE_DROPBOX_LOCATIONS:
+    print path
+    if os.path.exists(path):
+        BASE_DROPBOX_DIR = path
+        break
+LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
 _N_CPUS = 0
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
 
-_GLOBAL_POLYGON_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
+_GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\global_polygon\global_polygon.shp")
 
-_GLOBAL_WWIII_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
+_GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\wave_watch_iii\WaveWatchIII.shp")
 
-_GLOBAL_DEM_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+_GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\global_dem")
 
-_GLOBAL_SEA_LEVEL_PATH = r"D:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+_GLOBAL_SEA_LEVEL_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp")
 
-_GLOBAL_GPW_PATH = r"D:\Dropbox\ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"
+_GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif")
 
-_GLOBAL_NLDI_PATH = r"D:\Dropbox\ipbes-data\NLDI_2006_0p25_rev20111230.tif"
+_GLOBAL_NLDI_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\NLDI_2006_0p25_rev20111230.tif")
 
-_GLOBAL_POVERTY_PATH = r"D:\Dropbox\ipbes-data\poverty_pct_1.tif"
+_GLOBAL_POVERTY_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif")
 
-_GLOBAL_0t14_PATH = r"D:\Dropbox\ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"
+_GLOBAL_0t14_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif")
 
-_GLOBAL_80plus_PATH = r"D:\Dropbox\ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif"
+_GLOBAL_80plus_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif")
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
-    'saltmarsh': (r"D:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
-    'coralreef': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
-    'seagrass': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+    'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
+    'saltmarsh': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp"), 2, 1000.0),
+    'coralreef': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp"), 1, 2000.0),
+    'seagrass': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp"), 4, 500.0),
 }
 
 _GLOBAL_POPULATION_SCENARIOS = {
-    'ssp1_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif", 0),
-    'ssp1_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif", 0),
-    'ssp1_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif", 0),
-    'ssp2_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif", 0),
-    'ssp2_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif", 0),
-    'ssp2_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif", 0),
-    'ssp3_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif", 0),
-    'ssp3_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif", 0),
-    'ssp3_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif", 0),
-    'ssp4_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif", 0),
-    'ssp4_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif", 0),
-    'ssp4_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif", 0),
-    'ssp5_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif", 0),
-    'ssp5_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif", 0),
-    'ssp5_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif", 0),
+    'pdn_gpw_15': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif", 0),)
+    'pdn_ssp1_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), 0),
+    'pdn_ssp3_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), 0),
+    'pdn_ssp5_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), 0),
 }
 
 # The global bounding box to do the entire analysis
