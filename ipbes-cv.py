@@ -32,48 +32,48 @@ _N_CPUS = 0
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
 
-_GLOBAL_POLYGON_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
+_GLOBAL_POLYGON_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\Land\global_polygon.shp"
 
-_GLOBAL_WWIII_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
+_GLOBAL_WWIII_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\CoastalProtection\Input\WaveWatchIII.shp"
 
-_GLOBAL_DEM_PATH = r"C:\Users\rpsharp\Documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
+_GLOBAL_DEM_PATH = r"D:\rpsharp_documents\bitbucket_repos\invest\data\invest-data\Base_Data\Marine\DEMs\global_dem"
 
-_GLOBAL_SEA_LEVEL_PATH = r"E:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
+_GLOBAL_SEA_LEVEL_PATH = r"D:\Dropbox\ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp"
 
-_GLOBAL_GPW_PATH = r"E:\Dropbox\ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"
+_GLOBAL_GPW_PATH = r"D:\Dropbox\ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"
 
-_GLOBAL_NLDI_PATH = r"E:\Dropbox\ipbes-data\NLDI_2006_0p25_rev20111230.tif"
+_GLOBAL_NLDI_PATH = r"D:\Dropbox\ipbes-data\NLDI_2006_0p25_rev20111230.tif"
 
-_GLOBAL_POVERTY_PATH = r"E:\Dropbox\ipbes-data\poverty_pct_1.tif"
+_GLOBAL_POVERTY_PATH = r"D:\Dropbox\ipbes-data\poverty_pct_1.tif"
 
-_GLOBAL_0t14_PATH = r"E:\Dropbox\ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"
+_GLOBAL_0t14_PATH = r"D:\Dropbox\ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"
 
-_GLOBAL_80plus_PATH = r"E:\Dropbox\ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif"
+_GLOBAL_80plus_PATH = r"D:\Dropbox\ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif"
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
-    'saltmarsh': (r"E:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
-    'coralreef': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
-    'seagrass': (r"E:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
+    'mangrove': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp", 1, 1000.0),
+    'saltmarsh': (r"D:\Dropbox\ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp", 2, 1000.0),
+    'coralreef': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp", 1, 2000.0),
+    'seagrass': (r"D:\Dropbox\ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp", 4, 500.0),
 }
 
 _GLOBAL_POPULATION_SCENARIOS = {
-    'ssp1_2010': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif", 0),
-    'ssp1_2050': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif", 0),
-    'ssp1_2090': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif", 0),
-    'ssp2_2010': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif", 0),
-    'ssp2_2050': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif", 0),
-    'ssp2_2090': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif", 0),
-    'ssp3_2010': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif", 0),
-    'ssp3_2050': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif", 0),
-    'ssp3_2090': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif", 0),
-    'ssp4_2010': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif", 0),
-    'ssp4_2050': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif", 0),
-    'ssp4_2090': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif", 0),
-    'ssp5_2010': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif", 0),
-    'ssp5_2050': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif", 0),
-    'ssp5_2090': (r"E:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif", 0),
+    'ssp1_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif", 0),
+    'ssp1_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif", 0),
+    'ssp1_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2090.tif", 0),
+    'ssp2_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2010.tif", 0),
+    'ssp2_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2050.tif", 0),
+    'ssp2_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP2_GeoTIFF\total\GeoTIFF\ssp2_2090.tif", 0),
+    'ssp3_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2010.tif", 0),
+    'ssp3_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif", 0),
+    'ssp3_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2090.tif", 0),
+    'ssp4_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2010.tif", 0),
+    'ssp4_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2050.tif", 0),
+    'ssp4_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP4_GeoTIFF\total\GeoTIFF\ssp4_2090.tif", 0),
+    'ssp5_2010': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2010.tif", 0),
+    'ssp5_2050': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif", 0),
+    'ssp5_2090': (r"D:\Dropbox\ipbes-data\Spatial_population_scenarios\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2090.tif", 0),
 }
 
 # The global bounding box to do the entire analysis
@@ -157,7 +157,8 @@ def main():
 
     build_wwiii_task = task_graph.add_task(
         func=build_wwiii_rtree,
-        args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path))
+        args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path),
+        task_name='build_wwiii_rtree')
 
     simplified_vector_path = os.path.join(
         _TARGET_WORKSPACE, 'simplified_geometry.shp')
@@ -168,7 +169,8 @@ def main():
         args=(
             _GLOBAL_POLYGON_PATH, smallest_feature_size_degrees,
             simplified_vector_path),
-        target_path_list=[simplified_vector_path])
+        target_path_list=[simplified_vector_path],
+        task_name="simplify_geometry")
 
     simplify_habitat_task_list = []
     simplified_habitat_vector_lookup = {}
@@ -183,7 +185,8 @@ def main():
                 habitat_path, smallest_feature_size_degrees,
                 simplified_habitat_vector_lookup[habitat_id][0]),
             target_path_list=[
-                simplified_habitat_vector_lookup[habitat_id][0]])
+                simplified_habitat_vector_lookup[habitat_id][0]],
+            task_name='simplify_geometry_%s' % habitat_id)
         simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
@@ -193,7 +196,8 @@ def main():
         func=build_feature_bounding_box_rtree,
         args=(simplified_vector_path, landmass_bounding_rtree_path),
         dependent_task_list=[simplify_geometry_task],
-        target_path_list=[landmass_bounding_rtree_path])
+        target_path_list=[landmass_bounding_rtree_path],
+        task_name='simplify_geometry_landmass')
 
     global_grid_vector_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
@@ -205,7 +209,8 @@ def main():
             _WGS84_GRID_SIZE),
         dependent_task_list=[build_rtree_task],
         ignore_path_list=[landmass_bounding_rtree_path],
-        target_path_list=[global_grid_vector_path])
+        target_path_list=[global_grid_vector_path],
+        task_name='grid_global_edges')
 
     grid_edges_of_vector_task.join()
 
