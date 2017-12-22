@@ -41,7 +41,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
-_N_CPUS = 0
+_N_CPUS = 2
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -56,14 +56,6 @@ _GLOBAL_SEA_LEVEL_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\PSMSL_SL
 
 _GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif")
 
-_GLOBAL_NLDI_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\NLDI_2006_0p25_rev20111230.tif")
-
-_GLOBAL_POVERTY_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif")
-
-_GLOBAL_0t14_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif")
-
-_GLOBAL_80plus_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a080plusbt_2010_cntm_30_sec.tif")
-
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
     'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
@@ -72,11 +64,22 @@ _GLOBAL_HABITAT_LAYER_PATHS = {
     'seagrass': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp"), 4, 500.0),
 }
 
-_GLOBAL_POPULATION_SCENARIOS = {
-    'pdn_gpw_15': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif", 0),)
+_AGGREGATION_LAYER_MAP = {
+    'pdn_gpw_15': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), 0),
     'pdn_ssp1_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), 0),
     'pdn_ssp3_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), 0),
     'pdn_ssp5_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), 0),
+    'poverty_pct': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), 0),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), 0),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), 0),
+}
+
+# these will be used to determine urban extent
+_GLOBIO_LANDCOVER_MAP = {
+    'urbp_15': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"),
+    'urbpssp1_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"),
+    'urbpssp3_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"),
+    'urbpssp5_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"),
 }
 
 # The global bounding box to do the entire analysis
@@ -90,15 +93,12 @@ _GLOBAL_BOUNDING_BOX_WGS84 = [-180, -60, 180, 60]
 # half of that plus some buffer should be good enough
 _WGS84_GRID_SIZE = 3.0
 
-# Once global grid is cut, it is reprojected into UTM with this underlying
-# square grid cell size
-_UTM_GRID_SIZE = 250
-
 # Wave Watch III data does not cover the planet.  Make sure we don't deal
 # with a point that's not in range of said point.  I'm picking 1 degree since
 # that's double the diagonal distance between two WWIII points
 _MAX_WWIII_DISTANCE = 5.0
 
+# Choosing just 16 fetch rays to make things run faster
 _N_FETCH_RAYS = 16
 
 _GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
@@ -236,7 +236,8 @@ def main():
     local_surge_path_list = []
     sea_level_task_list = []
     local_sea_level_path_list = []
-    for grid_id in xrange(grid_count):
+    #for grid_id in xrange(grid_count):
+    for grid_id in [178]:
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -358,6 +359,16 @@ def main():
         sea_level_task_list.append(sea_level_task)
         local_sea_level_path_list.append(target_sea_level_point_vector_path)
 
+    # Below are the additional aggregateors.
+    # Aggregate Everything in _AGGREGATION_LAYER_MAP, some might need normalizing.
+
+    # mask 2 and 190 for everything in _GLOBIO_LANDCOVER_MAP, then aggregate those
+    # create urbanp_15, urbanp_50 by masking landcover codes 2 and 190 from
+
+    # figure out sea level rise later
+
+    #####################
+
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     merge_vectors_task_list = []
@@ -466,114 +477,6 @@ def main():
             risk_factor_vector_list, target_result_point_vector_path),
         target_path_list=[target_result_point_vector_path],
         dependent_task_list=merge_vectors_task_list)
-
-    target_population_result_point_vector_path = os.path.join(
-        r"E:\Dropbox\rps_bck_shared_stuff\ipbes stuff\ipbes_cv_folder",
-        _GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN)
-
-    # gwp is at 1km
-    gpw_raster_info = pygeoprocessing.get_raster_info(_GLOBAL_GPW_PATH)
-
-    # Resample everything to an aligned 1km square
-    # GPW x NLDI (at 30 km resolution)
-    # align_gpw_nldi_task
-    gpw_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, 'gpw_aligned.tif')
-    nldi_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, 'nldi_aligned.tif')
-    poverty_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, 'poverty_aligned.tif')
-    pop0to14_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, '0to14_aligned.tif')
-    pop80plus_aligned_path = os.path.join(
-        _TARGET_WORKSPACE, '80plus_aligned.tif')
-
-    aligned_gpw_nldi_path_list = [
-        gpw_aligned_path,
-        nldi_aligned_path,
-        poverty_aligned_path,
-        pop0to14_aligned_path,
-        pop80plus_aligned_path,
-        ]
-
-    align_gpw_nldi_poverty_task = task_graph.add_task(
-        func=pygeoprocessing.align_and_resize_raster_stack,
-        args=(
-            [_GLOBAL_GPW_PATH, _GLOBAL_NLDI_PATH, _GLOBAL_POVERTY_PATH,
-             _GLOBAL_0t14_PATH, _GLOBAL_80plus_PATH],
-            aligned_gpw_nldi_path_list, ['nearest'] * 5,
-            gpw_raster_info['pixel_size'], 'intersection'),
-        kwargs={
-            'base_vector_path_list': [target_result_point_vector_path],
-            'raster_align_index': 0},
-        target_path_list=aligned_gpw_nldi_path_list,
-        dependent_task_list=[summarize_results_task])
-
-    target_gpw_nldi_path = os.path.join(_TARGET_WORKSPACE, 'gpw_nldi.tif')
-    mult_gpw_nldi_op = _MultiplyRasters(
-        _TARGET_NODATA, target_gpw_nldi_path,
-        [nldi_aligned_path, gpw_aligned_path])
-
-    mult_gpw_nldi_task = task_graph.add_task(
-        func=mult_gpw_nldi_op,
-        target_path_list=[target_gpw_nldi_path],
-        dependent_task_list=[align_gpw_nldi_poverty_task])
-
-    # GPW x Poverty (at 1 km resolution)
-    target_gpw_poverty_path = os.path.join(
-        _TARGET_WORKSPACE, 'gpw_poverty_1km.tif')
-    mult_gpw_poverty_op = _MultiplyRasters(
-        _TARGET_NODATA, target_gpw_poverty_path,
-        [gpw_aligned_path, poverty_aligned_path])
-
-    mult_gpw_poverty_task = task_graph.add_task(
-        func=mult_gpw_poverty_op,
-        target_path_list=[target_gpw_poverty_path],
-        dependent_task_list=[align_gpw_nldi_poverty_task])
-
-    age_population_weighted_path = os.path.join(
-        _TARGET_WORKSPACE, 'gpwpovage.tif')
-
-    aggregate_dict = _GLOBAL_POPULATION_SCENARIOS.copy()
-
-    gpwpovage_op = _GPWPovAgeCalculator(
-        _TARGET_NODATA, age_population_weighted_path,
-        target_gpw_poverty_path, pop0to14_aligned_path,
-        pop80plus_aligned_path)
-
-    gpwpovage_task = task_graph.add_task(
-        func=gpwpovage_op,
-        target_path_list=[age_population_weighted_path],
-        dependent_task_list=[
-            mult_gpw_poverty_task, align_gpw_nldi_poverty_task])
-
-    gpwnldi_population_weighted_path = os.path.join(
-        _TARGET_WORKSPACE, 'gpwnldiage.tif')
-    gpwnldiage_op = _GPWPovAgeCalculator(
-        _TARGET_NODATA, gpwnldi_population_weighted_path,
-        target_gpw_nldi_path, pop0to14_aligned_path,
-        pop80plus_aligned_path)
-
-    gpwnldiage_task = task_graph.add_task(
-        func=gpwnldiage_op,
-        target_path_list=[gpwnldi_population_weighted_path],
-        dependent_task_list=[
-            mult_gpw_nldi_task, align_gpw_nldi_poverty_task])
-
-    aggregate_dict['gpwnldi'] = (target_gpw_nldi_path, 1)
-    aggregate_dict['gpwpov1km'] = (poverty_aligned_path, 1)
-    aggregate_dict['gpwpov30km'] = (poverty_aligned_path, 30)
-    aggregate_dict['gpwpovage'] = (age_population_weighted_path, 1)
-    aggregate_dict['gpwndliage'] = (gpwnldi_population_weighted_path, 1)
-
-    aggregate_data_task = task_graph.add_task(
-        func=aggregate_population_scenarios, args=(
-            aggregate_dict, target_result_point_vector_path,
-            target_population_result_point_vector_path),
-        target_path_list=[target_population_result_point_vector_path],
-        dependent_task_list=[
-            summarize_results_task, mult_gpw_nldi_task,
-            mult_gpw_poverty_task, gpwpovage_task, gpwnldiage_task])
 
     task_graph.close()
     task_graph.join()
@@ -2587,104 +2490,6 @@ def polygon_to_lines(geometry):
             last_point, interior.coords[0]]))
     return line_list
 
-
-class _MultiplyRasters(object):
-    """Multiply rasters and ignore their nodata."""
-
-    def __init__(self, target_nodata, target_path, raster_path_list):
-        # try to get the source code of __call__ so task graph will recompute
-        # if the function has changed
-        try:
-            self.__name__ = hashlib.sha1(
-                inspect.getsource(
-                    _MultiplyRasters.__call__
-                )).hexdigest()
-        except IOError:
-            # default to the classname if it doesn't work
-            self.__name__ = (
-                _MultiplyRasters.__name__)
-        self.raster_path_list = raster_path_list
-        self.target_path = target_path
-        self.target_nodata = target_nodata
-
-    def __call__(self):
-        print 'calling %s' % self.raster_path_list
-
-        nodata_list = [
-            pygeoprocessing.get_raster_info(x)['nodata'][0]
-            for x in self.raster_path_list]
-
-        def local_op(*array_list):
-            """Mult array list together."""
-            result = numpy.empty_like(array_list[0])
-            result[:] = self.target_nodata
-            valid_mask = numpy.empty(array_list[0].shape, dtype=numpy.bool)
-            valid_mask[:] = True
-            for nodata, array in zip(nodata_list, array_list):
-                if nodata is not None:
-                    valid_mask &= array != nodata
-                valid_mask &= array >= 0.0
-            result[valid_mask] = array_list[0][valid_mask]
-            for array in array_list[1::]:
-                result[valid_mask] *= array[valid_mask]
-            return result
-
-        pygeoprocessing.raster_calculator(
-            [(x, 1) for x in self.raster_path_list], local_op,
-            self.target_path, gdal.GDT_Float32, self.target_nodata)
-        print 'done calling %s' % self.raster_path_list
-
-
-class _GPWPovAgeCalculator(object):
-    """Multiply rasters and ignore their nodata."""
-
-    def __init__(
-            self, target_nodata, target_path, base_path, add_a_path,
-            add_b_path):
-        # try to get the source code of __call__ so task graph will recompute
-        # if the function has changed
-        try:
-            self.__name__ = hashlib.sha1(
-                inspect.getsource(
-                    _GPWPovAgeCalculator.__call__
-                )).hexdigest()
-        except IOError:
-            # default to the classname if it doesn't work
-            self.__name__ = (
-                _GPWPovAgeCalculator.__name__)
-        self.raster_path_list = [base_path, add_a_path, add_b_path]
-        self.target_path = target_path
-        self.target_nodata = target_nodata
-
-    def __call__(self):
-        print 'calling %s' % self.raster_path_list
-
-        nodata_list = [
-            pygeoprocessing.get_raster_info(x)['nodata'][0]
-            for x in self.raster_path_list]
-        print nodata_list
-
-        def local_op(base_array, add_a_array, add_b_array):
-            """Mult array list together."""
-            result = numpy.empty_like(base_array)
-            result[:] = self.target_nodata
-            valid_mask = numpy.empty(base_array.shape, dtype=numpy.bool)
-            valid_mask[:] = True
-            if nodata_list[0] is not None:
-                valid_mask &= (base_array != nodata_list[0])
-            if nodata_list[1] is not None:
-                valid_mask &= (add_a_array != nodata_list[1])
-            if nodata_list[2] is not None:
-                valid_mask &= (add_b_array != nodata_list[2])
-            result[valid_mask] = (
-                base_array[valid_mask] * (
-                    add_a_array[valid_mask] + add_b_array[valid_mask]))
-            return result
-
-        pygeoprocessing.raster_calculator(
-            [(x, 1) for x in self.raster_path_list], local_op,
-            self.target_path, gdal.GDT_Float32, self.target_nodata)
-        print 'done calling %s' % self.raster_path_list
 
 if __name__ == '__main__':
     main()
