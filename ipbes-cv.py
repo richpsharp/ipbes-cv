@@ -41,7 +41,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
-_N_CPUS = 2
+_N_CPUS = -1
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -68,21 +68,17 @@ _AGGREGATION_LAYER_MAP = {
     'pdn_gpw': (
         os.path.join(
             BASE_DROPBOX_DIR,
-            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True),
-    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False),
-}
-
-# these will be used to determine urban extent
-_GLOBIO_LANDCOVER_MAP = {
-    'urbp_2015': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"),
-    'urbp_ssp1': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"),
-    'urbp_ssp3': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"),
-    'urbp_ssp5': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"),
+            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True, None),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True, None),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True, None),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True, None),
+    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False, None),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None),
+    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190]),
+    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
+    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
+    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
 }
 
 # The global bounding box to do the entire analysis
@@ -490,15 +486,20 @@ def main():
 
 
 def aggregate_raster_data(
-        raster_feature_id_map, base_point_vector_path, sample_distance,
+        raster_feature_id_map,
+        base_point_vector_path, sample_distance,
         target_result_point_vector_path):
     """Add population scenarios and aggregate under each point.
 
     Parameters:
-        raster_feature_id_map (dict): maps feature id names to a tuple that's
-            a path to a raster to sample for each point in
-            `base_point_vector_path  and a boolean indicating whether that
-            value should be divided by the pixel area.
+        raster_feature_id_map (dict): maps feature id names to a 3-tuple:
+            * path to a raster to sample for each point in
+            `base_point_vector_path
+            * boolean indicating whether that value should be divided by the
+              pixel area.
+            * if not None, a list of rasrer ids that should be masked to 1
+              and everything else to 0. If so result is proportion of 1s in
+              sampled area within `sample_distance`
         base_point_vector_path (path): a global point vector path
             that is to be used for the base of the result
         sample_distance (float): distance in meters to sample raster values
@@ -524,7 +525,8 @@ def aggregate_raster_data(
         target_result_point_layer.CreateField(
             ogr.FieldDefn(simulation_id, ogr.OFTReal))
 
-    for simulation_id, (raster_path, divide_by_area) in raster_feature_id_map.iteritems():
+    for simulation_id, (raster_path, divide_by_area, reclass_ids) in (
+            raster_feature_id_map.iteritems()):
         raster = gdal.Open(raster_path)
         band = raster.GetRasterBand(1)
         n_rows = band.YSize
@@ -572,11 +574,14 @@ def aggregate_raster_data(
                     array = band.ReadAsArray(
                         xoff=pixel_x, yoff=pixel_y, win_xsize=win_xsize,
                         win_ysize=win_ysize)
-                    if nodata is not None:
+                    if nodata is not None and reclass_ids is None:
                         mask = array != nodata
                     else:
                         mask = numpy.ones(array.shape, dtype=numpy.bool)
-                    if numpy.count_nonzero(mask) > 0:
+                    if reclass_ids is not None:
+                        pixel_value = numpy.mean(
+                            numpy.in1d(array.flatten(), reclass_ids))
+                    elif numpy.count_nonzero(mask) > 0:
                         pixel_value = numpy.max(array[mask])
                     else:
                         pixel_value = 0
