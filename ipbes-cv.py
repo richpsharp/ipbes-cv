@@ -41,7 +41,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
-_N_CPUS = -1
+_N_CPUS = 4
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
@@ -234,8 +234,7 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
-    #for grid_id in xrange(grid_count):
-    for grid_id in [178]:
+    for grid_id in xrange(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
