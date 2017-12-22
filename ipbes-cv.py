@@ -52,8 +52,6 @@ _GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\wave_watch_i
 
 _GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\global_dem")
 
-_GLOBAL_SEA_LEVEL_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\PSMSL_SLRtrends\SLRtrend_All.shp")
-
 _GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif")
 
 # layer name, (layer path, layer rank, protection distance)
@@ -236,8 +234,6 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
-    sea_level_task_list = []
-    local_sea_level_path_list = []
     #for grid_id in xrange(grid_count):
     for grid_id in [178]:
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
@@ -346,21 +342,6 @@ def main():
         local_surge_path_list.append(
             target_surge_point_vector_path)
 
-        sea_level_workspaces = os.path.join(
-            _SEA_LEVEL_WORKSPACES, 'sea_level_%d' % grid_id)
-        target_sea_level_point_vector_path = os.path.join(
-            sea_level_workspaces, _SEA_LEVEL_POINT_FILE_PATTERN % grid_id)
-        sea_level_task = task_graph.add_task(
-            func=calculate_sea_level_rise, args=(
-                grid_point_path,
-                _GLOBAL_SEA_LEVEL_PATH,
-                sea_level_workspaces,
-                target_sea_level_point_vector_path),
-            target_path_list=[target_sea_level_point_vector_path],
-            dependent_task_list=[create_shore_points_task])
-        sea_level_task_list.append(sea_level_task)
-        local_sea_level_path_list.append(target_sea_level_point_vector_path)
-
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     merge_vectors_task_list = []
@@ -420,20 +401,6 @@ def main():
     risk_factor_vector_list.append(
         (target_merged_relief_points_path, 'relief', 'Rrelief'))
     merge_vectors_task_list.append(merge_relief_point_task)
-
-    target_merged_relief_sea_level_rise_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN)
-    merge_sea_level_point_task = task_graph.add_task(
-        func=merge_vectors, args=(
-            local_sea_level_path_list,
-            target_spatial_reference_wkt,
-            target_merged_relief_sea_level_rise_path,
-            ['MSLTrends_']),
-        target_path_list=[target_merged_relief_sea_level_rise_path],
-        dependent_task_list=sea_level_task_list)
-    risk_factor_vector_list.append(
-        (target_merged_relief_sea_level_rise_path, 'MSLTrends_', 'Rsea_rise'))
-    merge_vectors_task_list.append(merge_sea_level_point_task)
 
     target_merged_surge_points_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
@@ -1824,72 +1791,6 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
         kernel_band.WriteArray(kernel_block, xoff=block_data['xoff'],
                                yoff=block_data['yoff'])
 
-def calculate_sea_level_rise(
-        grid_point_path, global_sea_level_path, workspace_dir,
-        target_sea_level_point_vector_path):
-    """Assign a local sea level rise value to the incoming grid point.
-
-    Parameters:
-        grid_point_path (string):  path to a point shapefile to analyze
-            sea level rise.
-        global_sea_level_path (string): path to a set of points that have a
-            "MSLTrends_" field in them
-        workspace_dir (string): path to a directory to make local calculations
-            in
-        target_sea_level_point_vector_path (string): path to output vector.
-            after completion will a value for "MSLTrends_" in the nearest
-            sea level measurement."""
-    logger = logging.getLogger('ipbes-cv.calculate_sea_level_rise')
-
-    if os.path.exists(workspace_dir):
-        shutil.rmtree(workspace_dir)
-    os.makedirs(workspace_dir)
-
-    if os.path.exists(target_sea_level_point_vector_path):
-        os.remove(target_sea_level_point_vector_path)
-
-    global_sea_level_point_vector = ogr.Open(global_sea_level_path)
-    global_sea_level_point_layer = global_sea_level_point_vector.GetLayer()
-
-    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
-    target_sea_level_point_vector = esri_shapefile_driver.CreateDataSource(
-        target_sea_level_point_vector_path)
-    target_sea_level_point_layer = (
-        target_sea_level_point_vector.CreateLayer(
-            os.path.splitext(target_sea_level_point_vector_path)[0],
-            global_sea_level_point_layer.GetSpatialRef(), ogr.wkbPoint))
-    target_sea_level_point_layer.CreateField(
-        ogr.FieldDefn('MSLTrends_', ogr.OFTReal))
-    target_sea_level_point_defn = target_sea_level_point_layer.GetLayerDefn()
-
-    global_sea_level_rise_point_rtree = rtree.index.Index()
-
-    for global_sea_level_point in global_sea_level_point_layer:
-        global_sea_level_geometry = global_sea_level_point.GetGeometryRef()
-        global_sea_level_rise_point_rtree.insert(
-            0, [global_sea_level_geometry.GetX(),
-                global_sea_level_geometry.GetY(),
-                global_sea_level_geometry.GetX(),
-                global_sea_level_geometry.GetY()],
-            obj=float(global_sea_level_point.GetField('MSLTrends_')))
-
-    grid_point_vector = ogr.Open(grid_point_path)
-    grid_point_layer = grid_point_vector.GetLayer()
-    for grid_point_feature in grid_point_layer:
-        grid_point_geometry = grid_point_feature.GetGeometryRef()
-
-        target_sea_level_feature = ogr.Feature(target_sea_level_point_defn)
-        nearest_point_msl = list(global_sea_level_rise_point_rtree.nearest(
-            (grid_point_geometry.GetX(),
-             grid_point_geometry.GetY(),
-             grid_point_geometry.GetX(),
-             grid_point_geometry.GetY()), 1, objects=True))[0].object
-
-        target_sea_level_feature.SetGeometry(grid_point_geometry.Clone())
-        target_sea_level_feature.SetField('MSLTrends_', float(
-            nearest_point_msl))
-        target_sea_level_point_layer.CreateFeature(target_sea_level_feature)
-    target_sea_level_point_layer.SyncToDisk()
 
 def create_shore_points(
         sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
