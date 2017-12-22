@@ -65,21 +65,24 @@ _GLOBAL_HABITAT_LAYER_PATHS = {
 }
 
 _AGGREGATION_LAYER_MAP = {
-    'pdn_gpw_15': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), 0),
-    'pdn_ssp1_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), 0),
-    'pdn_ssp3_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), 0),
-    'pdn_ssp5_50': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), 0),
-    'poverty_pct': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), 0),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), 0),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), 0),
+    'pdn_gpw': (
+        os.path.join(
+            BASE_DROPBOX_DIR,
+            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True),
+    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False),
 }
 
 # these will be used to determine urban extent
 _GLOBIO_LANDCOVER_MAP = {
-    'urbp_15': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"),
-    'urbpssp1_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"),
-    'urbpssp3_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"),
-    'urbpssp5_50': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"),
+    'urbp_2015': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"),
+    'urbp_ssp1': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"),
+    'urbp_ssp3': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"),
+    'urbp_ssp5': os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"),
 }
 
 # The global bounding box to do the entire analysis
@@ -120,8 +123,8 @@ _GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
 _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
-_GLOBAL_RISK_POPULATION_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_population_poverty_and_more_v3.shp')
+_AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
+    'global_cv_risk_and_aggregate_analysis.shp')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -359,16 +362,6 @@ def main():
         sea_level_task_list.append(sea_level_task)
         local_sea_level_path_list.append(target_sea_level_point_vector_path)
 
-    # Below are the additional aggregateors.
-    # Aggregate Everything in _AGGREGATION_LAYER_MAP, some might need normalizing.
-
-    # mask 2 and 190 for everything in _GLOBIO_LANDCOVER_MAP, then aggregate those
-    # create urbanp_15, urbanp_50 by masking landcover codes 2 and 190 from
-
-    # figure out sea level rise later
-
-    #####################
-
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     merge_vectors_task_list = []
@@ -478,30 +471,48 @@ def main():
         target_path_list=[target_result_point_vector_path],
         dependent_task_list=merge_vectors_task_list)
 
+    ##### aggregate raster data
+
+    target_raster_aggregate_point_vector_path = os.path.join(
+        _TARGET_WORKSPACE, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
+
+    # the 5000 means sample out 5km around a given point
+    aggregate_data_task = task_graph.add_task(
+        func=aggregate_raster_data, args=(
+            _AGGREGATION_LAYER_MAP, target_result_point_vector_path, 5000,
+            target_raster_aggregate_point_vector_path),
+        target_path_list=[target_raster_aggregate_point_vector_path],
+        dependent_task_list=[summarize_results_task],
+        task_name='aggregate_raster_data')
+
     task_graph.close()
     task_graph.join()
 
 
-def aggregate_population_scenarios(
-        population_scenarios, base_result_point_vector_path,
+def aggregate_raster_data(
+        raster_feature_id_map, base_point_vector_path, sample_distance,
         target_result_point_vector_path):
     """Add population scenarios and aggregate under each point.
 
     Parameters:
-        population_scenarios (dict): a dictionary of population scenario id
-            path pairs.
-        base_result_point_vector_path (path): a global point vector path
+        raster_feature_id_map (dict): maps feature id names to a tuple that's
+            a path to a raster to sample for each point in
+            `base_point_vector_path  and a boolean indicating whether that
+            value should be divided by the pixel area.
+        base_point_vector_path (path): a global point vector path
             that is to be used for the base of the result
+        sample_distance (float): distance in meters to sample raster values
+            around the point.
         target_result_point_vector_path (path): will contain all the points
-            in base_result_point_vector_path with additional fields mapping
-            to the `population_scenarios` keys.
+            in base_point_vector_path with additional fields mapping
+            to the `raster_feature_id_map` keys.
 
     Returns:
         None.
     """
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
-    base_vector = ogr.Open(base_result_point_vector_path)
+    base_vector = ogr.Open(base_point_vector_path)
     ogr.GetDriverByName(
         'ESRI Shapefile').CopyDataSource(
             base_vector, target_result_point_vector_path)
@@ -509,17 +520,17 @@ def aggregate_population_scenarios(
         target_result_point_vector_path, 1)
 
     target_result_point_layer = target_result_point_vector.GetLayer()
-    for simulation_id in population_scenarios:
+    for simulation_id in raster_feature_id_map:
         target_result_point_layer.CreateField(
             ogr.FieldDefn(simulation_id, ogr.OFTReal))
 
-    for simulation_id, (population_path, pixel_dist) in population_scenarios.iteritems():
-        population_raster = gdal.Open(population_path)
-        population_band = population_raster.GetRasterBand(1)
-        n_rows = population_band.YSize
-        n_cols = population_band.XSize
-        population_geotransform = population_raster.GetGeoTransform()
-        nodata = population_band.GetNoDataValue()
+    for simulation_id, (raster_path, divide_by_area) in raster_feature_id_map.iteritems():
+        raster = gdal.Open(raster_path)
+        band = raster.GetRasterBand(1)
+        n_rows = band.YSize
+        n_cols = band.XSize
+        geotransform = raster.GetGeoTransform()
+        nodata = band.GetNoDataValue()
 
         for point_feature_id in xrange(
                 target_result_point_layer.GetFeatureCount()):
@@ -528,20 +539,28 @@ def aggregate_population_scenarios(
             point_geometry = point_feature.GetGeometryRef()
             point_x = point_geometry.GetX()
             point_y = point_geometry.GetY()
+
+            lng_m, lat_m = lat_to_meters(point_y)
+            pixel_dist_x = int(abs(
+                sample_distance / (lng_m * geotransform[1])))
+            pixel_dist_y = int(abs(
+                sample_distance / (lat_m * geotransform[5])))
+
             point_geometry = None
 
             pixel_x = int(
-                (point_x - population_geotransform[0]) /
-                population_geotransform[1]) - pixel_dist
+                (point_x - geotransform[0]) /
+                geotransform[1]) - pixel_dist_x
             pixel_y = int(
-                (point_y - population_geotransform[3]) /
-                population_geotransform[5]) - pixel_dist
+                (point_y - geotransform[3]) /
+                geotransform[5]) - pixel_dist_y
+
             if pixel_x < 0:
                 pixel_x = 0
             if pixel_y < 0:
                 pixel_y = 0
-            win_xsize = 1 + pixel_dist
-            win_ysize = 1 + pixel_dist
+            win_xsize = 1 + pixel_dist_x
+            win_ysize = 1 + pixel_dist_y
             if pixel_x + win_xsize >= n_cols:
                 win_xsize = n_cols - pixel_x - 1
             if pixel_y + win_ysize >= n_rows:
@@ -550,7 +569,7 @@ def aggregate_population_scenarios(
                 pixel_value = 0
             else:
                 try:
-                    array = population_band.ReadAsArray(
+                    array = band.ReadAsArray(
                         xoff=pixel_x, yoff=pixel_y, win_xsize=win_xsize,
                         win_ysize=win_ysize)
                     if nodata is not None:
@@ -563,9 +582,15 @@ def aggregate_population_scenarios(
                         pixel_value = 0
                 except Exception:
                     logger.error(
-                        'population_band size %d %d', population_band.XSize,
-                        population_band.YSize)
+                        'band size %d %d', band.XSize,
+                        band.YSize)
                     raise
+            # calculate pixel area in sq km
+            if divide_by_area:
+                pixel_area_km = abs(
+                    (lng_m * geotransform[1]) *
+                    (lat_m * geotransform[5])) / 1e6
+                pixel_value /= pixel_area_km
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
@@ -711,6 +736,9 @@ def summarize_results(
             target_result_point_layer.SetFeature(target_feature)
 
     target_result_point_layer.SyncToDisk()
+    target_result_point_vector.SyncToDisk()
+    target_result_point_layer = None
+    target_result_point_vector = None
 
 
 def simplify_geometry(
@@ -2489,6 +2517,26 @@ def polygon_to_lines(geometry):
         line_list.append(shapely.geometry.LineString([
             last_point, interior.coords[0]]))
     return line_list
+
+
+def lat_to_meters(lat):
+    """Return (lng, lat) in meters."""
+    m1 = 111132.92
+    m2 = -559.82
+    m3 = 1.175
+    m4 = -0.0023
+    p1 = 111412.84
+    p2 = -93.5
+    p3 = 0.118
+
+    lat = lat * math.pi / 180
+
+    latlen = (
+        m1 + (m2 * math.cos(2 * lat)) + (m3 * math.cos(4 * lat)) + (m4 * math.cos(6 * lat)))
+    longlen = abs(
+        (p1 * math.cos(lat)) + (p2 * math.cos(3 * lat)) + (p3 * math.cos(5 * lat)))
+
+    return (longlen, latlen)
 
 
 if __name__ == '__main__':
