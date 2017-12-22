@@ -68,17 +68,20 @@ _AGGREGATION_LAYER_MAP = {
     'pdn_gpw': (
         os.path.join(
             BASE_DROPBOX_DIR,
-            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True, None),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True, None),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True, None),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True, None),
-    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False, None),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None),
-    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190]),
-    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
-    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
-    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190]),
+            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True, None, 0),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True, None, 0),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True, None, 0),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True, None, 0),
+    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False, None, 0),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 0),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 0),
+    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+    'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
+    'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
+    'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
 }
 
 # The global bounding box to do the entire analysis
@@ -525,7 +528,7 @@ def aggregate_raster_data(
         target_result_point_layer.CreateField(
             ogr.FieldDefn(simulation_id, ogr.OFTReal))
 
-    for simulation_id, (raster_path, divide_by_area, reclass_ids) in (
+    for simulation_id, (raster_path, divide_by_area, reclass_ids, extra_pixel) in (
             raster_feature_id_map.iteritems()):
         raster = gdal.Open(raster_path)
         band = raster.GetRasterBand(1)
@@ -544,11 +547,14 @@ def aggregate_raster_data(
 
             lng_m, lat_m = lat_to_meters(point_y)
             pixel_dist_x = int(abs(
-                sample_distance / (lng_m * geotransform[1])))
+                sample_distance / (lng_m * geotransform[1]))) + extra_pixel
             pixel_dist_y = int(abs(
-                sample_distance / (lat_m * geotransform[5])))
-
+                sample_distance / (lat_m * geotransform[5]))) + extra_pixel
             point_geometry = None
+
+            # this handles the case where slr goes to 360
+            if geotransform[0] == 0 and point_x < 0:
+                point_x += 360
 
             pixel_x = int(
                 (point_x - geotransform[0]) /
@@ -561,8 +567,8 @@ def aggregate_raster_data(
                 pixel_x = 0
             if pixel_y < 0:
                 pixel_y = 0
-            win_xsize = 1 + pixel_dist_x
-            win_ysize = 1 + pixel_dist_y
+            win_xsize = 1 + pixel_dist_x + extra_pixel
+            win_ysize = 1 + pixel_dist_y + extra_pixel
             if pixel_x + win_xsize >= n_cols:
                 win_xsize = n_cols - pixel_x - 1
             if pixel_y + win_ysize >= n_rows:
