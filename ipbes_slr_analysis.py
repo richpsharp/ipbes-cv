@@ -93,18 +93,53 @@ def main():
         target_layer.CreateField(
             ogr.FieldDefn(slr_risk_field_id, ogr.OFTInteger))
 
+    rt_slr_field_id_ssp_id_map = {}
+    rt_nohab_slr_field_id_ssp_id_map = {}
+    for ssp_id in [1, 3, 5]:
+        rt_slr_field_id = 'Rtslrsp%d' % ssp_id
+        rt_nohab_slr_field_id = 'Rtslrsp%dnh' % ssp_id
+        rt_slr_field_id_ssp_id_map[ssp_id] = rt_slr_field_id
+        rt_nohab_slr_field_id_ssp_id_map[ssp_id] = rt_nohab_slr_field_id
+        target_layer.CreateField(ogr.FieldDefn(rt_slr_field_id, ogr.OFTReal))
+        target_layer.CreateField(
+            ogr.FieldDefn(rt_nohab_slr_field_id, ogr.OFTReal))
+
+    risk_ids = ['Rwind', 'Rwave', 'Rrelief', 'Rsurge']
+    hab_id = 'Rhab'
+
     while True:
         feature = target_layer.GetNextFeature()
         if not feature:
             break
-        for slr_risk_field_id, slr_id in [
-                ('slr_ssp1_r', 'slr_rcp26'),
-                ('slr_ssp3_r', 'slr_rcp60'),
-                ('slr_ssp5_r', 'slr_rcp85')]:
+        for slr_risk_field_id, slr_id, ssp_id in [
+                ('slr_ssp1_r', 'slr_rcp26', 1),
+                ('slr_ssp3_r', 'slr_rcp60', 3),
+                ('slr_ssp5_r', 'slr_rcp85', 5)]:
+            # retrieve slr value and find what percentile it's in for risk
             slr_val = feature.GetField(slr_id)
             slr_risk = numpy.searchsorted(
                 slr_thresholds, slr_val, side='right')
             feature.SetField(slr_risk_field_id, slr_risk)
+
+            # load up the existing risks for the feature
+            hab_risk = feature.GetField(hab_id)
+            base_risk_list = [
+                feature.GetField(x) for x in risk_ids] + [slr_risk]
+
+            # calculate geometric mean with hab
+            rt_slr_risk = numpy.prod(
+                [hab_risk] + base_risk_list) ** (
+                    1. / (len(base_risk_list) + 1))
+
+            # calculate geometric mean with no hab
+            rt_slr_nohab_risk = numpy.prod(
+                [5.] + base_risk_list) ** (
+                    1. / (len(base_risk_list) + 1))
+
+            feature.SetField(
+                rt_slr_field_id_ssp_id_map[ssp_id], rt_slr_risk)
+            feature.SetField(
+                rt_nohab_slr_field_id_ssp_id_map[ssp_id], rt_slr_nohab_risk)
         target_layer.SetFeature(feature)
 
 
