@@ -250,7 +250,7 @@ def main():
                 crpop_ssp = 0.0
 
             feature.SetField('crpop_ssp%s' % ssp_id, crpop_ssp)
-            crpov_ssp_list[ssp_id].append(crpop_ssp)
+            crpop_ssp_list[ssp_id].append(crpop_ssp)
 
             # crage_ssp[1|3|5] = (rage_ssp[1|3|5] - rage_cur) / rage_cur
             try:
