@@ -285,6 +285,8 @@ def main():
         5: sorted(crpov_ssp_list[5])[int(len(crpov_ssp_list[5]) * .9)],
     }
 
+    target_layer.ResetReading()
+
     while True:
         feature = target_layer.GetNextFeature()
         if not feature:
