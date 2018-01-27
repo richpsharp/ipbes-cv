@@ -162,7 +162,7 @@ def main():
 
         # rage_cur  =  rt_cur * poverty_p (ssp versions below)
         rage_cur = feature.GetField('Rt') * feature.GetField('poverty_p')
-        feature.SetField('rage_cur%s' % ssp_id, rage_cur)
+        feature.SetField('rage_cur', rage_cur)
         crage_ssp_list['cur'].append(rage_cur)
 
         # rpov_cur|ssp[1|3|5]  =  rt_cur|ssp[1|3|5] * (14bt_pop+65plus_pop)
