@@ -175,9 +175,11 @@ def main():
             # Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc)
             # New columns: pdn_rc_ssp[1|3|5]
             # pdn_sspn / pdn_2010 * pdn_gpw
-
-            pdn_rc_ssp_val = feature.GetField('pdn_gpw') * (
-                feature.GetField('pdn_ssp%d' % ssp_id) / feature.GetField('pdn_2010'))
+            try:
+                pdn_rc_ssp_val = feature.GetField('pdn_gpw') * (
+                    feature.GetField('pdn_ssp%d' % ssp_id) / feature.GetField('pdn_2010'))
+            except ZeroDivisionError:
+                pdn_rc_ssp_val = 0.0
             feature.SetField('pdn_rc_ssp%d' % ssp_id, pdn_rc_ssp_val)
 
         # Histogram values in slr_rcp[26 | 60 | 85] columns across all rcp scenarios; then rank 1-5 (with 5 being highest risk)
@@ -240,24 +242,35 @@ def main():
                     feature.GetField('Rt')) / feature.GetField('Rt'))
 
             # crpop_ssp[1|3|5] = (rpop_ssp[1|3|5] - rpop_cur)/ rpop_cur
-            crpop_ssp = (
-                feature.GetField('rpop_ssp%d' % ssp_id) -
-                feature.GetField('rpop_cur')) / feature.GetField('rpop_cur')
+            try:
+                crpop_ssp = (
+                    feature.GetField('rpop_ssp%d' % ssp_id) -
+                    feature.GetField('rpop_cur')) / feature.GetField('rpop_cur')
+            except ZeroDivisionError:
+                crpop_ssp = 0.0
+
             feature.SetField('crpop_ssp%s' % ssp_id, crpop_ssp)
             crpov_ssp_list[ssp_id].append(crpop_ssp)
 
             # crage_ssp[1|3|5] = (rage_ssp[1|3|5] - rage_cur) / rage_cur
-            crage_ssp = (
-                feature.GetField('rage_ssp%d' % ssp_id) -
-                feature.GetField('rage_cur')) / feature.GetField('rage_cur')
+            try:
+                crage_ssp = (
+                    feature.GetField('rage_ssp%d' % ssp_id) -
+                    feature.GetField('rage_cur')) / feature.GetField('rage_cur')
+            except ZeroDivisionError:
+                crage_ssp = 0.0
+
             feature.SetField(
                 'crage_ssp%s' % ssp_id, crage_ssp)
             crage_ssp_list[ssp_id].append(crage_ssp)
 
             # crpov_ssp[1|3|5] = (rpov_ssp[1|3|5] -rpov_cur) / rpov_cur
-            crpov_ssp = (
-                feature.GetField('rpov_ssp%d' % ssp_id) -
-                feature.GetField('rpov_cur')) / feature.GetField('rpov_cur')
+            try:
+                crpov_ssp = (
+                    feature.GetField('rpov_ssp%d' % ssp_id) -
+                    feature.GetField('rpov_cur')) / feature.GetField('rpov_cur')
+            except ZeroDivisionError:
+                crpov_ssp = 0.0
             feature.SetField('crpov_ssp%s' % ssp_id, crpov_ssp)
             crpov_ssp_list[ssp_id].append(crpov_ssp)
 
