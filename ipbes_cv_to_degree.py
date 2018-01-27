@@ -132,6 +132,7 @@ def main():
         summary_band = summary_raster.GetRasterBand(1)
         nodata = -1
         summary_band.SetNoDataValue(nodata)
+        summary_band.Fill(nodata)
         base_array = numpy.empty((181, 361), dtype=numpy.float32)
         base_array[:] = nodata
         inv_gt = gdal.InvGeoTransform(wgs84_gt)
@@ -145,7 +146,10 @@ def main():
         for grid_x, grid_y in summary_grid_index_map:
             i_x = int(inv_gt[0] + grid_x * inv_gt[1])
             i_y = int(inv_gt[3] + grid_y * inv_gt[5])
-            print grid_x, grid_y, i_x, i_y
+            value = sorted(
+                summary_grid_index_map[(grid_x, grid_y)])[
+                    int(.9*len(summary_grid_index_map[(grid_x, grid_y)]))]
+            summary_band.WriteArray(numpy.array([[value]]), i_x, i_y)
 
     print 'done'
 
