@@ -102,10 +102,10 @@ def main():
             ogr.FieldDefn(slr_risk_field_id, ogr.OFTInteger))
 
     #Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc)
-    #New columns: pdn_rc_ssp[1|3|5]
+    #New columns: pdnrc_ssp[1|3|5]
     for ssp_id in [1, 3, 5]:
         target_layer.CreateField(
-            ogr.FieldDefn('pdn_rc_ssp%d' % ssp_id, ogr.OFTReal))
+            ogr.FieldDefn('pdnrc_ssp%d' % ssp_id, ogr.OFTReal))
         target_layer.CreateField(
             ogr.FieldDefn('crnom_ssp%d' % ssp_id, ogr.OFTReal))
 
@@ -153,7 +153,7 @@ def main():
                 1. / (len(base_risk_list) + 1))
 
         feature.SetField('Rt', rt_slr_risk)
-        feature.SetField('Rt_nohab', rt_slr_nohab_risk)
+        feature.SetField('Rtnohab', rt_slr_nohab_risk)
 
         # rpop_cur = Rt * pdn_gpw
         rpop_cur = feature.GetField('Rt') * feature.GetField('pdn_gpw')
@@ -173,14 +173,14 @@ def main():
 
         for ssp_id in [1, 3, 5]:
             # Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc)
-            # New columns: pdn_rc_ssp[1|3|5]
+            # New columns: pdnrc_ssp[1|3|5]
             # pdn_sspn / pdn_2010 * pdn_gpw
             try:
-                pdn_rc_ssp_val = feature.GetField('pdn_gpw') * (
+                pdnrc_ssp_val = feature.GetField('pdn_gpw') * (
                     feature.GetField('pdn_ssp%d' % ssp_id) / feature.GetField('pdn_2010'))
             except ZeroDivisionError:
-                pdn_rc_ssp_val = 0.0
-            feature.SetField('pdn_rc_ssp%d' % ssp_id, pdn_rc_ssp_val)
+                pdnrc_ssp_val = 0.0
+            feature.SetField('pdnrc_ssp%d' % ssp_id, pdnrc_ssp_val)
 
         # Histogram values in slr_rcp[26 | 60 | 85] columns across all rcp scenarios; then rank 1-5 (with 5 being highest risk)
         for slr_risk_field_id, slr_id, ssp_id in [
@@ -219,10 +219,10 @@ def main():
             else:
                 feature.SetField('rt_ssp%d' % ssp_id, rt_slr_nohab_risk)
 
-            # rpop_ssp[1|3|5] = rt_ssp[1|3|5] *  pdn_rc_ssp[1|3|5]
+            # rpop_ssp[1|3|5] = rt_ssp[1|3|5] *  pdnrc_ssp[1|3|5]
             feature.SetField(
                 'rpop_ssp%s' % ssp_id,
-                feature.GetField('rt_ssp%d' % ssp_id) * feature.GetField('pdn_rc_ssp%d' % ssp_id))
+                feature.GetField('rt_ssp%d' % ssp_id) * feature.GetField('pdnrc_ssp%d' % ssp_id))
 
             # rage_ssp[1|3|5]  =  rt|ssp[1|3|5] * poverty_p (current versions above)
             feature.SetField(
