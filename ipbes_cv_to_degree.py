@@ -65,7 +65,7 @@ def sort_points(summary_field_list, pickle_dir):
     layer = vector.GetLayer()
 
     field_list_grid_index_map = collections.defaultdict(
-        collections.defaultdict(list))
+        lambda: collections.defaultdict(list))
 
     while True:
         feature = layer.GetNextFeature()
@@ -134,17 +134,17 @@ def main():
         summary_band.SetNoDataValue(nodata)
         base_array = numpy.empty((181, 361), dtype=numpy.float32)
         base_array[:] = nodata
-        inv_gt = summary_band.InvGeoTransform()
+        inv_gt = gdal.InvGeoTransform(wgs84_gt)
 
         print 'load summary pickle'
         pickle_path = os.path.join(
             summary_grid_pickle_dir, '%s.pickle' % summary_field)
         with open(pickle_path, 'r') as pickle_file:
-            summary_grid_index_map = pickle.load(pickle_path)
+            summary_grid_index_map = pickle.load(pickle_file)
 
         for grid_x, grid_y in summary_grid_index_map:
-            i_x = inv_gt[0] + grid_x * inv_gt[1]
-            i_y = inv_gt[3] + grid_y * inv_gt[5]
+            i_x = int(inv_gt[0] + grid_x * inv_gt[1])
+            i_y = int(inv_gt[3] + grid_y * inv_gt[5])
             print grid_x, grid_y, i_x, i_y
 
     print 'done'
