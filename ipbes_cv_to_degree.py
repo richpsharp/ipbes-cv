@@ -40,14 +40,32 @@ TARGET_SUMMARY_DEGREE_DIR = os.path.join(
 
 SLR_LIST_PICKLE_PATH = 'slr.pickle'
 
+WORKING_DIR = 'ipbes_cv_to_degree_workspace'
 
-def sort_points(summary_field_list, pickle_path):
-    if os.path.exists(pickle_path):
-        return
+
+def sort_points(summary_field_list, pickle_dir):
+    """Read all features from GLOBAL_CV_VECTOR_PATH and sort to grid.
+
+    Parameters:
+        summary_field_list (string): field ID to record per grid.
+        pickle_dir (string): path to a directoty that will create pickle
+            files named field_name.pickle. Each pickle file will be a
+            dictionary mapping
+            (long, lat) -> [feature0[summary_field], feature1[summary_field]...]
+
+    Returns:
+        None.
+    """
+    try:
+        os.makedirs(pickle_dir)
+    except OSError:
+        pass
+
     vector = gdal.OpenEx(GLOBAL_CV_VECTOR_PATH, gdal.OF_VECTOR)
     layer = vector.GetLayer()
 
-    summary_grid_index_path = collections.defaultdict(list)
+    field_list_grid_index_map = collections.defaultdict(
+        collections.defaultdict(list))
 
     while True:
         feature = layer.GetNextFeature()
@@ -55,20 +73,23 @@ def sort_points(summary_field_list, pickle_path):
             break
         centroid = feature.GetGeometryRef().Centroid()
         grid_index = (int(centroid.GetX()), int(centroid.GetY()))
-        summary_fields = dict([
-            (x, feature.GetField(x)) for x in summary_field_list])
-        summary_grid_index_path[grid_index].append(summary_fields)
+        for field_id in summary_field_list:
+            field_list_grid_index_map[field_id][grid_index].append(
+                feature.GetField(field_id))
 
-    with open(pickle_path, 'wb') as pickle_file:
-        pickle.dump(summary_grid_index_path, pickle_file)
+    for field_id in summary_field_list:
+        pickle_path = os.path.join(pickle_dir, '%s.pickle' % field_id)
+        with open(pickle_path, 'wb') as pickle_file:
+            pickle.dump(field_list_grid_index_map[field_id], pickle_file)
 
 
 def main():
     """Entry point."""
-    try:
-        os.makedirs(TARGET_SUMMARY_DEGREE_DIR)
-    except OSError:
-        pass
+    for dir_path in [WORKING_DIR, TARGET_SUMMARY_DEGREE_DIR]:
+        try:
+            os.makedirs(dir_path)
+        except OSError:
+            pass
 
     cur_ssp_list = ['cur', 'ssp1', 'ssp3', 'ssp5']
 
@@ -85,23 +106,20 @@ def main():
         ['rage_ssp%d' % x for x in [1, 3, 5]])
 
     task_graph = taskgraph.TaskGraph(
-        os.path.join(TARGET_SUMMARY_DEGREE_DIR, 'taskgraph_cache'), -1)
+        os.path.join(WORKING_DIR, 'taskgraph_cache'), -1)
 
-    summary_grid_index_path_path = os.path.join(
-        TARGET_SUMMARY_DEGREE_DIR, 'summary_grid_index_path.pickle')
-
-    grid_index_task = task_graph.add_task(
+    summary_grid_pickle_dir = os.path.join(WORKING_DIR, 'pickles')
+    task = task_graph.add_task(
         func=sort_points,
-        args=(summary_field_list, summary_grid_index_path_path,),
-        target_path_list=[summary_grid_index_path_path])
+        args=(summary_field_list, summary_grid_pickle_dir,),
+        target_path_list=[summary_grid_pickle_dir])
 
-    print 'join grid index'
-    grid_index_task.join()
+    task_graph.join()
 
     for summary_field in summary_field_list:
         print 'summary %s' % summary_field
         summary_raster_path = os.path.join(
-            TARGET_SUMMARY_DEGREE_DIR, '%s.tif' % summary_field)
+            WORKING_DIR, '%s.tif' % summary_field)
         wgs84_sr = osr.SpatialReference()
         wgs84_sr.ImportFromEPSG(4326)
         driver = gdal.GetDriverByName('GTiff')
@@ -119,8 +137,10 @@ def main():
         inv_gt = summary_band.InvGeoTransform()
 
         print 'load summary pickle'
-        with open(summary_grid_index_path_path, 'r') as pickle_file:
-            summary_grid_index_map = pickle.load(summary_grid_index_path_path)
+        pickle_path = os.path.join(
+            summary_grid_pickle_dir, '%s.pickle' % summary_field)
+        with open(pickle_path, 'r') as pickle_file:
+            summary_grid_index_map = pickle.load(pickle_path)
 
         for grid_x, grid_y in summary_grid_index_map:
             i_x = inv_gt[0] + grid_x * inv_gt[1]
