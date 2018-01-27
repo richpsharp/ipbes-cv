@@ -38,14 +38,24 @@ CV_VECTOR_PATH = os.path.join(
 def main():
     vector = gdal.OpenEx(CV_VECTOR_PATH, gdal.OF_VECTOR | gdal.OF_UPDATE)
     layer = vector.GetLayer()
-    feature = layer.GetNextFeature()
-    defn = layer.Get
-    field_name_list = []
-    for i in range(feature.GetFieldCount()):
-        fieldname = feature.GetFieldDefnRef(i).GetName()
-        field_name_list.append(fieldname)
-    print field_name_list
 
+    feature = layer.GetNextFeature()
+    for last_index in xrange(feature.GetFieldCount()):
+        layer.ResetReading()
+        feature = layer.GetNextFeature()
+        field_name_list = []
+        for i in xrange(last_index, feature.GetFieldCount()):
+            field_name_list.append(feature.GetFieldDefnRef(i).GetName())
+        min_field_name = min(field_name_list)
+        print min_field_name, last_index, feature.GetFieldCount()
+        layer.ReorderField(
+            field_name_list.index(
+                min_field_name, key=lambda x: x.lower())+last_index,
+            last_index)
+
+    print 'syncing'
+    layer.SyncToDisk()
+    print 'done'
 
 if __name__ == '__main__':
     main()
