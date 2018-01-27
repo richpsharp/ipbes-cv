@@ -31,12 +31,12 @@ LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
 GLOBAL_CV_VECTOR_PATH = os.path.join(
     BASE_DROPBOX_DIR, 'rps_bck_shared_stuff', 'ipbes stuff',
-    'ipbes_cv_results', 'global_cv_rt_ssp.shp')
+    'ipbes_cv_results', 'without slr incorporated into RT',
+    'global_cv_rt_ssp.shp')
 
 TARGET_GLOBAL_CV_SLR_VECTOR_PATH = os.path.join(
     BASE_DROPBOX_DIR, 'rps_bck_shared_stuff', 'ipbes stuff',
-    'ipbes_cv_results', 'global_cv_rt_ssp_slr_risk.shp')
-
+    'ipbes_cv_results', 'global_cv_rt_ssp_recalc.shp')
 
 SLR_LIST_PICKLE_PATH = 'slr.pickle'
 
@@ -89,8 +89,10 @@ def main():
     target_layer = target_vector.GetLayer()
 
     #1) Sea level rise
-    # Set R_slr_cur to 1 for whole globe 
+    # Set R_slr_cur to 1 for whole globe
     target_layer.CreateField(ogr.FieldDefn('R_slr_cur', ogr.OFTInteger))
+
+    target_layer.CreateField(ogr.FieldDefn('rnom_cur', ogr.OFTReal))
 
     for slr_risk_field_id, slr_id in [
             ('slr_ssp1_r', 'slr_rcp26'),
@@ -99,11 +101,14 @@ def main():
         target_layer.CreateField(
             ogr.FieldDefn(slr_risk_field_id, ogr.OFTInteger))
 
-    #Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc) 
+    #Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc)
     #New columns: pdn_rc_ssp[1|3|5]
     for ssp_id in [1, 3, 5]:
         target_layer.CreateField(
-            ogr.FieldDefn('pdn_rc_ssp%d' % ssp_id, ogr.OFTInteger))
+            ogr.FieldDefn('pdn_rc_ssp%d' % ssp_id, ogr.OFTReal))
+        target_layer.CreateField(
+            ogr.FieldDefn('crnom_ssp%d' % ssp_id, ogr.OFTReal))
+
 
 
     rt_slr_field_id_ssp_id_map = {}
@@ -122,9 +127,6 @@ def main():
     risk_ids = ['Rwind', 'Rwave', 'Rrelief', 'Rsurge']
     hab_id = 'Rhab'
 
-    rpop_cur_list = []
-    rage_cur_list = []
-    rpov_cur_list = []
     crpop_ssp_list = collections.defaultdict(list)
     crage_ssp_list = collections.defaultdict(list)
     crpov_ssp_list = collections.defaultdict(list)
@@ -134,7 +136,7 @@ def main():
             break
         feature.SetField('R_slr_cur', 1)
 
-        # Rt/Rt_nohab = adding slr into geometric mean (with SLR = 1 everywhere) 
+        # Rt/Rt_nohab = adding slr into geometric mean (with SLR = 1 everywhere)
         # load up the existing risks for the feature with a SLR risk of 1.0
         hab_risk = feature.GetField(hab_id)
         base_risk_list = [
@@ -154,21 +156,23 @@ def main():
         feature.SetField('Rt_nohab', rt_slr_nohab_risk)
 
         # rpop_cur = Rt * pdn_gpw
-        feature.SetField('rpop_cur', feature.GetField('Rt') * feature.GetField('pdn_gpw'))
+        rpop_cur = feature.GetField('Rt') * feature.GetField('pdn_gpw')
+        feature.SetField('rpop_cur', rpop_cur)
+        crpop_ssp_list['cur'].append(rpop_cur)
 
         # rage_cur  =  rt_cur * poverty_p (ssp versions below)
-        feature.SetField(
-            'rage_cur%s' % ssp_id,
-            feature.GetField('Rt') * feature.GetField('poverty_p'))
+        rage_cur = feature.GetField('Rt') * feature.GetField('poverty_p')
+        feature.SetField('rage_cur%s' % ssp_id, rage_cur)
+        crage_ssp_list['cur'].append(rage_cur)
 
         # rpov_cur|ssp[1|3|5]  =  rt_cur|ssp[1|3|5] * (14bt_pop+65plus_pop)
-        feature.SetField(
-            'rpov_cur',
-            feature.GetField('Rt') * (
-                feature.GetField('14bt_pop') + feature.GetField('65plus_pop')))
+        rpov_cur = feature.GetField('Rt') * (
+                feature.GetField('14bt_pop') + feature.GetField('65plus_pop'))
+        feature.SetField('rpov_cur', rpov_cur)
+        crpov_ssp_list['cur'].append(rpov_cur)
 
         for ssp_id in [1, 3, 5]:
-            # Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc) 
+            # Population - recalibrate scenarios population to current gpw pdn (see Beneficiaries Dilemma design doc)
             # New columns: pdn_rc_ssp[1|3|5]
             # pdn_sspn / pdn_2010 * pdn_gpw
 
@@ -210,12 +214,12 @@ def main():
             # rt_ssp[1|3|5] = Rtslrsp[1|3|5] when urbp_ssp[1|3|5] < 0.2; else Rtslrsp[1|3|5]nh
             if feature.GetField('urbp_ssp%d' % ssp_id) < 0.2:
                 feature.SetField('rt_ssp%d' % ssp_id, rt_slr_risk)
-            else: 
+            else:
                 feature.SetField('rt_ssp%d' % ssp_id, rt_slr_nohab_risk)
 
             # rpop_ssp[1|3|5] = rt_ssp[1|3|5] *  pdn_rc_ssp[1|3|5]
             feature.SetField(
-                'rpop_ssp%s' % ssp_id, 
+                'rpop_ssp%s' % ssp_id,
                 feature.GetField('rt_ssp%d' % ssp_id) * feature.GetField('pdn_rc_ssp%d' % ssp_id))
 
             # rage_ssp[1|3|5]  =  rt|ssp[1|3|5] * poverty_p (current versions above)
@@ -232,29 +236,75 @@ def main():
             # crt_ssp[1|3|5] = (rt_ssp[1|3|5] - rt_cur)/rt_cur
             feature.SetField(
                 'crt_ssp%s' % ssp_id, (
-                    feature.GetField('rt_ssp%d' % ssp_id) - 
+                    feature.GetField('rt_ssp%d' % ssp_id) -
                     feature.GetField('Rt')) / feature.GetField('Rt'))
 
             # crpop_ssp[1|3|5] = (rpop_ssp[1|3|5] - rpop_cur)/ rpop_cur
-            feature.SetField(
-                'crpop_ssp%s' % ssp_id, (
-                    feature.GetField('rpop_ssp%d' % ssp_id) - 
-                    feature.GetField('rpop_cur')) / feature.GetField('rpop_cur'))
+            crpop_ssp = (
+                feature.GetField('rpop_ssp%d' % ssp_id) -
+                feature.GetField('rpop_cur')) / feature.GetField('rpop_cur')
+            feature.SetField('crpop_ssp%s' % ssp_id, crpop_ssp)
+            crpov_ssp_list[ssp_id].append(crpop_ssp)
 
             # crage_ssp[1|3|5] = (rage_ssp[1|3|5] - rage_cur) / rage_cur
+            crage_ssp = (
+                feature.GetField('rage_ssp%d' % ssp_id) -
+                feature.GetField('rage_cur')) / feature.GetField('rage_cur')
             feature.SetField(
-                'crage_ssp%s' % ssp_id, (
-                    feature.GetField('rage_ssp%d' % ssp_id) - 
-                    feature.GetField('rage_cur')) / feature.GetField('rage_cur'))
+                'crage_ssp%s' % ssp_id, crage_ssp)
+            crage_ssp_list[ssp_id].append(crage_ssp)
 
             # crpov_ssp[1|3|5] = (rpov_ssp[1|3|5] -rpov_cur) / rpov_cur
-            feature.SetField(
-                'crpov_ssp%s' % ssp_id, (
-                    feature.GetField('rpov_ssp%d' % ssp_id) - 
-                    feature.GetField('rpov_cur')) / feature.GetField('rpov_cur'))
+            crpov_ssp = (
+                feature.GetField('rpov_ssp%d' % ssp_id) -
+                feature.GetField('rpov_cur')) / feature.GetField('rpov_cur')
+            feature.SetField('crpov_ssp%s' % ssp_id, crpov_ssp)
+            crpov_ssp_list[ssp_id].append(crpov_ssp)
 
         target_layer.SetFeature(feature)
 
+    # loop through one more time to set the normalized results
+    crpop_ssp_90th = {
+        'cur': sorted(crpop_ssp_list['cur'])[int(len(crpop_ssp_list['cur']) * .9)],
+        1: sorted(crpop_ssp_list[1])[int(len(crpop_ssp_list[1]) * .9)],
+        3: sorted(crpop_ssp_list[3])[int(len(crpop_ssp_list[3]) * .9)],
+        5: sorted(crpop_ssp_list[5])[int(len(crpop_ssp_list[5]) * .9)],
+    }
+
+    crage_ssp_90th = {
+        'cur': sorted(crage_ssp_list['cur'])[int(len(crage_ssp_list['cur']) * .9)],
+        1: sorted(crage_ssp_list[1])[int(len(crage_ssp_list[1]) * .9)],
+        3: sorted(crage_ssp_list[3])[int(len(crage_ssp_list[3]) * .9)],
+        5: sorted(crage_ssp_list[5])[int(len(crage_ssp_list[5]) * .9)],
+    }
+
+    crpov_ssp_90th = {
+        'cur': sorted(crpov_ssp_list['cur'])[int(len(crpov_ssp_list['cur']) * .9)],
+        1: sorted(crpov_ssp_list[1])[int(len(crpov_ssp_list[1]) * .9)],
+        3: sorted(crpov_ssp_list[3])[int(len(crpov_ssp_list[3]) * .9)],
+        5: sorted(crpov_ssp_list[5])[int(len(crpov_ssp_list[5]) * .9)],
+    }
+
+    while True:
+        feature = target_layer.GetNextFeature()
+        if not feature:
+            break
+
+        rnom_cur = (
+            feature.GetField('rpop_cur') / crpop_ssp_90th['cur'] +
+            feature.GetField('rage_cur') / crage_ssp_90th['cur'] +
+            feature.GetField('rpov_cur') / crpov_ssp_90th['cur']) / 3.
+        feature.SetField('rnom_cur', rnom_cur)
+
+        for ssp_id in [1, 3, 5]:
+            crnom_ssp = (
+                feature.GetField('crpop_ssp%d' % ssp_id) / crpop_ssp_90th[ssp_id] +
+                feature.GetField('crage_ssp%d' % ssp_id) / crage_ssp_90th[ssp_id] +
+                feature.GetField('crpov_ssp%d' % ssp_id) / crpov_ssp_90th[ssp_id]) / 3.
+            feature.SetField(
+                'crnom_ssp%d' % ssp_id, crnom_ssp)
+
+        target_layer.SetFeature(feature)
 
 if __name__ == '__main__':
     main()
