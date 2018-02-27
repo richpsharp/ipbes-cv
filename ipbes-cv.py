@@ -81,7 +81,7 @@ _AGGREGATION_LAYER_MAP = {
     'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data\MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 2)
+    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data\MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
 }
 
 # The global bounding box to do the entire analysis
@@ -354,11 +354,11 @@ def main():
             local_habitat_protection_path_list,
             target_spatial_reference_wkt,
             target_habitat_protection_points_path,
-            ['Rhab']),
+            ['Rhab_cur']),
         target_path_list=[target_habitat_protection_points_path],
         dependent_task_list=habitat_protection_task_list)
     risk_factor_vector_list.append(
-        (target_habitat_protection_points_path, 'Rhab', 'Rhab'))
+        (target_habitat_protection_points_path, 'Rhab_cur', 'Rhab_cur'))
     merge_vectors_task_list.append(merge_habitat_protection_point_task)
 
     target_merged_rei_points_path = os.path.join(
@@ -496,6 +496,21 @@ def aggregate_raster_data(
         target_result_point_layer.CreateField(
             ogr.FieldDefn(simulation_id, ogr.OFTReal))
 
+    # this is for sea level rise
+    target_result_point_layer.CreateField(
+        ogr.FieldDefn('SLRrise_c', ogr.OFTReal))
+    for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn('SLRrate_%d' % ssp_id, ogr.OFTReal))
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn('SLRrise_%d' % ssp_id, ogr.OFTReal))
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn('Rhab_ssp%d' % ssp_id, ogr.OFTReal))
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn('curpb_ssp%d' % ssp_id, ogr.OFTReal))
+        target_result_point_layer.CreateField(
+            ogr.FieldDefn('cpdn_ssp%d' % ssp_id, ogr.OFTReal))
+
     for simulation_id, (raster_path, divide_by_area, reclass_ids, extra_pixel) in (
             raster_feature_id_map.iteritems()):
         raster = gdal.Open(raster_path)
@@ -573,6 +588,53 @@ def aggregate_raster_data(
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
+    for point_feature_id in xrange(
+            target_result_point_layer.GetFeatureCount()):
+        point_feature = target_result_point_layer.GetFeature(
+            point_feature_id)
+        point_feature.SetField(
+            'SLRrise_c', point_feature.GetField(
+                'SLRrate_c') * 25. / 1000.)
+        for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
+            point_feature.SetField(
+                'SLRrate_%d' % ssp_id, point_feature.GetField(
+                    'slr_rcp%d' % rcp_id) * 1000. / 95.)
+            point_feature.SetField(
+                'SLRrise_%d' % ssp_id, point_feature.GetField(
+                    'slr_rcp%d' % rcp_id))
+
+            point_feature.SetField(
+                'Rhab_ssp%d' % ssp_id, (
+                    5. - point_feature.GetField('Rhab_cur')) * (
+                        point_feature.GetField('urbp_ssp%d' % ssp_id) -
+                        point_feature.GetField('urbp_2015')) +
+                    point_feature.GetField('Rhab_cur'))
+
+            point_feature.SetField(
+                'curpb_ssp%d' % ssp_id, (
+                    point_feature.GetField('urbp_ssp%d' % ssp_id) -
+                    point_feature.GetField('urbp_2015')))
+
+            if point_feature.GetField('pdn_2010') != 0:
+                point_feature.SetField(
+                    'cpdn_ssp%d' % ssp_id, (
+                        point_feature.GetField('pdn_ssp%d' % ssp_id) /
+                        point_feature.GetField('pdn_2010')))
+            else:
+                point_feature.SetField('cpdn_ssp%d' % ssp_id, 0.0)
+
+        #Rt_ssp[1|3|5] = recalculated using Rhab_ssp[1|3|5] and Rslr_ssp[1|3|5]
+        #Rt_cur_nh = Rt_cur calculated with Rhab = 5
+        #Rt_ssp[1|3|5]_nh = Rt_ssp[1|3|5] calculated with Rhab = 5
+
+
+        target_result_point_layer.SetFeature(point_feature)
+
+
+        # convert SLRrate_1|3|5 = slr_rcp[26|60|85] * 1000 / 95.
+        # SLRrise_c = SLRrate_c * 25 / 1000
+        # SLRrise_|1|3|5] = slr_rcp[26|60|85]
+
 def summarize_results(
         risk_factor_vector_list, target_result_point_vector_path):
     """Aggregate the sub factors into a global one.
@@ -616,7 +678,7 @@ def summarize_results(
             risk_id, ogr.OFTReal))
         risk_id_list.append(risk_id)
     target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rt', ogr.OFTReal))
+        'Rt_cur', ogr.OFTReal))
     target_result_point_layer.CreateField(ogr.FieldDefn(
         'Rtnohab', ogr.OFTReal))
     target_result_point_layer.CreateField(ogr.FieldDefn(
@@ -688,7 +750,7 @@ def summarize_results(
             # calculate risk with no habitat
             r_no_hab_list = [
                 target_feature.GetField(risk_id) for risk_id in risk_id_list
-                if risk_id != 'Rhab'] + [5]
+                if risk_id != 'Rhab_cur'] + [5]
             r_no_hab = numpy.prod(r_no_hab_list)**(1./len(r_no_hab_list))
             r_target_array[target_feature.GetFID()] = r_tot
             r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
@@ -705,7 +767,7 @@ def summarize_results(
 
         for fid in xrange(r_target_array.size):
             target_feature = target_result_point_layer.GetFeature(fid)
-            target_feature.SetField('Rt', r_target_array[fid])
+            target_feature.SetField('Rt_cur', r_target_array[fid])
             target_feature.SetField('Rtnohab', r_no_hab_target_array[fid])
             target_feature.SetField('Rt_p', r_target_percentile[fid])
             target_feature.SetField(
@@ -910,7 +972,7 @@ def calculate_habitat_protection(
         target_habitat_protection_point_layer = (
             target_habitat_protection_point_vector.GetLayer())
         target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
-            'Rhab', ogr.OFTReal))
+            'Rhab_cur', ogr.OFTReal))
         for habitat_id in habitat_layer_lookup:
             target_habitat_protection_point_layer.CreateField(ogr.FieldDefn(
                 habitat_id, ogr.OFTReal))
@@ -937,7 +999,7 @@ def calculate_habitat_protection(
 
             # Equation 4
             target_feature.SetField(
-                'Rhab', 4.8 - 0.5 * (
+                'Rhab_cur', 4.8 - 0.5 * (
                     (1.5 * (5-min_rank))**2 +
                     sum_sq_rank - (5-min_rank)**2)**0.5)
             target_feature.SetGeometry(target_feature_geometry)
