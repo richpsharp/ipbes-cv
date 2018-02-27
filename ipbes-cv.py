@@ -81,6 +81,7 @@ _AGGREGATION_LAYER_MAP = {
     'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
+    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data\MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 2)
 }
 
 # The global bounding box to do the entire analysis
@@ -120,7 +121,7 @@ _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
 _GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
 _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
-_GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'global_cv_risk.shp'
+_GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.shp'
 _AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
     'global_cv_risk_and_aggregate_analysis.shp')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
