@@ -109,8 +109,6 @@ def main():
         target_layer.CreateField(
             ogr.FieldDefn('crnom_ssp%d' % ssp_id, ogr.OFTReal))
 
-
-
     rt_slr_field_id_ssp_id_map = {}
     rt_nohab_slr_field_id_ssp_id_map = {}
     for ssp_id in [1, 3, 5]:
