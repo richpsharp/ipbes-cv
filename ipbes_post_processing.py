@@ -87,7 +87,14 @@ def main():
             'Rt_ssp1', 'Rt_ssp3', 'Rt_ssp5',
             'Rt_ssp1_nh', 'Rt_ssp3_nh', 'Rt_ssp5_nh',
             'pdnrc_ssp1', 'pdnrc_ssp3', 'pdnrc_ssp5', 'pRisk_cur',
-            'pRisk_ssp1', 'pRisk_ssp3', 'pRisk_ssp5']:
+            'pRisk_ssp1', 'pRisk_ssp3', 'pRisk_ssp5',
+            'pServ_cur', 'pServ_ssp1', 'pServ_ssp3', 'pServ_ssp5',
+            'aRisk_cur', 'aRisk_ssp1', 'aRisk_ssp3', 'aRisk_ssp5',
+            'aServ_cur', 'aServ_ssp1', 'aServ_ssp3', 'aServ_ssp5',
+            'vRisk_cur', 'vRisk_ssp1', 'vRisk_ssp3', 'vRisk_ssp5',
+            'vServ_cur', 'vServ_ssp1', 'vServ_ssp3', 'vServ_ssp5',
+            ]:
+
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
             target_layer.CreateField(
                 ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -149,12 +156,60 @@ def main():
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Rt_ssp%d' % ssp_id))
 
+            feature.SetField(
+                'pServ_ssp%d' % ssp_id,
+                feature.GetField('pdnrc_ssp%d' % ssp_id) *
+                feature.GetField('Serv_ssp%d' % ssp_id))
+
+            feature.SetField(
+                'aRisk_ssp%d' % ssp_id, (
+                    feature.GetField('14bt_pop') +
+                    feature.GetField('65plus_pop')) *
+                feature.GetField('Rt_ssp%d' % ssp_id))
+
+            feature.SetField(
+                'aServ_ssp%d' % ssp_id, (
+                    feature.GetField('14bt_pop') +
+                    feature.GetField('65plus_pop')) *
+                feature.GetField('Serv_ssp%d' % ssp_id))
+
+            feature.SetField(
+                'vRisk_ssp%d' % ssp_id, (
+                    feature.GetField('poverty_p') *
+                    feature.GetField('Rt_ssp%d' % ssp_id)))
+
+            feature.SetField(
+                'vServ_ssp%d' % ssp_id, (
+                    feature.GetField('poverty_p') *
+                    feature.GetField('Serv_ssp%d' % ssp_id)))
+
         feature.SetField(
             'pRisk_cur', feature.GetField('pdn_gpw') *
             feature.GetField('Rt_cur'))
 
-        target_layer.SetFeature(feature)
+        feature.SetField(
+            'pServ_cur', feature.GetField('pdn_gpw') *
+            feature.GetField('Serv_cur'))
 
+        feature.SetField(
+            'aRisk_cur', (
+                feature.GetField('14bt_pop') +
+                feature.GetField('65plus_pop')) * feature.GetField('Rt_cur'))
+
+        feature.SetField(
+            'aServ_cur', (
+                feature.GetField('14bt_pop') +
+                feature.GetField('65plus_pop')) * feature.GetField('Serv_cur'))
+
+        feature.SetField(
+            'vRisk_cur', (
+                feature.GetField('poverty_p') * feature.GetField('Rt_cur')))
+
+        feature.SetField(
+            'vServ_cur', (
+                feature.GetField('poverty_p') * feature.GetField('Serv_cur')))
+
+        target_layer.SetFeature(feature)
 
 
 def calculate_slr_list(sst_vector_path, slr_type, slr_pickle_path):
