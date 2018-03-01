@@ -67,16 +67,11 @@ def main():
     LOGGER.info('copying CV vector')
     esri_driver = gdal.GetDriverByName('ESRI Shapefile')
     base_vector = gdal.OpenEx(BASE_CV_VECTOR_PATH)
-    if not os.path.exists(TARGET_CV_VECTOR_PATH):
-        #esri_driver.Delete(TARGET_CV_VECTOR_PATH)
-        LOGGER.info('creating vector')
-        target_vector = esri_driver.CreateCopy(
-            TARGET_CV_VECTOR_PATH, base_vector)
-    else:
-        LOGGER.info('loading existing vector')
-        target_vector = gdal.OpenEx(
-            TARGET_CV_VECTOR_PATH, gdal.OF_VECTOR | gdal.OF_UPDATE)
-
+    if os.path.exists(TARGET_CV_VECTOR_PATH):
+        esri_driver.Delete(TARGET_CV_VECTOR_PATH)
+    LOGGER.info('creating vector')
+    target_vector = esri_driver.CreateCopy(
+        TARGET_CV_VECTOR_PATH, base_vector)
     target_layer = target_vector.GetLayer()
 
     # Add new fields that we're making in this file
