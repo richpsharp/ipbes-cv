@@ -165,7 +165,7 @@ def main():
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Rt_ssp%d' % ssp_id))
             if 'pRisk' not in min_max_id:
-                min_max_id['pRisk'] = (pRisk, pRisk)
+                min_max_id['pRisk'] = [pRisk, pRisk]
             else:
                 min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
                 min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
@@ -175,7 +175,7 @@ def main():
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Serv_ssp%d' % ssp_id))
             if 'pServ' not in min_max_id:
-                min_max_id['pServ'] = (pServ, pServ)
+                min_max_id['pServ'] = [pServ, pServ]
             else:
                 min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
                 min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
@@ -183,9 +183,9 @@ def main():
 
             aRisk = feature.GetField('Rt_ssp%d' % ssp_id) * (
                 feature.GetField('14bt_pop') +
-                feature.GetField('65plus_pop')) *
+                feature.GetField('65plus_pop'))
             if 'aRisk' not in min_max_id:
-                min_max_id['aRisk'] = (aRisk, aRisk)
+                min_max_id['aRisk'] = [aRisk, aRisk]
             else:
                 min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
                 min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
@@ -193,9 +193,9 @@ def main():
 
             aServ = feature.GetField('Serv_ssp%d' % ssp_id) * (
                 feature.GetField('14bt_pop') +
-                feature.GetField('65plus_pop')) *
+                feature.GetField('65plus_pop'))
             if 'aServ' not in min_max_id:
-                min_max_id['aServ'] = (aServ, aServ)
+                min_max_id['aServ'] = [aServ, aServ]
             else:
                 min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
                 min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
@@ -205,7 +205,7 @@ def main():
                 feature.GetField('poverty_p') *
                 feature.GetField('Rt_ssp%d' % ssp_id))
             if 'vRisk' not in min_max_id:
-                min_max_id['vRisk'] = (vRisk, vRisk)
+                min_max_id['vRisk'] = [vRisk, vRisk]
             else:
                 min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
                 min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
@@ -215,7 +215,7 @@ def main():
                 feature.GetField('poverty_p') *
                 feature.GetField('Serv_ssp%d' % ssp_id))
             if 'vServ' not in min_max_id:
-                min_max_id['vServ'] = (vServ, vServ)
+                min_max_id['vServ'] = [vServ, vServ]
             else:
                 min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
                 min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
@@ -224,7 +224,7 @@ def main():
 
         pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
         if 'pRisk' not in min_max_id:
-            min_max_id['pRisk'] = (pRisk, pRisk)
+            min_max_id['pRisk'] = [pRisk, pRisk]
         else:
             min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
             min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
@@ -232,7 +232,7 @@ def main():
 
         pServ = feature.GetField('pdn_gpw') * feature.GetField('Serv_cur')
         if 'pServ' not in min_max_id:
-            min_max_id['pServ'] = (pServ, pServ)
+            min_max_id['pServ'] = [pServ, pServ]
         else:
             min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
             min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
@@ -241,7 +241,7 @@ def main():
         aRisk = feature.GetField('Rt_cur') * (
             feature.GetField('14bt_pop') + feature.GetField('65plus_pop'))
         if 'aRisk' not in min_max_id:
-            min_max_id['aRisk'] = (aRisk, aRisk)
+            min_max_id['aRisk'] = [aRisk, aRisk]
         else:
             min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
             min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
@@ -250,7 +250,7 @@ def main():
         aServ = feature.GetField('Serv_cur') * (
             feature.GetField('14bt_pop') + feature.GetField('65plus_pop'))
         if 'aServ' not in min_max_id:
-            min_max_id['aServ'] = (aServ, aServ)
+            min_max_id['aServ'] = [aServ, aServ]
         else:
             min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
             min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
@@ -259,7 +259,7 @@ def main():
         vServ = (
             feature.GetField('poverty_p') * feature.GetField('Serv_cur'))
         if 'vServ' not in min_max_id:
-            min_max_id['vServ'] = (vServ, vServ)
+            min_max_id['vServ'] = [vServ, vServ]
         else:
             min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
             min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
@@ -268,7 +268,7 @@ def main():
         vRisk = (
             feature.GetField('poverty_p') * feature.GetField('Risk_cur'))
         if 'vRisk' not in min_max_id:
-            min_max_id['vRisk'] = (vRisk, vRisk)
+            min_max_id['vRisk'] = [vRisk, vRisk]
         else:
             min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
             min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
