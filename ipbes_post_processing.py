@@ -221,17 +221,6 @@ def main():
                 min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
             feature.SetField('vServ_ssp%d' % ssp_id, vServ)
 
-            feature.SetField(
-                'nRisk_ssp%d' % ssp_id, numpy.mean([
-                    feature.GetField('pRisk_ssp%d' % ssp_id),
-                    feature.GetField('vRisk_ssp%d' % ssp_id),
-                    feature.GetField('aRisk_ssp%d' % ssp_id)]))
-
-            feature.SetField(
-                'nServ_ssp%d' % ssp_id, numpy.mean([
-                    feature.GetField('pServ_ssp%d' % ssp_id),
-                    feature.GetField('vServ_ssp%d' % ssp_id),
-                    feature.GetField('aServ_ssp%d' % ssp_id)]))
 
         pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
         if 'pRisk' not in min_max_id:
@@ -284,18 +273,6 @@ def main():
             min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
             min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
         feature.SetField('vRisk_cur', vRisk)
-
-        feature.SetField(
-            'nRisk_cur', numpy.mean([
-                feature.GetField('pRisk_cur'),
-                feature.GetField('vRisk_cur'),
-                feature.GetField('aRisk_cur')]))
-
-        feature.SetField(
-            'nServ_cur', numpy.mean([
-                feature.GetField('pServ_cur'),
-                feature.GetField('vServ_cur'),
-                feature.GetField('aServ_cur')]))
 
         for ssp_id in [1, 3, 5]:
             if feature.GetField('Rt_cur') != 0:
@@ -351,6 +328,37 @@ def main():
                     feature.GetField('nServ_cur'))
             else:
                 feature.SetField('cnServssp%d' % ssp_id, 0)
+
+    target_layer.ResetReading()
+    while True:
+        feature = target_layer.GetNextFeature()
+        if not feature:
+            break
+
+        for ssp_id in [1, 3, 5]:
+            feature.SetField(
+                'nRisk_ssp%d' % ssp_id, numpy.mean([
+                    (feature.GetField('pRisk_ssp%d' % ssp_id) - min_max_id['pRisk'][0]) / (min_max_id['pRisk'][1]-min_max_id['pRisk'][0]),
+                    (feature.GetField('vRisk_ssp%d' % ssp_id) - min_max_id['vRisk'][0]) / (min_max_id['vRisk'][1]-min_max_id['vRisk'][0]),
+                    (feature.GetField('aRisk_ssp%d' % ssp_id) - min_max_id['aRisk'][0]) / (min_max_id['aRisk'][1]-min_max_id['aRisk'][0])]))
+
+            feature.SetField(
+                'nServ_ssp%d' % ssp_id, numpy.mean([
+                    (feature.GetField('pServ_ssp%d' % ssp_id) - min_max_id['pServ'][0]) / (min_max_id['pServ'][1]-min_max_id['pServ'][0]),
+                    (feature.GetField('vServ_ssp%d' % ssp_id) - min_max_id['vServ'][0]) / (min_max_id['vServ'][1]-min_max_id['vServ'][0]),
+                    (feature.GetField('aServ_ssp%d' % ssp_id) - min_max_id['aServ'][0]) / (min_max_id['aServ'][1]-min_max_id['aServ'][0])]))
+
+        feature.SetField(
+            'nRisk_cur', numpy.mean([
+                (feature.GetField('pRisk_cur') - min_max_id['pRisk'][0]) / (min_max_id['pRisk'][1]-min_max_id['pRisk'][0]),
+                (feature.GetField('vRisk_cur') - min_max_id['vRisk'][0]) / (min_max_id['vRisk'][1]-min_max_id['vRisk'][0]),
+                (feature.GetField('aRisk_cur') - min_max_id['aRisk'][0]) / (min_max_id['aRisk'][1]-min_max_id['aRisk'][0])]))
+
+        feature.SetField(
+            'nServ_cur', numpy.mean([
+                (feature.GetField('pServ_cur') - min_max_id['pServ'][0]) / (min_max_id['pServ'][1]-min_max_id['pServ'][0]),
+                (feature.GetField('vServ_cur') - min_max_id['vServ'][0]) / (min_max_id['vServ'][1]-min_max_id['vServ'][0]),
+                (feature.GetField('aServ_cur') - min_max_id['aServ'][0]) / (min_max_id['aServ'][1]-min_max_id['aServ'][0])]))
 
         target_layer.SetFeature(feature)
 
