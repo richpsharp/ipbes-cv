@@ -38,8 +38,6 @@ TARGET_CV_VECTOR_PATH = os.path.join(
     WORKSPACE_DIR, 'POST_PROCESS_global_cv_risk_and_aggregate_analysis.shp')
 
 SLRISE_LIST_PICKLE_PATH = os.path.join(WORKSPACE_DIR, 'slrise.pickle')
-SLRATE_LIST_PICKLE_PATH = os.path.join(WORKSPACE_DIR, 'slrate.pickle')
-
 
 def main():
     """Entry point."""
@@ -88,7 +86,8 @@ def main():
             'dSLRrt_sp1', 'dSLRrt_sp3', 'dSLRrt_sp5', 'Rt_cur_nh',
             'Rt_ssp1', 'Rt_ssp3', 'Rt_ssp5',
             'Rt_ssp1_nh', 'Rt_ssp3_nh', 'Rt_ssp5_nh',
-            'pdnrc_ssp1', 'pdnrc_ssp3', 'pdnrc_ssp5']:
+            'pdnrc_ssp1', 'pdnrc_ssp3', 'pdnrc_ssp5', 'pRisk_cur',
+            'pRisk_ssp1', 'pRisk_ssp3', 'pRisk_ssp5']:
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
             target_layer.CreateField(
                 ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -144,6 +143,15 @@ def main():
                     feature.GetField('pdn_2010') * feature.GetField('pdn_gpw'))
             else:
                 feature.SetField('pdnrc_ssp%d' % ssp_id, 0.0)
+
+            feature.SetField(
+                'pRisk_ssp%d' % ssp_id,
+                feature.GetField('pdnrc_ssp%d' % ssp_id) *
+                feature.GetField('Rt_ssp%d' % ssp_id))
+
+        feature.SetField(
+            'pRisk_cur', feature.GetField('pdn_gpw') *
+            feature.GetField('Rt_cur'))
 
         target_layer.SetFeature(feature)
 
