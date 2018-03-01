@@ -76,13 +76,21 @@ def main():
 
     base_vector = gdal.OpenEx(BASE_CV_VECTOR_PATH, gdal.OF_VECTOR)
 
-    for path in []:
+    for path, field_set in [
+            (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
+            (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set)]:
         if os.path.exists(path):
             esri_driver.Delete(path)
 
         target_vector = esri_driver.CreateCopy(path, base_vector)
-        target_layer = target_vector
+        target_layer = target_vector.GetLayer()
 
+        for i in reversed(xrange(target_layer.GetFieldCount())):
+            if self.GetFieldDefnRef(i).GetName() not in field_set:
+                LOGGER.info(
+                    'deleting %s from %s', self.GetFieldDefnRef(i).GetName(),
+                    path)
+                target_layer.DeleteField(i)
 
 if __name__ == '__main__':
     main()
