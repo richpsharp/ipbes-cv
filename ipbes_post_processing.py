@@ -93,8 +93,8 @@ def main():
             'aServ_cur', 'aServ_ssp1', 'aServ_ssp3', 'aServ_ssp5',
             'vRisk_cur', 'vRisk_ssp1', 'vRisk_ssp3', 'vRisk_ssp5',
             'vServ_cur', 'vServ_ssp1', 'vServ_ssp3', 'vServ_ssp5',
-            'vRisk_cur', 'vRisk_ssp1', 'vRisk_ssp3', 'vRisk_ssp5',
             'nRisk_cur', 'nRisk_ssp1', 'nRisk_ssp3', 'nRisk_ssp5',
+            'nServ_cur', 'nServ_ssp1', 'nServ_ssp3', 'nServ_ssp5',
             'cRtssp1', 'cRtssp3', 'cRtssp5',
             'cServssp1', 'cServssp3', 'cServssp5',
             'cpRiskssp1', 'cpRiskssp3', 'cpRiskssp5',
@@ -108,6 +108,8 @@ def main():
                 ogr.FieldDefn(new_field_id, ogr.OFTReal))
 
     risk_ids = ['Rwind', 'Rwave', 'Rrelief', 'Rsurge']
+
+    min_max_id = {}
 
     while True:
         feature = target_layer.GetNextFeature()
@@ -159,37 +161,65 @@ def main():
             else:
                 feature.SetField('pdnrc_ssp%d' % ssp_id, 0.0)
 
-            feature.SetField(
-                'pRisk_ssp%d' % ssp_id,
+            pRisk = (
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Rt_ssp%d' % ssp_id))
+            if 'pRisk' not in min_max_id:
+                min_max_id['pRisk'] = (pRisk, pRisk)
+            else:
+                min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
+                min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
+            feature.SetField('pRisk_ssp%d' % ssp_id, pRisk)
 
-            feature.SetField(
-                'pServ_ssp%d' % ssp_id,
+            pServ = (
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Serv_ssp%d' % ssp_id))
+            if 'pServ' not in min_max_id:
+                min_max_id['pServ'] = (pServ, pServ)
+            else:
+                min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
+                min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
+            feature.SetField('pServ_ssp%d' % ssp_id, pServ)
 
-            feature.SetField(
-                'aRisk_ssp%d' % ssp_id, (
-                    feature.GetField('14bt_pop') +
-                    feature.GetField('65plus_pop')) *
+            aRisk = feature.GetField('Rt_ssp%d' % ssp_id) * (
+                feature.GetField('14bt_pop') +
+                feature.GetField('65plus_pop')) *
+            if 'aRisk' not in min_max_id:
+                min_max_id['aRisk'] = (aRisk, aRisk)
+            else:
+                min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
+                min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
+            feature.SetField('aRisk_ssp%d' % ssp_id, aRisk)
+
+            aServ = feature.GetField('Serv_ssp%d' % ssp_id) * (
+                feature.GetField('14bt_pop') +
+                feature.GetField('65plus_pop')) *
+            if 'aServ' not in min_max_id:
+                min_max_id['aServ'] = (aServ, aServ)
+            else:
+                min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
+                min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
+            feature.SetField('aServ_ssp%d' % ssp_id, aServ)
+
+            vRisk = (
+                feature.GetField('poverty_p') *
                 feature.GetField('Rt_ssp%d' % ssp_id))
+            if 'vRisk' not in min_max_id:
+                min_max_id['vRisk'] = (vRisk, vRisk)
+            else:
+                min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
+                min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
+            feature.SetField('vRisk_ssp%d' % ssp_id, vRisk)
 
-            feature.SetField(
-                'aServ_ssp%d' % ssp_id, (
-                    feature.GetField('14bt_pop') +
-                    feature.GetField('65plus_pop')) *
+            vServ = (
+                feature.GetField('poverty_p') *
                 feature.GetField('Serv_ssp%d' % ssp_id))
-
-            feature.SetField(
-                'vRisk_ssp%d' % ssp_id, (
-                    feature.GetField('poverty_p') *
-                    feature.GetField('Rt_ssp%d' % ssp_id)))
-
-            feature.SetField(
-                'vServ_ssp%d' % ssp_id, (
-                    feature.GetField('poverty_p') *
-                    feature.GetField('Serv_ssp%d' % ssp_id)))
+            if 'vServ' not in min_max_id:
+                min_max_id['vServ'] = (vServ, vServ)
+            else:
+                min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
+                min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
+            feature.SetField('vServ_ssp%d' % ssp_id, vServ)
 
             feature.SetField(
                 'nRisk_ssp%d' % ssp_id, numpy.mean([
@@ -203,32 +233,57 @@ def main():
                     feature.GetField('vServ_ssp%d' % ssp_id),
                     feature.GetField('aServ_ssp%d' % ssp_id)]))
 
+        pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
+        if 'pRisk' not in min_max_id:
+            min_max_id['pRisk'] = (pRisk, pRisk)
+        else:
+            min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
+            min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
+        feature.SetField('pRisk_cur', pRisk)
 
-        feature.SetField(
-            'pRisk_cur', feature.GetField('pdn_gpw') *
-            feature.GetField('Rt_cur'))
+        pServ = feature.GetField('pdn_gpw') * feature.GetField('Serv_cur')
+        if 'pServ' not in min_max_id:
+            min_max_id['pServ'] = (pServ, pServ)
+        else:
+            min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
+            min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
+        feature.SetField('pServ_cur', pServ)
 
-        feature.SetField(
-            'pServ_cur', feature.GetField('pdn_gpw') *
-            feature.GetField('Serv_cur'))
+        aRisk = feature.GetField('Rt_cur') * (
+            feature.GetField('14bt_pop') + feature.GetField('65plus_pop'))
+        if 'aRisk' not in min_max_id:
+            min_max_id['aRisk'] = (aRisk, aRisk)
+        else:
+            min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
+            min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
+        feature.SetField('aRisk_cur', aRisk)
 
-        feature.SetField(
-            'aRisk_cur', (
-                feature.GetField('14bt_pop') +
-                feature.GetField('65plus_pop')) * feature.GetField('Rt_cur'))
+        aServ = feature.GetField('Serv_cur') * (
+            feature.GetField('14bt_pop') + feature.GetField('65plus_pop'))
+        if 'aServ' not in min_max_id:
+            min_max_id['aServ'] = (aServ, aServ)
+        else:
+            min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
+            min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
+        feature.SetField('aServ_cur', aServ)
 
-        feature.SetField(
-            'aServ_cur', (
-                feature.GetField('14bt_pop') +
-                feature.GetField('65plus_pop')) * feature.GetField('Serv_cur'))
+        vServ = (
+            feature.GetField('poverty_p') * feature.GetField('Serv_cur'))
+        if 'vServ' not in min_max_id:
+            min_max_id['vServ'] = (vServ, vServ)
+        else:
+            min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
+            min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
+        feature.SetField('vServ_cur', vServ)
 
-        feature.SetField(
-            'vRisk_cur', (
-                feature.GetField('poverty_p') * feature.GetField('Rt_cur')))
-
-        feature.SetField(
-            'vServ_cur', (
-                feature.GetField('poverty_p') * feature.GetField('Serv_cur')))
+        vRisk = (
+            feature.GetField('poverty_p') * feature.GetField('Risk_cur'))
+        if 'vRisk' not in min_max_id:
+            min_max_id['vRisk'] = (vRisk, vRisk)
+        else:
+            min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
+            min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
+        feature.SetField('vRisk_cur', vRisk)
 
         feature.SetField(
             'nRisk_cur', numpy.mean([

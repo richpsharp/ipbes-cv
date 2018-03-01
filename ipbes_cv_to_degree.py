@@ -31,12 +31,11 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
 GLOBAL_CV_VECTOR_PATH = os.path.join(
-    BASE_DROPBOX_DIR, 'rps_bck_shared_stuff', 'ipbes stuff',
-    'ipbes_cv_results', 'global_cv_rt_ssp_recalc.shp')
+    "ipbes-cv-post-processing-workspace",
+    "POST_PROCESS_global_cv_risk_and_aggregate_analysis.shp")
 
 TARGET_SUMMARY_DEGREE_DIR = os.path.join(
-    BASE_DROPBOX_DIR, 'rps_bck_shared_stuff', 'ipbes stuff',
-    'ipbes_cv_results', 'sum_to_degree')
+    "ipbes-cv-post-processing-workspace", 'sum_to_degree')
 
 SLR_LIST_PICKLE_PATH = 'slr.pickle'
 
@@ -62,6 +61,7 @@ def sort_points(summary_field_list, pickle_dir):
         pass
 
     vector = gdal.OpenEx(GLOBAL_CV_VECTOR_PATH, gdal.OF_VECTOR)
+    print GLOBAL_CV_VECTOR_PATH
     layer = vector.GetLayer()
 
     field_list_grid_index_map = collections.defaultdict(
@@ -94,16 +94,18 @@ def main():
     cur_ssp_list = ['cur', 'ssp1', 'ssp3', 'ssp5']
 
     summary_field_list = (
-        ['Rt', 'rnom_cur'] +
-        ['rt_ssp%d' % x for x in [1, 3, 5]] +
-        ['crt_ssp%d' % x for x in [1, 3, 5]] +
-        ['rpop_%s' % x for x in cur_ssp_list] +
-        ['rpov_%s' % x for x in cur_ssp_list] +
-        ['rage_%s' % x for x in cur_ssp_list] +
-        ['crnom_ssp%s' % x for x in [1, 3, 5]] +
-        ['rpop_ssp%d' % x for x in [1, 3, 5]] +
-        ['rpov_ssp%d' % x for x in [1, 3, 5]] +
-        ['rage_ssp%d' % x for x in [1, 3, 5]])
+        ['Rt_%s' % x for x in cur_ssp_list] +
+        ['cRtssp%d' % x for x in [1, 3, 5]] +
+        ['Serv_%s' % x for x in cur_ssp_list] +
+        ['cServssp%d' % x for x in [1, 3, 5]] +
+        ['pRisk%s' % x for x in cur_ssp_list] +
+        ['nRisk%s' % x for x in cur_ssp_list] +
+        ['pServ%s' % x for x in cur_ssp_list] +
+        ['nServ%s' % x for x in cur_ssp_list] +
+        ['cpRiskssp%d' % x for x in [1, 3, 5]] +
+        ['cpServssp%d' % x for x in [1, 3, 5]] +
+        ['cnRiskssp%d' % x for x in [1, 3, 5]] +
+        ['cnServssp%d' % x for x in [1, 3, 5]])
 
     task_graph = taskgraph.TaskGraph(
         os.path.join(WORKING_DIR, 'taskgraph_cache'), -1)
