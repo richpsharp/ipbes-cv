@@ -93,6 +93,14 @@ def main():
             'aServ_cur', 'aServ_ssp1', 'aServ_ssp3', 'aServ_ssp5',
             'vRisk_cur', 'vRisk_ssp1', 'vRisk_ssp3', 'vRisk_ssp5',
             'vServ_cur', 'vServ_ssp1', 'vServ_ssp3', 'vServ_ssp5',
+            'vRisk_cur', 'vRisk_ssp1', 'vRisk_ssp3', 'vRisk_ssp5',
+            'nRisk_cur', 'nRisk_ssp1', 'nRisk_ssp3', 'nRisk_ssp5',
+            'cRtssp1', 'cRtssp3', 'cRtssp5',
+            'cServssp1', 'cServssp3', 'cServssp5',
+            'cpRiskssp1', 'cpRiskssp3', 'cpRiskssp5',
+            'cpServssp1', 'cpServssp3', 'cpServssp5',
+            'cnRiskssp1', 'cnRiskssp3', 'cnRiskssp5',
+            'cnServssp1', 'cnServssp3', 'cnServssp5',
             ]:
 
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
@@ -183,6 +191,19 @@ def main():
                     feature.GetField('poverty_p') *
                     feature.GetField('Serv_ssp%d' % ssp_id)))
 
+            feature.SetField(
+                'nRisk_ssp%d' % ssp_id, numpy.mean([
+                    feature.GetField('pRisk_ssp%d' % ssp_id),
+                    feature.GetField('vRisk_ssp%d' % ssp_id),
+                    feature.GetField('aRisk_ssp%d' % ssp_id)]))
+
+            feature.SetField(
+                'nServ_ssp%d' % ssp_id, numpy.mean([
+                    feature.GetField('pServ_ssp%d' % ssp_id),
+                    feature.GetField('vServ_ssp%d' % ssp_id),
+                    feature.GetField('aServ_ssp%d' % ssp_id)]))
+
+
         feature.SetField(
             'pRisk_cur', feature.GetField('pdn_gpw') *
             feature.GetField('Rt_cur'))
@@ -208,6 +229,73 @@ def main():
         feature.SetField(
             'vServ_cur', (
                 feature.GetField('poverty_p') * feature.GetField('Serv_cur')))
+
+        feature.SetField(
+            'nRisk_cur', numpy.mean([
+                feature.GetField('pRisk_cur'),
+                feature.GetField('vRisk_cur'),
+                feature.GetField('aRisk_cur')]))
+
+        feature.SetField(
+            'nServ_cur', numpy.mean([
+                feature.GetField('pServ_cur'),
+                feature.GetField('vServ_cur'),
+                feature.GetField('aServ_cur')]))
+
+        for ssp_id in [1, 3, 5]:
+            if feature.GetField('Rt_cur') != 0:
+                feature.SetField(
+                    'cRtssp%d' % ssp_id, (
+                        feature.GetField('Rt_ssp%d' % ssp_id) -
+                        feature.GetField('Rt_cur')) /
+                    feature.GetField('Rt_cur'))
+            else:
+                feature.SetField('cRtssp%d' % ssp_id, 0)
+
+            if feature.GetField('Serv_cur') != 0:
+                feature.SetField(
+                    'cServssp%d' % ssp_id, (
+                        feature.GetField('Serv_ssp%d' % ssp_id) -
+                        feature.GetField('Serv_cur')) /
+                    feature.GetField('Serv_cur'))
+            else:
+                feature.SetField('cServssp%d' % ssp_id, 0)
+
+            if feature.GetField('pRisk_cur') != 0:
+                feature.SetField(
+                    'cpRiskssp%d' % ssp_id, (
+                        feature.GetField('pRisk_ssp%d' % ssp_id) -
+                        feature.GetField('pRisk_cur')) /
+                    feature.GetField('pRisk_cur'))
+            else:
+                feature.SetField('cpRiskssp%d' % ssp_id, 0)
+
+            if feature.GetField('nRisk_cur') != 0:
+                feature.SetField(
+                    'cnRiskssp%d' % ssp_id, (
+                        feature.GetField('nRisk_ssp%d' % ssp_id) -
+                        feature.GetField('nRisk_cur')) /
+                    feature.GetField('nRisk_cur'))
+            else:
+                feature.SetField('cpRiskssp%d' % ssp_id, 0)
+
+            if feature.GetField('pServ_cur') != 0:
+                feature.SetField(
+                    'cpServssp%d' % ssp_id, (
+                        feature.GetField('pServ_ssp%d' % ssp_id) -
+                        feature.GetField('pServ_cur')) /
+                    feature.GetField('pServ_cur'))
+            else:
+                feature.SetField('cpServssp%d' % ssp_id, 0)
+
+            if feature.GetField('nServ_cur') != 0:
+                feature.SetField(
+                    'cnServssp%d' % ssp_id, (
+                        feature.GetField('nServ_ssp%d' % ssp_id) -
+                        feature.GetField('nServ_cur')) /
+                    feature.GetField('nServ_cur'))
+            else:
+                feature.SetField('cnServssp%d' % ssp_id, 0)
 
         target_layer.SetFeature(feature)
 
