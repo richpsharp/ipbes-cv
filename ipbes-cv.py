@@ -6,8 +6,6 @@ import os
 import math
 import logging
 import re
-import hashlib
-import inspect
 
 import taskgraph
 import numpy
@@ -679,14 +677,6 @@ def summarize_results(
         risk_id_list.append(risk_id)
     target_result_point_layer.CreateField(ogr.FieldDefn(
         'Rt_cur', ogr.OFTReal))
-    target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rtnohab', ogr.OFTReal))
-    target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rt_p', ogr.OFTReal))
-    target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rtnohab_p', ogr.OFTReal))
-    target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rtnohab-Rt', ogr.OFTReal))
 
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
@@ -755,25 +745,9 @@ def summarize_results(
             r_target_array[target_feature.GetFID()] = r_tot
             r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
 
-        combined_percentile = numpy.percentile(
-            numpy.concatenate((r_target_array, r_no_hab_target_array)),
-            [25, 50, 75, 100])
-
-        r_target_percentile = (numpy.searchsorted(
-            combined_percentile, r_target_array) + 1) * 25
-
-        r_no_hab_target_percentile = (numpy.searchsorted(
-            combined_percentile, r_no_hab_target_array) + 1) * 25
-
         for fid in xrange(r_target_array.size):
             target_feature = target_result_point_layer.GetFeature(fid)
             target_feature.SetField('Rt_cur', r_target_array[fid])
-            target_feature.SetField('Rtnohab', r_no_hab_target_array[fid])
-            target_feature.SetField('Rt_p', r_target_percentile[fid])
-            target_feature.SetField(
-                'Rtnohab_p', r_no_hab_target_percentile[fid])
-            target_feature.SetField(
-                'Rtnohab-Rt', r_no_hab_target_array[fid]-r_target_array[fid])
             target_result_point_layer.SetFeature(target_feature)
 
     target_result_point_layer.SyncToDisk()
