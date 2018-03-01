@@ -305,6 +305,7 @@ def main():
                     feature.GetField('pServ_cur'))
             else:
                 feature.SetField('cpServssp%d' % ssp_id, 0)
+        target_layer.SetFeature(feature)
 
     target_layer.ResetReading()
     while True:
