@@ -35,7 +35,7 @@ def main():
         ['urbp_%s' % x for x in ['2015', 'ssp1', 'ssp3', 'ssp5']] +
         ['pdn_%s' % x for x in ['2010', 'ssp1', 'ssp3', 'ssp5']] +
         ['SLRrate_%s' % x for x in ['c', '1', '3', '5']] +
-        ['SLRrise_%s' % x for x in |['1', '3', '5']] +
+        ['SLRrise_%s' % x for x in ['1', '3', '5']] +
         ['curpb_ssp%s' % x for x in ['1', '3', '5']] +
         ['cpdn_ssp%s' % x for x in ['1', '3', '5']] +
         ['pdnrc_ssp%s' % x for x in ['1', '3', '5']] +
@@ -84,12 +84,13 @@ def main():
 
         target_vector = esri_driver.CreateCopy(path, base_vector)
         target_layer = target_vector.GetLayer()
+        target_defn = target_layer.GetLayerDefn()
 
-        for i in reversed(xrange(target_layer.GetFieldCount())):
-            if self.GetFieldDefnRef(i).GetName() not in field_set:
+        for i in reversed(xrange(target_defn.GetFieldCount())):
+            if target_defn.GetFieldDefn(i).GetName() not in field_set:
                 LOGGER.info(
-                    'deleting %s from %s', self.GetFieldDefnRef(i).GetName(),
-                    path)
+                    'deleting %s from %s',
+                    target_defn.GetFieldDefn(i).GetName(), path)
                 target_layer.DeleteField(i)
 
 if __name__ == '__main__':

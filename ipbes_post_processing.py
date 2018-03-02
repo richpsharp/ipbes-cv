@@ -163,7 +163,7 @@ def main():
                 min_max_id['pRisk'] = [pRisk, pRisk]
             else:
                 min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
-                min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
+                min_max_id['pRisk'][1] = max(pRisk, min_max_id['pRisk'][1])
             feature.SetField('pRisk_ssp%d' % ssp_id, pRisk)
 
             pServ = (
@@ -173,7 +173,7 @@ def main():
                 min_max_id['pServ'] = [pServ, pServ]
             else:
                 min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
-                min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
+                min_max_id['pServ'][1] = max(pServ, min_max_id['pServ'][1])
             feature.SetField('pServ_ssp%d' % ssp_id, pServ)
 
             aRisk = feature.GetField('Rt_ssp%d' % ssp_id) * (
@@ -183,7 +183,7 @@ def main():
                 min_max_id['aRisk'] = [aRisk, aRisk]
             else:
                 min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
-                min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
+                min_max_id['aRisk'][1] = max(aRisk, min_max_id['aRisk'][1])
             feature.SetField('aRisk_ssp%d' % ssp_id, aRisk)
 
             aServ = feature.GetField('Serv_ssp%d' % ssp_id) * (
@@ -193,7 +193,7 @@ def main():
                 min_max_id['aServ'] = [aServ, aServ]
             else:
                 min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
-                min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
+                min_max_id['aServ'][1] = max(aServ, min_max_id['aServ'][1])
             feature.SetField('aServ_ssp%d' % ssp_id, aServ)
 
             vRisk = (
@@ -203,7 +203,7 @@ def main():
                 min_max_id['vRisk'] = [vRisk, vRisk]
             else:
                 min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
-                min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
+                min_max_id['vRisk'][1] = max(vRisk, min_max_id['vRisk'][1])
             feature.SetField('vRisk_ssp%d' % ssp_id, vRisk)
 
             vServ = (
@@ -213,7 +213,7 @@ def main():
                 min_max_id['vServ'] = [vServ, vServ]
             else:
                 min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
-                min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
+                min_max_id['vServ'][1] = max(vServ, min_max_id['vServ'][1])
             feature.SetField('vServ_ssp%d' % ssp_id, vServ)
 
 
@@ -222,7 +222,7 @@ def main():
             min_max_id['pRisk'] = [pRisk, pRisk]
         else:
             min_max_id['pRisk'][0] = min(pRisk, min_max_id['pRisk'][0])
-            min_max_id['pRisk'][1] = min(pRisk, min_max_id['pRisk'][1])
+            min_max_id['pRisk'][1] = max(pRisk, min_max_id['pRisk'][1])
         feature.SetField('pRisk_cur', pRisk)
 
         pServ = feature.GetField('pdn_gpw') * feature.GetField('Serv_cur')
@@ -230,7 +230,7 @@ def main():
             min_max_id['pServ'] = [pServ, pServ]
         else:
             min_max_id['pServ'][0] = min(pServ, min_max_id['pServ'][0])
-            min_max_id['pServ'][1] = min(pServ, min_max_id['pServ'][1])
+            min_max_id['pServ'][1] = max(pServ, min_max_id['pServ'][1])
         feature.SetField('pServ_cur', pServ)
 
         aRisk = feature.GetField('Rt_cur') * (
@@ -239,7 +239,7 @@ def main():
             min_max_id['aRisk'] = [aRisk, aRisk]
         else:
             min_max_id['aRisk'][0] = min(aRisk, min_max_id['aRisk'][0])
-            min_max_id['aRisk'][1] = min(aRisk, min_max_id['aRisk'][1])
+            min_max_id['aRisk'][1] = max(aRisk, min_max_id['aRisk'][1])
         feature.SetField('aRisk_cur', aRisk)
 
         aServ = feature.GetField('Serv_cur') * (
@@ -248,7 +248,7 @@ def main():
             min_max_id['aServ'] = [aServ, aServ]
         else:
             min_max_id['aServ'][0] = min(aServ, min_max_id['aServ'][0])
-            min_max_id['aServ'][1] = min(aServ, min_max_id['aServ'][1])
+            min_max_id['aServ'][1] = max(aServ, min_max_id['aServ'][1])
         feature.SetField('aServ_cur', aServ)
 
         vServ = (
@@ -257,7 +257,7 @@ def main():
             min_max_id['vServ'] = [vServ, vServ]
         else:
             min_max_id['vServ'][0] = min(vServ, min_max_id['vServ'][0])
-            min_max_id['vServ'][1] = min(vServ, min_max_id['vServ'][1])
+            min_max_id['vServ'][1] = max(vServ, min_max_id['vServ'][1])
         feature.SetField('vServ_cur', vServ)
 
         vRisk = (
@@ -266,7 +266,7 @@ def main():
             min_max_id['vRisk'] = [vRisk, vRisk]
         else:
             min_max_id['vRisk'][0] = min(vRisk, min_max_id['vRisk'][0])
-            min_max_id['vRisk'][1] = min(vRisk, min_max_id['vRisk'][1])
+            min_max_id['vRisk'][1] = max(vRisk, min_max_id['vRisk'][1])
         feature.SetField('vRisk_cur', vRisk)
 
         for ssp_id in [1, 3, 5]:

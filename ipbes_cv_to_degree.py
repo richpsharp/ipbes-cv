@@ -98,10 +98,10 @@ def main():
         ['cRtssp%d' % x for x in [1, 3, 5]] +
         ['Serv_%s' % x for x in cur_ssp_list] +
         ['cServssp%d' % x for x in [1, 3, 5]] +
-        ['pRisk%s' % x for x in cur_ssp_list] +
-        ['nRisk%s' % x for x in cur_ssp_list] +
-        ['pServ%s' % x for x in cur_ssp_list] +
-        ['nServ%s' % x for x in cur_ssp_list] +
+        ['pRisk_%s' % x for x in cur_ssp_list] +
+        ['nRisk_%s' % x for x in cur_ssp_list] +
+        ['pServ_%s' % x for x in cur_ssp_list] +
+        ['nServ_%s' % x for x in cur_ssp_list] +
         ['cpRiskssp%d' % x for x in [1, 3, 5]] +
         ['cpServssp%d' % x for x in [1, 3, 5]] +
         ['cnRiskssp%d' % x for x in [1, 3, 5]] +
@@ -115,6 +115,9 @@ def main():
         func=sort_points,
         args=(summary_field_list, summary_grid_pickle_dir,),
         target_path_list=[summary_grid_pickle_dir])
+    """
+    sort_points(summary_field_list, summary_grid_pickle_dir)
+    """
 
     task_graph.join()
 
