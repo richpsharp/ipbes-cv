@@ -102,8 +102,8 @@ def main():
             'vSvRt_cur', 'vSvRt_ssp1', 'vSvRt_ssp3', 'vSvRt_ssp5',
             'cSvRt_cur', 'cSvRt_ssp1', 'cSvRt_ssp3', 'cSvRt_ssp5',
             'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
-            'cnSvRt_cur', 'cnSvRt_ssp1', 'cnSvRt_ssp3', 'cnSvRt_ssp5',
-            'cpSvRt_cur', 'cpSvRt_ssp1', 'cpSvRt_ssp3', 'cpSvRt_ssp5',
+            'cnSvRtcur', 'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
+            'cpSvRtcur', 'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
             ]:
 
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
@@ -487,12 +487,12 @@ def main():
 
             if feature.GetField('nServ_cur') != 0:
                 feature.SetField(
-                    'cnSvRt_ssp%d' % ssp_id, (
+                    'cnSvRtssp%d' % ssp_id, (
                         feature.GetField('nSvRt_ssp%d' % ssp_id) -
                         feature.GetField('nSvRt_cur')) /
                     feature.GetField('nSvRt_cur'))
             else:
-                feature.SetField('cnSvRt_ssp%d' % ssp_id, 0)
+                feature.SetField('cnSvRtssp%d' % ssp_id, 0)
 
         target_layer.SetFeature(feature)
 
