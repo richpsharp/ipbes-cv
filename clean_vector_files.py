@@ -19,6 +19,7 @@ WORKSPACE_DIR = 'clean_vector_dir'
 
 TARGET_FACTOR_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_factors.shp')
 TARGET_OUTPUTS_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_outputs.shp')
+TARGET_SVRT_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_SvRt.shp')
 
 
 def main():
@@ -72,13 +73,24 @@ def main():
         ['pRisk_cur'] +
         ['nServ'])
 
+    cv_svrt_field_set = set(
+        ['SvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['aSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['vSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['nSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cpSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
+
     esri_driver = gdal.GetDriverByName('ESRI Shapefile')
 
     base_vector = gdal.OpenEx(BASE_CV_VECTOR_PATH, gdal.OF_VECTOR)
 
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
-            (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set)]:
+            (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
+            (TARGET_SVRT_VECTOR_PATH, cv_svrt_field_set)]:
         if os.path.exists(path):
             esri_driver.Delete(path)
 
