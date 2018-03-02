@@ -96,6 +96,14 @@ def main():
             'cpServssp1', 'cpServssp3', 'cpServssp5',
             'cnRiskssp1', 'cnRiskssp3', 'cnRiskssp5',
             'cnServssp1', 'cnServssp3', 'cnServssp5',
+            'SvRt_cur', 'SvRt_ssp1', 'SvRt_ssp3', 'SvRt_ssp5',
+            'pSvRt_cur', 'pSvRt_ssp1', 'pSvRt_ssp3', 'pSvRt_ssp5',
+            'aSvRt_cur', 'aSvRt_ssp1', 'aSvRt_ssp3', 'aSvRt_ssp5',
+            'vSvRt_cur', 'vSvRt_ssp1', 'vSvRt_ssp3', 'vSvRt_ssp5',
+            'cSvRt_cur', 'cSvRt_ssp1', 'cSvRt_ssp3', 'cSvRt_ssp5',
+            'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
+            'cnSvRt_cur', 'cnSvRt_ssp1', 'cnSvRt_ssp3', 'cnSvRt_ssp5',
+            'cpSvRt_cur', 'cpSvRt_ssp1', 'cpSvRt_ssp3', 'cpSvRt_ssp5',
             ]:
 
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
@@ -216,6 +224,52 @@ def main():
                 min_max_id['vServ'][1] = max(vServ, min_max_id['vServ'][1])
             feature.SetField('vServ_ssp%d' % ssp_id, vServ)
 
+            if feature.GetField('Rt_ssp%d' % ssp_id) != 0:
+                SvRt = (
+                    feature.GetField('Serv_ssp%d' % ssp_id) /
+                    feature.GetField('Rt_ssp%d' % ssp_id))
+            else:
+                SvRt = 0
+            if 'SvRt' not in min_max_id:
+                min_max_id['SvRt'] = [SvRt, SvRt]
+            else:
+                min_max_id['SvRt'][0] = min(SvRt, min_max_id['SvRt'][0])
+                min_max_id['SvRt'][1] = max(SvRt, min_max_id['SvRt'][1])
+            feature.SetField('SvRt_ssp%d' % ssp_id, SvRt)
+
+            pSvRt = (
+                feature.GetField('pdnrc_ssp%d' % ssp_id) *
+                feature.GetField('SvRt_ssp%d' % ssp_id))
+            if 'pSvRt' not in min_max_id:
+                min_max_id['pSvRt'] = [pSvRt, pSvRt]
+            else:
+                min_max_id['pSvRt'][0] = min(pSvRt, min_max_id['pSvRt'][0])
+                min_max_id['pSvRt'][1] = max(pSvRt, min_max_id['pSvRt'][1])
+            feature.SetField('pSvRt_ssp%d' % ssp_id, pSvRt)
+
+            aSvRt = feature.GetField('SvRt_ssp%d' % ssp_id) * (
+                feature.GetField('14bt_pop') +
+                feature.GetField('65bt_pop'))
+
+            if 'aSvRt' not in min_max_id:
+                min_max_id['aSvRt'] = [aSvRt, aSvRt]
+            else:
+                min_max_id['aSvRt'][0] = min(aSvRt, min_max_id['aSvRt'][0])
+                min_max_id['aSvRt'][1] = max(aSvRt, min_max_id['aSvRt'][1])
+            feature.SetField('aSvRt_ssp%d' % ssp_id, aSvRt)
+
+            vSvRt = feature.GetField('SvRt_ssp%d' % ssp_id) * (
+                feature.GetField('poverty_p'))
+
+            if 'vSvRt' not in min_max_id:
+                min_max_id['vSvRt'] = [vSvRt, vSvRt]
+            else:
+                min_max_id['vSvRt'][0] = min(vSvRt, min_max_id['vSvRt'][0])
+                min_max_id['vSvRt'][1] = max(vSvRt, min_max_id['vSvRt'][1])
+            feature.SetField('vSvRt_ssp%d' % ssp_id, vSvRt)
+
+            vSvRt_[cur|ssp[1|3|5]] = poverty_p*SvRt_[cur|ssp[1|3|5]]
+
 
         pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
         if 'pRisk' not in min_max_id:
@@ -269,6 +323,50 @@ def main():
             min_max_id['vRisk'][1] = max(vRisk, min_max_id['vRisk'][1])
         feature.SetField('vRisk_cur', vRisk)
 
+        if feature.GetField('Rt_cur') != 0:
+            SvRt = (
+                feature.GetField('Serv_cur') /
+                feature.GetField('Rt_cur'))
+        else:
+            SvRt = 0
+        if 'SvRt' not in min_max_id:
+            min_max_id['SvRt'] = [SvRt, SvRt]
+        else:
+            min_max_id['SvRt'][0] = min(SvRt, min_max_id['SvRt'][0])
+            min_max_id['SvRt'][1] = max(SvRt, min_max_id['SvRt'][1])
+        feature.SetField('SvRt_cur', SvRt)
+
+        pSvRt = (
+            feature.GetField('pdn_gpw') *
+            feature.GetField('SvRt_cur'))
+        if 'pSvRt' not in min_max_id:
+            min_max_id['pSvRt'] = [pSvRt, pSvRt]
+        else:
+            min_max_id['pSvRt'][0] = min(pSvRt, min_max_id['pSvRt'][0])
+            min_max_id['pSvRt'][1] = max(pSvRt, min_max_id['pSvRt'][1])
+        feature.SetField('pSvRt_cur', pSvRt)
+
+        aSvRt = feature.GetField('SvRt_cur') * (
+            feature.GetField('14bt_pop') +
+            feature.GetField('65bt_pop'))
+
+        if 'aSvRt' not in min_max_id:
+            min_max_id['aSvRt'] = [aSvRt, aSvRt]
+        else:
+            min_max_id['aSvRt'][0] = min(aSvRt, min_max_id['aSvRt'][0])
+            min_max_id['aSvRt'][1] = max(aSvRt, min_max_id['aSvRt'][1])
+        feature.SetField('aSvRt_cur', aSvRt)
+
+        vSvRt = feature.GetField('SvRt_cur') * (
+            feature.GetField('poverty_p'))
+
+        if 'vSvRt' not in min_max_id:
+            min_max_id['vSvRt'] = [vSvRt, vSvRt]
+        else:
+            min_max_id['vSvRt'][0] = min(vSvRt, min_max_id['vSvRt'][0])
+            min_max_id['vSvRt'][1] = max(vSvRt, min_max_id['vSvRt'][1])
+        feature.SetField('vSvRt_cur', vSvRt)
+
         for ssp_id in [1, 3, 5]:
             if feature.GetField('Rt_cur') != 0:
                 feature.SetField(
@@ -305,6 +403,25 @@ def main():
                     feature.GetField('pServ_cur'))
             else:
                 feature.SetField('cpServssp%d' % ssp_id, 0)
+
+            if feature.GetField('SvRt_cur') != 0:
+                feature.SetField(
+                    'cSvRtssp%d' % ssp_id, (
+                        feature.GetField('SvRt_ssp%d' % ssp_id) -
+                        feature.GetField('SvRt_cur')) /
+                    feature.GetField('SvRt_cur'))
+            else:
+                feature.SetField('cSvRtssp%d' % ssp_id, 0)
+
+            if feature.GetField('pSvRt_cur') != 0:
+                feature.SetField(
+                    'cpSvRt%d' % ssp_id, (
+                        feature.GetField('pSvRt_ssp%d' % ssp_id) -
+                        feature.GetField('pSvRt_cur')) /
+                    feature.GetField('pSvRt_cur'))
+            else:
+                feature.SetField('cpSvRt%d' % ssp_id, 0)
+
         target_layer.SetFeature(feature)
 
     target_layer.ResetReading()
@@ -325,6 +442,12 @@ def main():
                 (feature.GetField('vServ_cur') - min_max_id['vServ'][0]) / (min_max_id['vServ'][1]-min_max_id['vServ'][0]),
                 (feature.GetField('aServ_cur') - min_max_id['aServ'][0]) / (min_max_id['aServ'][1]-min_max_id['aServ'][0])]))
 
+        feature.SetField(
+            'nSvRt_cur', numpy.mean([
+                (feature.GetField('pSvRt_cur') - min_max_id['pSvRt'][0]) / (min_max_id['pSvRt'][1]-min_max_id['pSvRt'][0]),
+                (feature.GetField('vSvRt_cur') - min_max_id['vSvRt'][0]) / (min_max_id['vSvRt'][1]-min_max_id['vSvRt'][0]),
+                (feature.GetField('aSvRt_cur') - min_max_id['aSvRt'][0]) / (min_max_id['aSvRt'][1]-min_max_id['aSvRt'][0])]))
+
         for ssp_id in [1, 3, 5]:
             feature.SetField(
                 'nRisk_ssp%d' % ssp_id, numpy.mean([
@@ -337,6 +460,12 @@ def main():
                     (feature.GetField('pServ_ssp%d' % ssp_id) - min_max_id['pServ'][0]) / (min_max_id['pServ'][1]-min_max_id['pServ'][0]),
                     (feature.GetField('vServ_ssp%d' % ssp_id) - min_max_id['vServ'][0]) / (min_max_id['vServ'][1]-min_max_id['vServ'][0]),
                     (feature.GetField('aServ_ssp%d' % ssp_id) - min_max_id['aServ'][0]) / (min_max_id['aServ'][1]-min_max_id['aServ'][0])]))
+
+            feature.SetField(
+                'nSvRt_ssp%d' % ssp_id, numpy.mean([
+                    (feature.GetField('pSvRt_ssp%d' % ssp_id) - min_max_id['pSvRt'][0]) / (min_max_id['pSvRt'][1]-min_max_id['pSvRt'][0]),
+                    (feature.GetField('vSvRt_ssp%d' % ssp_id) - min_max_id['vSvRt'][0]) / (min_max_id['vSvRt'][1]-min_max_id['vSvRt'][0]),
+                    (feature.GetField('aSvRt_ssp%d' % ssp_id) - min_max_id['aSvRt'][0]) / (min_max_id['aSvRt'][1]-min_max_id['aSvRt'][0])]))
 
             if feature.GetField('nRisk_cur') != 0:
                 feature.SetField(
@@ -355,6 +484,15 @@ def main():
                     feature.GetField('nServ_cur'))
             else:
                 feature.SetField('cnServssp%d' % ssp_id, 0)
+
+            if feature.GetField('nServ_cur') != 0:
+                feature.SetField(
+                    'cnSvRt_ssp%d' % ssp_id, (
+                        feature.GetField('nSvRt_ssp%d' % ssp_id) -
+                        feature.GetField('nSvRt_cur')) /
+                    feature.GetField('nSvRt_cur'))
+            else:
+                feature.SetField('cnSvRt_ssp%d' % ssp_id, 0)
 
         target_layer.SetFeature(feature)
 
