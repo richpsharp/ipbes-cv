@@ -100,10 +100,10 @@ def main():
             'pSvRt_cur', 'pSvRt_ssp1', 'pSvRt_ssp3', 'pSvRt_ssp5',
             'aSvRt_cur', 'aSvRt_ssp1', 'aSvRt_ssp3', 'aSvRt_ssp5',
             'vSvRt_cur', 'vSvRt_ssp1', 'vSvRt_ssp3', 'vSvRt_ssp5',
-            'cSvRt_cur', 'cSvRt_ssp1', 'cSvRt_ssp3', 'cSvRt_ssp5',
+            'cSvRt_ssp1', 'cSvRt_ssp3', 'cSvRt_ssp5',
             'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
-            'cnSvRtcur', 'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
-            'cpSvRtcur', 'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
+            'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
+            'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
             ]:
 
         if target_layer.FindFieldIndex(new_field_id, 1) == -1:
@@ -268,8 +268,6 @@ def main():
                 min_max_id['vSvRt'][1] = max(vSvRt, min_max_id['vSvRt'][1])
             feature.SetField('vSvRt_ssp%d' % ssp_id, vSvRt)
 
-            vSvRt_[cur|ssp[1|3|5]] = poverty_p*SvRt_[cur|ssp[1|3|5]]
-
         pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
         if 'pRisk' not in min_max_id:
             min_max_id['pRisk'] = [pRisk, pRisk]
@@ -405,16 +403,16 @@ def main():
 
             if feature.GetField('SvRt_cur') != 0:
                 feature.SetField(
-                    'cSvRtssp%d' % ssp_id, (
+                    'cSvRt_ssp%d' % ssp_id, (
                         feature.GetField('SvRt_ssp%d' % ssp_id) -
                         feature.GetField('SvRt_cur')) /
                     feature.GetField('SvRt_cur'))
             else:
-                feature.SetField('cSvRtssp%d' % ssp_id, 0)
+                feature.SetField('cSvRt_ssp%d' % ssp_id, 0)
 
             if feature.GetField('pSvRt_cur') != 0:
                 feature.SetField(
-                    'cpSvRt%d' % ssp_id, (
+                    'cpSvRtssp%d' % ssp_id, (
                         feature.GetField('pSvRt_ssp%d' % ssp_id) -
                         feature.GetField('pSvRt_cur')) /
                     feature.GetField('pSvRt_cur'))
