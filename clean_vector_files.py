@@ -13,10 +13,10 @@ LOGGER = logging.getLogger('clean-vector-files')
 LOGGER.setLevel(logging.DEBUG)
 
 BASE_CV_VECTOR_PATH = os.path.join(
-    'ipbes-cv-post-processing-workspace',
+    'C:', 'fast_dir', 'ipbes-cv-post-processing-workspace',
     'POST_PROCESS_global_cv_risk_and_aggregate_analysis.shp')
 
-WORKSPACE_DIR = 'clean_vector_dir'
+WORKSPACE_DIR = os.path.join("C:", 'fast_dir', 'clean_vector_dir')
 
 TARGET_FACTOR_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_factors.shp')
 TARGET_OUTPUTS_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_outputs.shp')
@@ -89,10 +89,10 @@ def main():
         ['vRisk_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['aServ_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['vServ_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['nRisk_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['nServ_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pServ_cur'] +
-        ['nRisk'] +
-        ['pRisk_cur'] +
-        ['nServ'])
+        ['pRisk_cur'])
 
     cv_svrt_field_set = set(
         ['SvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
@@ -104,7 +104,7 @@ def main():
         ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
-    task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', -1)
+    task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', 3)
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
             (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
