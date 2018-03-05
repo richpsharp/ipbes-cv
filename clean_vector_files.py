@@ -39,7 +39,7 @@ def clean_cv_vector(base_path, target_path, field_set):
         if target_defn.GetFieldDefn(i).GetName() not in field_set:
             LOGGER.info(
                 'deleting %s from %s',
-                target_defn.GetFieldDefn(i).GetName(), path)
+                target_defn.GetFieldDefn(i).GetName(), base_path)
             target_layer.DeleteField(i)
 
 
@@ -104,15 +104,15 @@ def main():
         ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
-
     task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', -1)
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
             (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
             (TARGET_SVRT_VECTOR_PATH, cv_svrt_field_set)]:
-        task_graph.add(
+        task_graph.add_task(
             func=clean_cv_vector,
-            args=(BASE_CV_VECTOR_PATH, path, field_set))
+            args=(BASE_CV_VECTOR_PATH, path, field_set),
+            task_name=os.path.basename(path))
 
     task_graph.close()
     task_graph.join()
