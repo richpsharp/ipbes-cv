@@ -8,6 +8,8 @@ import taskgraph
 from osgeo import ogr
 from osgeo import gdal
 
+gdal.UseExceptions()
+
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
@@ -104,11 +106,9 @@ def main():
             'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
-            ]:
-
-        if target_layer.FindFieldIndex(new_field_id, 1) == -1:
-            target_layer.CreateField(
-                ogr.FieldDefn(new_field_id, ogr.OFTReal))
+                ]:
+        target_layer.CreateField(
+            ogr.FieldDefn(new_field_id, ogr.OFTReal))
 
     risk_ids = ['Rwind', 'Rwave', 'Rrelief', 'Rsurge']
 
