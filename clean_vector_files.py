@@ -2,6 +2,7 @@
 import logging
 import os
 
+import taskgraph
 from osgeo import gdal
 from osgeo import ogr
 
@@ -20,6 +21,26 @@ WORKSPACE_DIR = 'clean_vector_dir'
 TARGET_FACTOR_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_factors.shp')
 TARGET_OUTPUTS_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_outputs.shp')
 TARGET_SVRT_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_SvRt.shp')
+
+
+def clean_cv_vector(base_path, target_path, field_set):
+    """Copy base and remove the fields in `field_set`."""
+    esri_driver = gdal.GetDriverByName('ESRI Shapefile')
+    if os.path.exists(target_path):
+        esri_driver.Delete(target_path)
+
+    base_vector = gdal.OpenEx(base_path, gdal.OF_VECTOR)
+
+    target_vector = esri_driver.CreateCopy(target_path, base_vector)
+    target_layer = target_vector.GetLayer()
+    target_defn = target_layer.GetLayerDefn()
+
+    for i in reversed(xrange(target_defn.GetFieldCount())):
+        if target_defn.GetFieldDefn(i).GetName() not in field_set:
+            LOGGER.info(
+                'deleting %s from %s',
+                target_defn.GetFieldDefn(i).GetName(), path)
+            target_layer.DeleteField(i)
 
 
 def main():
@@ -83,27 +104,18 @@ def main():
         ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
-    esri_driver = gdal.GetDriverByName('ESRI Shapefile')
 
-    base_vector = gdal.OpenEx(BASE_CV_VECTOR_PATH, gdal.OF_VECTOR)
-
+    task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', -1)
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
             (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
             (TARGET_SVRT_VECTOR_PATH, cv_svrt_field_set)]:
-        if os.path.exists(path):
-            esri_driver.Delete(path)
+        task_graph.add(
+            func=clean_cv_vector,
+            args=(BASE_CV_VECTOR_PATH, path, field_set))
 
-        target_vector = esri_driver.CreateCopy(path, base_vector)
-        target_layer = target_vector.GetLayer()
-        target_defn = target_layer.GetLayerDefn()
-
-        for i in reversed(xrange(target_defn.GetFieldCount())):
-            if target_defn.GetFieldDefn(i).GetName() not in field_set:
-                LOGGER.info(
-                    'deleting %s from %s',
-                    target_defn.GetFieldDefn(i).GetName(), path)
-                target_layer.DeleteField(i)
+    task_graph.close()
+    task_graph.join()
 
 if __name__ == '__main__':
     main()

@@ -28,7 +28,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
-WORKSPACE_DIR = 'ipbes-cv-post-processing-workspace'
+WORKSPACE_DIR = r'C:\fast_dir\ipbes-cv-post-processing-workspace'
 
 BASE_CV_VECTOR_PATH = os.path.join(
     BASE_DROPBOX_DIR, 'cv_results',
@@ -249,7 +249,7 @@ def main():
 
             aSvRt = feature.GetField('SvRt_ssp%d' % ssp_id) * (
                 feature.GetField('14bt_pop') +
-                feature.GetField('65bt_pop'))
+                feature.GetField('65plus_pop'))
 
             if 'aSvRt' not in min_max_id:
                 min_max_id['aSvRt'] = [aSvRt, aSvRt]
@@ -269,7 +269,6 @@ def main():
             feature.SetField('vSvRt_ssp%d' % ssp_id, vSvRt)
 
             vSvRt_[cur|ssp[1|3|5]] = poverty_p*SvRt_[cur|ssp[1|3|5]]
-
 
         pRisk = feature.GetField('pdn_gpw') * feature.GetField('Rt_cur')
         if 'pRisk' not in min_max_id:
@@ -348,7 +347,7 @@ def main():
 
         aSvRt = feature.GetField('SvRt_cur') * (
             feature.GetField('14bt_pop') +
-            feature.GetField('65bt_pop'))
+            feature.GetField('65plus_pop'))
 
         if 'aSvRt' not in min_max_id:
             min_max_id['aSvRt'] = [aSvRt, aSvRt]
