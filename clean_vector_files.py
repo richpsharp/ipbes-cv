@@ -30,16 +30,15 @@ def clean_cv_vector(base_path, target_path, field_set):
     if os.path.exists(target_path):
         esri_driver.Delete(target_path)
 
-    mem_driver = gdal.GetDriverByName('Memory')
     base_vector = gdal.OpenEx(base_path, gdal.OF_VECTOR)
     base_layer = base_vector.GetLayer()
-    field_definitions = target_layer.GetLayerDefn()
+    field_definitions = base_layer.GetLayerDefn()
 
     LOGGER.info('copying %s to memory', base_path)
-    mem_vector = mem_driver.CreateCopy('', base_vector)
+    target_vector = esri_driver.CreateCopy('', base_vector)
 
-    mem_layer = mem_vector.GetLayer()
-    mem_defn = mem_layer.GetLayerDefn()
+    target_layer = target_vector.GetLayer()
+    target_defn = target_layer.GetLayerDefn()
 
     base_field_names = set(
         [field_definitions.GetFieldDefn(i).GetName()
@@ -52,15 +51,13 @@ def clean_cv_vector(base_path, target_path, field_set):
             "The following field names were unknown: %s",
             unknown_field_names)
 
-    for i in reversed(xrange(mem_defn.GetFieldCount())):
-        if mem_defn.GetFieldDefn(i).GetName() not in field_set:
+    for i in reversed(xrange(target_defn.GetFieldCount())):
+        if target_defn.GetFieldDefn(i).GetName() not in field_set:
             LOGGER.info(
                 'deleting %s from %s',
-                mem_defn.GetFieldDefn(i).GetName(), base_path)
-            mem_layer.DeleteField(i)
+                target_defn.GetFieldDefn(i).GetName(), base_path)
+            target_layer.DeleteField(i)
 
-    LOGGER.info('saving mem vector to file %s', target_path)
-    esri_driver.CreateCopy(target_path, mem_vector)
     LOGGER.info('done saving %s', target_path)
 
 
@@ -122,7 +119,7 @@ def main():
         ['nSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['cSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['cpSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cnSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
     cv_pop_outputs_set = set(
@@ -145,7 +142,7 @@ def main():
         ['acServ_s%d' % x for x in [1,3,5]] +
         ['acSvRt_s%d' % x for x in [1,3,5]])
 
-    task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', 3)
+    task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', 4)
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
             (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
