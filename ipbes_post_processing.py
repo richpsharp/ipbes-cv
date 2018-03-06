@@ -107,7 +107,7 @@ def main():
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
             'logpop_cur', 'logpop_s1', 'logpop_s3', 'logpop_s5',
-            'logage', 'logpRt_cur'
+            'logage', 'logpRt_cur', 'logaRt_cur'
             ]:
         target_layer.CreateField(
             ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -372,6 +372,11 @@ def main():
         feature.SetField(
             'logpSvRt_cur', feature.GetField('logpop_cur') *
             feature.GetField('SvRt_cur'))
+
+        # logaRt_cur = logage * Rt_cur
+        feature.SetField(
+            'logaRt_cur', feature.GetField('logage') *
+            feature.GetField('Rt_cur'))
 
         pSvRt = (
             feature.GetField('pdn_gpw') *
