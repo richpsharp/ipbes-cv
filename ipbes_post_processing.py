@@ -106,6 +106,7 @@ def main():
             'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
+            'logpop_cur',
                 ]:
         target_layer.CreateField(
             ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -118,6 +119,12 @@ def main():
         feature = target_layer.GetNextFeature()
         if not feature:
             break
+        #logpop_cur = log(pdn_gpw)
+        pdn_gpw = feature.GetField('pdn_gpw')
+        if pdn_gpw > 0:
+            feature.SetField('logpop_cur', numpy.log(pdn_gpw))
+        else:
+            feature.SetField('logpop_cur', 0.0)
         for slr_risk_field_id, rhab_id, slr_id, rt_hab_id, rt_nohab_id, serv_id in [
                 ('Rslr_cur', 'Rhab_cur', 'SLRrise_c', 'Rt_cur', 'Rt_cur_nh', 'Serv_cur'),
                 ('Rslr_ssp1', 'Rhab_ssp1', 'SLRrise_1', 'Rt_ssp1', 'Rt_ssp1_nh', 'Serv_ssp1'),
