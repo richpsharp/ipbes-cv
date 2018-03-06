@@ -31,11 +31,12 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
 GLOBAL_CV_VECTOR_PATH = os.path.join(
-    "ipbes-cv-post-processing-workspace",
-    "POST_PROCESS_global_cv_risk_and_aggregate_analysis.shp")
+    "C:", 'fast_dir', 'ipbes-cv-post-processing-workspace',
+    'POST_PROCESS_global_cv_risk_and_aggregate_analysis.shp')
 
 TARGET_SUMMARY_DEGREE_DIR = os.path.join(
-    "ipbes-cv-post-processing-workspace", 'sum_to_degree')
+    BASE_DROPBOX_DIR, 'ipbes stuff', 'ipbes_cv_results',
+    'cv_results_3_5_2018', 'degree_rasters')
 
 SLR_LIST_PICKLE_PATH = 'slr.pickle'
 
@@ -94,6 +95,9 @@ def main():
     cur_ssp_list = ['cur', 'ssp1', 'ssp3', 'ssp5']
 
     summary_field_list = (
+        ['SvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['pSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['nSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['Rt_%s' % x for x in cur_ssp_list] +
         ['cRtssp%d' % x for x in [1, 3, 5]] +
         ['Serv_%s' % x for x in cur_ssp_list] +
@@ -105,7 +109,9 @@ def main():
         ['cpRiskssp%d' % x for x in [1, 3, 5]] +
         ['cpServssp%d' % x for x in [1, 3, 5]] +
         ['cnRiskssp%d' % x for x in [1, 3, 5]] +
-        ['cnServssp%d' % x for x in [1, 3, 5]])
+        ['cnServssp%d' % x for x in [1, 3, 5]] +
+        ['cnServssp%d' % x for x in [1, 3, 5]]
+        )
 
     task_graph = taskgraph.TaskGraph(
         os.path.join(WORKING_DIR, 'taskgraph_cache'), -1)
@@ -124,7 +130,7 @@ def main():
     for summary_field in summary_field_list:
         print 'summary %s' % summary_field
         summary_raster_path = os.path.join(
-            WORKING_DIR, '%s.tif' % summary_field)
+            TARGET_SUMMARY_DEGREE_DIR, '%s.tif' % summary_field)
         wgs84_sr = osr.SpatialReference()
         wgs84_sr.ImportFromEPSG(4326)
         driver = gdal.GetDriverByName('GTiff')
