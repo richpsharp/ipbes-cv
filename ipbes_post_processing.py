@@ -206,6 +206,16 @@ def main():
             else:
                 feature.SetField('logpop_s%d' % ssp_id, 0.0)
 
+            # c_logpop_s[1|3|5]  = (logpop_s[1|3|5] - logpop_cur) / logpop_cur
+            if feature.GetField('logpop_cur') > 0:
+                feature.SetField(
+                    'c_logpop_s%d' % ssp_id, (
+                        feature.GetField('logpop_s%d' % ssp_id) -
+                        feature.GetField('logpop_cur')) / (
+                            feature.GetField('logpop_cur')))
+            else:
+                feature.SetField('c_logpop_s%d' % ssp_id, 0.0)
+
             pRisk = (
                 feature.GetField('pdnrc_ssp%d' % ssp_id) *
                 feature.GetField('Rt_ssp%d' % ssp_id))

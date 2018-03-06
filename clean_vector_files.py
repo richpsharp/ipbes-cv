@@ -123,10 +123,10 @@ def main():
 
     cv_pop_outputs_set = set(
         ['SvRt_cur'] +
-        ['cSvRt_ssp%d' % x for x in [1,3,5]] +
+        ['cSvRt_ssp%d' % x for x in [1, 3, 5]] +
         ['logpop_cur'] +
-        ['logpop_s%d' % x for x in [1,3,5]] +
-        ['logpop_s%d' % x for x in [1,3,5]] +
+        ['logpop_s%d' % x for x in [1, 3, 5]] +
+        ['logpop_s%d' % x for x in [1, 3, 5]] +
         ['logage'] +
         ['logpRt_cur'] +
         ['logpServ_c'] +
@@ -134,12 +134,12 @@ def main():
         ['logaRt_cur'] +
         ['logaServ_c'] +
         ['logaSvRt_c'] +
-        ['pcRt_s%d' % x for x in [1,3,5]] +
-        ['pcServ_s%d' % x for x in [1,3,5]] +
-        ['pcSvRt_s%d' % x for x in [1,3,5]] +
-        ['acRt_s%d' % x for x in [1,3,5]] +
-        ['acServ_s%d' % x for x in [1,3,5]] +
-        ['acSvRt_s%d' % x for x in [1,3,5]])
+        ['pcRt_s%d' % x for x in [1, 3, 5]] +
+        ['pcServ_s%d' % x for x in [1, 3, 5]] +
+        ['pcSvRt_s%d' % x for x in [1, 3, 5]] +
+        ['acRt_s%d' % x for x in [1, 3, 5]] +
+        ['acServ_s%d' % x for x in [1, 3, 5]] +
+        ['acSvRt_s%d' % x for x in [1, 3, 5]])
 
     task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', 4)
     for path, field_set in [
