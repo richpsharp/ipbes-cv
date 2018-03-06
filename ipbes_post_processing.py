@@ -166,11 +166,16 @@ def main():
             rt_slr_nohab_risk = numpy.prod(
                 [5.] + base_risk_list) ** (
                     1. / (len(base_risk_list) + 1))
-            feature.SetField(rt_nohab_id, rt_slr_nohab_risk)
+            feature.SetField('rt_nohab_id', rt_slr_nohab_risk)
 
             feature.SetField(
-                serv_id, feature.GetField(rt_nohab_id) -
-                feature.GetField(rt_hab_id))
+                serv_id, feature.GetField('rt_nohab_id') -
+                feature.GetField('rt_hab_id'))
+
+        # logpServ_cur = logpop_cur * Serv_cur
+        feature.SetField(
+            'logpServ_cur', feature.GetField('logpop_cur') *
+            feature.GetField('Serv_cur'))
 
         for ssp_id in [1, 3, 5]:
             feature.SetField(
@@ -362,6 +367,11 @@ def main():
             min_max_id['SvRt'][0] = min(SvRt, min_max_id['SvRt'][0])
             min_max_id['SvRt'][1] = max(SvRt, min_max_id['SvRt'][1])
         feature.SetField('SvRt_cur', SvRt)
+
+        # logpSvRt_cur = logpop_cur * SvRt_cur
+        feature.SetField(
+            'logpSvRt_cur', feature.GetField('logpop_cur') *
+            feature.GetField('SvRt_cur'))
 
         pSvRt = (
             feature.GetField('pdn_gpw') *
