@@ -35,7 +35,7 @@ def clean_cv_vector(base_path, target_path, field_set):
     field_definitions = base_layer.GetLayerDefn()
 
     LOGGER.info('copying %s to memory', base_path)
-    target_vector = esri_driver.CreateCopy('', base_vector)
+    target_vector = esri_driver.CreateCopy(target_path, base_vector)
 
     target_layer = target_vector.GetLayer()
     target_defn = target_layer.GetLayerDefn()
