@@ -107,7 +107,14 @@ def main():
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
             'logpop_cur', 'logpop_s1', 'logpop_s3', 'logpop_s5',
-            'logage', 'logpRt_cur', 'logaRt_cur'
+            'logage', 'logpRt_cur', 'logaRt_cur', 'logpServ_cur',
+            'logpSvRt_cur', 'logaRt_cur', 'logaServ_cur', 'logaSvRt_cur',
+            'pcRt_s1', 'pcRt_s3', 'pcRt_s5',
+            'pcServ_s1', 'pcServ_s3', 'pcServ_s5',
+            'pcSvRt_s1', 'pcSvRt_s3', 'pcSvRt_s5',
+            'acRt_s1', 'acRt_s3', 'acRt_s5',
+            'acServ_s1', 'acServ_s3', 'acServ_s5',
+            'acSvRt_s1', 'acSvRt_s3', 'acSvRt_s5'
             ]:
         target_layer.CreateField(
             ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -421,8 +428,21 @@ def main():
                         feature.GetField('Rt_ssp%d' % ssp_id) -
                         feature.GetField('Rt_cur')) /
                     feature.GetField('Rt_cur'))
+
+                # acRt_s[1|3|5] = logage * cRtssp[1|3|5]
+                feature.SetField(
+                    'acRt_s%d' % ssp_id, (
+                        feature.GetField('logage') *
+                        feature.GetField('cRtssp%d' % ssp_id)))
+
+                feature.SetField(
+                    'pcRt_s%d' % ssp_id,
+                    feature.GetField('logpop_s%d' % ssp_id) *
+                    feature.GetField('cRtssp%d' % ssp_id))
             else:
                 feature.SetField('cRtssp%d' % ssp_id, 0)
+                feature.SetField('acRt_s%d' % ssp_id, 0)
+                feature.SetField('pcRt_s%d' % ssp_id, 0)
 
             if feature.GetField('Serv_cur') != 0:
                 feature.SetField(
@@ -430,8 +450,19 @@ def main():
                         feature.GetField('Serv_ssp%d' % ssp_id) -
                         feature.GetField('Serv_cur')) /
                     feature.GetField('Serv_cur'))
+                # pcServ_s[1|3|5] = logpop_s[1|3|5]) * cServssp[1|3|5]
+                feature.SetField(
+                    'pcServ_s%d' % ssp_id,
+                    feature.GetField('logpop_s%d' % ssp_id) *
+                    feature.GetField('cServssp%d' % ssp_id))
+                # acServ_s[1|3|5] = logage * cServssp[1|3|5]
+                feature.SetField(
+                    'acServ_s%d' % ssp_id,
+                    feature.GetField('logage') *
+                    feature.GetField('cServssp%d' % ssp_id))
             else:
                 feature.SetField('cServssp%d' % ssp_id, 0)
+                feature.SetField('pcServ_s%d' % ssp_id, 0)
 
             if feature.GetField('pRisk_cur') != 0:
                 feature.SetField(
@@ -457,8 +488,20 @@ def main():
                         feature.GetField('SvRt_ssp%d' % ssp_id) -
                         feature.GetField('SvRt_cur')) /
                     feature.GetField('SvRt_cur'))
+                # pcSvRt_s[1|3|5] = logpop_s[1|3|5]) * cSvRT
+                feature.SetField(
+                    'pcSvRt_s%d' % ssp_id, (
+                        feature.GetField('logpop_s%d' % ssp_id) *
+                        feature.GetField('cSvRt_ssp%d' % ssp_id)))
+                # acSvRt_s[1|3|5] = logage * cSvRt_ssp[1|3|5]
+                feature.SetField(
+                    'acSvRt_s%d' % ssp_id, (
+                        feature.GetField('logage') *
+                        feature.GetField('cSvRt_ssp%d' % ssp_id)))
             else:
                 feature.SetField('cSvRt_ssp%d' % ssp_id, 0)
+                feature.SetField('pcSvRt_s%d' % ssp_id, 0)
+                feature.SetField('acSvRt_s%d' % ssp_id, 0)
 
             if feature.GetField('pSvRt_cur') != 0:
                 feature.SetField(
