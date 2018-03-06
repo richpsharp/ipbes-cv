@@ -173,11 +173,11 @@ def main():
             rt_slr_nohab_risk = numpy.prod(
                 [5.] + base_risk_list) ** (
                     1. / (len(base_risk_list) + 1))
-            feature.SetField('rt_nohab_id', rt_slr_nohab_risk)
+            feature.SetField(rt_nohab_id, rt_slr_nohab_risk)
 
             feature.SetField(
-                serv_id, feature.GetField('rt_nohab_id') -
-                feature.GetField('rt_hab_id'))
+                serv_id, feature.GetField(rt_nohab_id) -
+                feature.GetField(rt_hab_id))
 
         # logpServ_c = logpop_cur * Serv_cur
         feature.SetField(

@@ -21,6 +21,7 @@ WORKSPACE_DIR = os.path.join("C:", 'fast_dir', 'clean_vector_dir')
 TARGET_FACTOR_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_factors.shp')
 TARGET_OUTPUTS_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_outputs.shp')
 TARGET_SVRT_VECTOR_PATH = os.path.join(WORKSPACE_DIR, 'CV_SvRt.shp')
+TARGET_CV_POPOUTPUTS_PATH = os.path.join(WORKSPACE_DIR, 'CV_popoutputs.shp')
 
 
 def clean_cv_vector(base_path, target_path, field_set):
@@ -29,18 +30,38 @@ def clean_cv_vector(base_path, target_path, field_set):
     if os.path.exists(target_path):
         esri_driver.Delete(target_path)
 
+    mem_driver = gdal.GetDriverByName('Memory')
     base_vector = gdal.OpenEx(base_path, gdal.OF_VECTOR)
+    base_layer = base_vector.GetLayer()
+    field_definitions = target_layer.GetLayerDefn()
 
-    target_vector = esri_driver.CreateCopy(target_path, base_vector)
-    target_layer = target_vector.GetLayer()
-    target_defn = target_layer.GetLayerDefn()
+    LOGGER.info('copying %s to memory', base_path)
+    mem_vector = mem_driver.CreateCopy('', base_vector)
 
-    for i in reversed(xrange(target_defn.GetFieldCount())):
-        if target_defn.GetFieldDefn(i).GetName() not in field_set:
+    mem_layer = mem_vector.GetLayer()
+    mem_defn = mem_layer.GetLayerDefn()
+
+    base_field_names = set(
+        [field_definitions.GetFieldDefn(i).GetName()
+         for i in xrange(field_definitions.GetFieldCount())])
+    field_definitions = None
+
+    unknown_field_names = field_set.subtract(base_field_names)
+    if unknown_field_names:
+        raise ValueError(
+            "The following field names were unknown: %s",
+            unknown_field_names)
+
+    for i in reversed(xrange(mem_defn.GetFieldCount())):
+        if mem_defn.GetFieldDefn(i).GetName() not in field_set:
             LOGGER.info(
                 'deleting %s from %s',
-                target_defn.GetFieldDefn(i).GetName(), base_path)
-            target_layer.DeleteField(i)
+                mem_defn.GetFieldDefn(i).GetName(), base_path)
+            mem_layer.DeleteField(i)
+
+    LOGGER.info('saving mem vector to file %s', target_path)
+    esri_driver.CreateCopy(target_path, mem_vector)
+    LOGGER.info('done saving %s', target_path)
 
 
 def main():
@@ -104,11 +125,32 @@ def main():
         ['cnSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
+    cv_pop_outputs_set = set(
+        ['SvRt_cur'] +
+        ['cSvRt_ssp%d' % x for x in [1,3,5]] +
+        ['logpop_cur'] +
+        ['logpop_s%d' % x for x in [1,3,5]] +
+        ['c_logpop_s%d' % x for x in [1,3,5]] +
+        ['logage'] +
+        ['logpRt_cur'] +
+        ['logpServ_cur'] +
+        ['logpSvRt_cur'] +
+        ['logaRt_cur'] +
+        ['logaServ_cur'] +
+        ['logaSvRt_cur'] +
+        ['pcRt_s%d' % x for x in [1,3,5]] +
+        ['pcServ_s%d' % x for x in [1,3,5]] +
+        ['pcSvRt_s%d' % x for x in [1,3,5]] +
+        ['acRt_s%d' % x for x in [1,3,5]] +
+        ['acServ_s%d' % x for x in [1,3,5]] +
+        ['acSvRt_s%d' % x for x in [1,3,5]])
+
     task_graph = taskgraph.TaskGraph('clean_vector_taskgraph_dir', 3)
     for path, field_set in [
             (TARGET_FACTOR_VECTOR_PATH, factor_field_set),
             (TARGET_OUTPUTS_VECTOR_PATH, outputs_field_set),
-            (TARGET_SVRT_VECTOR_PATH, cv_svrt_field_set)]:
+            (TARGET_SVRT_VECTOR_PATH, cv_svrt_field_set),
+            (TARGET_CV_POPOUTPUTS_PATH, cv_pop_outputs_set)]:
         task_graph.add_task(
             func=clean_cv_vector,
             args=(BASE_CV_VECTOR_PATH, path, field_set),
