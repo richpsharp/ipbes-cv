@@ -107,8 +107,8 @@ def main():
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
             'logpop_cur', 'logpop_s1', 'logpop_s3', 'logpop_s5',
-            'logage', 'logpRt_cur', 'logaRt_cur', 'logpServ_cur',
-            'logpSvRt_cur', 'logaRt_cur', 'logaServ_cur', 'logaSvRt_cur',
+            'logage', 'logpRt_cur', 'logaRt_cur', 'logpServ_c',
+            'logpSvRt_c', 'logaServ_c', 'logaSvRt_c',
             'pcRt_s1', 'pcRt_s3', 'pcRt_s5',
             'pcServ_s1', 'pcServ_s3', 'pcServ_s5',
             'pcSvRt_s1', 'pcSvRt_s3', 'pcSvRt_s5',
@@ -179,9 +179,9 @@ def main():
                 serv_id, feature.GetField('rt_nohab_id') -
                 feature.GetField('rt_hab_id'))
 
-        # logpServ_cur = logpop_cur * Serv_cur
+        # logpServ_c = logpop_cur * Serv_cur
         feature.SetField(
-            'logpServ_cur', feature.GetField('logpop_cur') *
+            'logpServ_c', feature.GetField('logpop_cur') *
             feature.GetField('Serv_cur'))
 
         for ssp_id in [1, 3, 5]:
@@ -375,9 +375,9 @@ def main():
             min_max_id['SvRt'][1] = max(SvRt, min_max_id['SvRt'][1])
         feature.SetField('SvRt_cur', SvRt)
 
-        # logpSvRt_cur = logpop_cur * SvRt_cur
+        # logpSvRt_c = logpop_cur * SvRt_cur
         feature.SetField(
-            'logpSvRt_cur', feature.GetField('logpop_cur') *
+            'logpSvRt_c', feature.GetField('logpop_cur') *
             feature.GetField('SvRt_cur'))
 
         # logaRt_cur = logage * Rt_cur
@@ -385,10 +385,15 @@ def main():
             'logaRt_cur', feature.GetField('logage') *
             feature.GetField('Rt_cur'))
 
-        # logaServ_cur = logage * Serv_cur
+        # logaServ_c = logage * Serv_cur
         feature.SetField(
-            'logaServ_cur', feature.GetField('logage') *
+            'logaServ_c', feature.GetField('logage') *
             feature.GetField('Serv_cur'))
+
+        #logaSvRt_c = logage * SvRt_cur (done)
+        feature.SetField(
+            'logaSvRt_c', feature.GetField('logage') *
+            feature.GetField('SvRt_cur'))
 
         pSvRt = (
             feature.GetField('pdn_gpw') *
