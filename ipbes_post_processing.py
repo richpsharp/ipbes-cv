@@ -106,7 +106,8 @@ def main():
             'nSvRt_cur', 'nSvRt_ssp1', 'nSvRt_ssp3', 'nSvRt_ssp5',
             'cnSvRtssp1', 'cnSvRtssp3', 'cnSvRtssp5',
             'cpSvRtssp1', 'cpSvRtssp3', 'cpSvRtssp5',
-            'logpop_cur', 'logpop_s1', 'logpop_s3', 'logpop_s5'
+            'logpop_cur', 'logpop_s1', 'logpop_s3', 'logpop_s5',
+            'logage'
             ]:
         target_layer.CreateField(
             ogr.FieldDefn(new_field_id, ogr.OFTReal))
@@ -125,6 +126,14 @@ def main():
             feature.SetField('logpop_cur', numpy.log(pdn_gpw))
         else:
             feature.SetField('logpop_cur', 0.0)
+
+        #logage = log(14bt_pop+65plus_pop)
+        if feature.GetField('14bt_pop') + feature.GetField('65plus_pop') > 0:
+            feature.SetField('logage',
+                feature.GetField('14bt_pop') +
+                feature.GetField('65plus_pop'))
+        else:
+            feature.SetField('logage', 0.0)
 
         for slr_risk_field_id, rhab_id, slr_id, rt_hab_id, rt_nohab_id, serv_id in [
                 ('Rslr_cur', 'Rhab_cur', 'SLRrise_c', 'Rt_cur', 'Rt_cur_nh', 'Serv_cur'),
