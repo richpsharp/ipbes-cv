@@ -45,7 +45,7 @@ def clean_cv_vector(base_path, target_path, field_set):
          for i in xrange(field_definitions.GetFieldCount())])
     field_definitions = None
 
-    unknown_field_names = field_set.subtract(base_field_names)
+    unknown_field_names = field_set.difference(base_field_names)
     if unknown_field_names:
         raise ValueError(
             "The following field names were unknown: %s",
