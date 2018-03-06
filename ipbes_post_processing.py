@@ -378,6 +378,11 @@ def main():
             'logaRt_cur', feature.GetField('logage') *
             feature.GetField('Rt_cur'))
 
+        # logaServ_cur = logage * Serv_cur
+        feature.SetField(
+            'logaServ_cur', feature.GetField('logage') *
+            feature.GetField('Serv_cur'))
+
         pSvRt = (
             feature.GetField('pdn_gpw') *
             feature.GetField('SvRt_cur'))
