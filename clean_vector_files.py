@@ -34,7 +34,7 @@ def clean_cv_vector(base_path, target_path, field_set):
     base_layer = base_vector.GetLayer()
     field_definitions = base_layer.GetLayerDefn()
 
-    LOGGER.info('copying %s to memory', base_path)
+    LOGGER.info('copying %s to disk', base_path)
     target_vector = esri_driver.CreateCopy(target_path, base_vector)
 
     target_layer = target_vector.GetLayer()
@@ -70,8 +70,7 @@ def main():
 
     factor_field_set = set(
         ['Rhab_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['Rslra_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['Rslri_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['Rslr_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['urbp_%s' % x for x in ['2015', 'ssp1', 'ssp3', 'ssp5']] +
         ['pdn_%s' % x for x in ['2010', 'ssp1', 'ssp3', 'ssp5']] +
         ['SLRrate_%s' % x for x in ['c', '1', '3', '5']] +
@@ -127,14 +126,14 @@ def main():
         ['cSvRt_ssp%d' % x for x in [1,3,5]] +
         ['logpop_cur'] +
         ['logpop_s%d' % x for x in [1,3,5]] +
-        ['c_logpop_s%d' % x for x in [1,3,5]] +
+        ['logpop_s%d' % x for x in [1,3,5]] +
         ['logage'] +
         ['logpRt_cur'] +
-        ['logpServ_cur'] +
-        ['logpSvRt_cur'] +
+        ['logpServ_c'] +
+        ['logpSvRt_c'] +
         ['logaRt_cur'] +
-        ['logaServ_cur'] +
-        ['logaSvRt_cur'] +
+        ['logaServ_c'] +
+        ['logaSvRt_c'] +
         ['pcRt_s%d' % x for x in [1,3,5]] +
         ['pcServ_s%d' % x for x in [1,3,5]] +
         ['pcSvRt_s%d' % x for x in [1,3,5]] +
