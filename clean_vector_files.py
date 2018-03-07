@@ -80,7 +80,6 @@ def main():
         ['pdnrc_ssp%s' % x for x in ['1', '3', '5']] +
         ['slr_rcp%s' % x for x in ['26', '60', '85']] +
         ['dSLRrt_sp%s' % x for x in ['1', '3', '5']] +
-        ['dSLRrs_sp%s' % x for x in ['1', '3', '5']] +
         ['pdn_gpw'] +
         ['14bt_pop'] +
         ['65plus_pop'] +
@@ -116,10 +115,10 @@ def main():
         ['aSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['vSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['nSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['cSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['cpSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['cnSvRt%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['pSvRt_ssp%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
+        ['cSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cpSvRt%s' % x for x in ['ssp1', 'ssp3', 'ssp5']] +
+        ['cnSvRt%s' % x for x in ['ssp1', 'ssp3', 'ssp5']] +
+        ['pSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])
 
     cv_pop_outputs_set = set(
         ['SvRt_cur'] +
