@@ -115,7 +115,7 @@ def main():
         ['aSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['vSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['nSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
-        ['cSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
+        ['cSvRt_%s' % x for x in ['ssp1', 'ssp3', 'ssp5']] +
         ['cpSvRt%s' % x for x in ['ssp1', 'ssp3', 'ssp5']] +
         ['cnSvRt%s' % x for x in ['ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']])

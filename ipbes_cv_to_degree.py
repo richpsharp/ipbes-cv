@@ -36,7 +36,7 @@ GLOBAL_CV_VECTOR_PATH = os.path.join(
 
 TARGET_SUMMARY_DEGREE_DIR = os.path.join(
     BASE_DROPBOX_DIR, 'ipbes stuff', 'ipbes_cv_results',
-    'cv_results_3_5_2018', 'degree_rasters')
+    'cv_results_3_11_2018', 'degree_rasters')
 
 SLR_LIST_PICKLE_PATH = 'slr.pickle'
 
@@ -94,6 +94,7 @@ def main():
 
     cur_ssp_list = ['cur', 'ssp1', 'ssp3', 'ssp5']
 
+    """
     summary_field_list = (
         ['SvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
         ['pSvRt_%s' % x for x in ['cur', 'ssp1', 'ssp3', 'ssp5']] +
@@ -111,6 +112,24 @@ def main():
         ['cnRiskssp%d' % x for x in [1, 3, 5]] +
         ['cnServssp%d' % x for x in [1, 3, 5]] +
         ['cnServssp%d' % x for x in [1, 3, 5]]
+        )
+    """
+    summary_field_list = (
+        ['logpRt_cur'] +
+        ['logpServ_c'] +
+        ['logpSvRt_c'] +
+        ['logaRt_cur'] +
+        ['logaServ_c'] +
+        ['logaSvRt_c'] +
+        ['pcRt_s%d' % x for x in [1, 3, 5]] +
+        ['pcServ_s%d' % x for x in [1, 3, 5]] +
+        ['pcSvRt_s%d' % x for x in [1, 3, 5]] +
+        ['acRt_s%d' % x for x in [1, 3, 5]] +
+        ['acServ_s%d' % x for x in [1, 3, 5]] +
+        ['acSvRt_s%d' % x for x in [1, 3, 5]] +
+        ['vRisk_%s' % x for x in cur_ssp_list] +
+        ['vServ_%s' % x for x in cur_ssp_list] +
+        ['vSvRt_%s' % x for x in cur_ssp_list]
         )
 
     task_graph = taskgraph.TaskGraph(
