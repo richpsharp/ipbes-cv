@@ -180,7 +180,7 @@ def main():
     simplify_habitat_task_list = []
     simplified_habitat_vector_lookup = {}
     for habitat_id, (habitat_path, habitat_rank, habitat_dist) in (
-            _GLOBAL_HABITAT_LAYER_PATHS.iteritems()):
+            _GLOBAL_HABITAT_LAYER_PATHS.items()):
         smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
         simplified_habitat_vector_lookup[habitat_id] = (
             os.path.join(_TARGET_WORKSPACE, '%s.shp' % habitat_id),
@@ -512,7 +512,7 @@ def aggregate_raster_data(
             ogr.FieldDefn('cpdn_ssp%d' % ssp_id, ogr.OFTReal))
 
     for simulation_id, (raster_path, divide_by_area, reclass_ids, extra_pixel) in (
-            raster_feature_id_map.iteritems()):
+            raster_feature_id_map.items()):
         raster = gdal.Open(raster_path)
         band = raster.GetRasterBand(1)
         n_rows = band.YSize
@@ -962,7 +962,7 @@ def calculate_habitat_protection(
             min_rank = 5
             sum_sq_rank = 0.0
             for habitat_id, (_, rank, protection_distance) in (
-                    habitat_layer_lookup.iteritems()):
+                    habitat_layer_lookup.items()):
                 if (target_feature_shapely.distance(
                         habitat_shapely_lookup[habitat_id]) >
                         protection_distance):
