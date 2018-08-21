@@ -222,7 +222,7 @@ def main():
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
     global_grid_layer = global_grid_vector.GetLayer()
-    grid_count = global_grid_layer.GetFeatureCount()
+    grid_fid_list = [feature.GetFID() for feature in global_grid_layer]
     global_grid_layer = None
     global_grid_vector = None
 
@@ -237,17 +237,17 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
-    for grid_id in range(grid_count):
-        logger.info("Calculating grid %d of %d", grid_id, grid_count)
+    for grid_fid in grid_fid_list:
+        logger.info("Calculating grid %d of %d", grid_fid, grid_count)
 
         shore_points_workspace = os.path.join(
-            _GRID_WORKSPACES, 'grid_%d' % grid_id)
+            _GRID_WORKSPACES, 'grid_%d' % grid_fid)
         grid_point_path = os.path.join(
-            shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_id))
+            shore_points_workspace, _GRID_POINT_FILE_PATTERN % (grid_fid))
 
         create_shore_points_task = task_graph.add_task(
             func=create_shore_points, args=(
-                global_grid_vector_path, grid_id, landmass_bounding_rtree_path,
+                global_grid_vector_path, grid_fid, landmass_bounding_rtree_path,
                 simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
@@ -257,10 +257,10 @@ def main():
             dependent_task_list=[grid_edges_of_vector_task, build_wwiii_task])
 
         wind_exposure_workspace = os.path.join(
-            _WIND_EXPOSURE_WORKSPACES, 'wind_exposure_%d' % grid_id)
+            _WIND_EXPOSURE_WORKSPACES, 'wind_exposure_%d' % grid_fid)
         target_wind_exposure_point_path = os.path.join(
             wind_exposure_workspace,
-            _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+            _WIND_EXPOSURE_POINT_FILE_PATTERN % grid_fid)
         wind_exposure_task = task_graph.add_task(
             func=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
@@ -278,10 +278,10 @@ def main():
             os.path.join(wind_exposure_workspace, 'fetch_rays.gpkg'))
 
         wave_exposure_workspace = os.path.join(
-            _WAVE_EXPOSURE_WORKSPACES, 'wave_exposure_%d' % grid_id)
+            _WAVE_EXPOSURE_WORKSPACES, 'wave_exposure_%d' % grid_fid)
         target_wave_exposure_point_path = os.path.join(
             wave_exposure_workspace,
-            _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_id)
+            _WAVE_EXPOSURE_POINT_FILE_PATTERN % grid_fid)
         wave_exposure_task = task_graph.add_task(
             func=calculate_wave_exposure, args=(
                 target_wind_exposure_point_path, _MAX_FETCH_DISTANCE,
@@ -295,10 +295,10 @@ def main():
             target_wave_exposure_point_path)
 
         habitat_protection_workspace = os.path.join(
-            _HABITAT_PROTECTION_WORKSPACES, 'habitat_protection_%d' % grid_id)
+            _HABITAT_PROTECTION_WORKSPACES, 'habitat_protection_%d' % grid_fid)
         target_habitat_protection_point_path = os.path.join(
             habitat_protection_workspace,
-            _HABITAT_PROTECTION_POINT_FILE_PATTERN % grid_id)
+            _HABITAT_PROTECTION_POINT_FILE_PATTERN % grid_fid)
         habitat_protection_task = task_graph.add_task(
             func=calculate_habitat_protection, args=(
                 grid_point_path,
@@ -313,9 +313,9 @@ def main():
             target_habitat_protection_point_path)
 
         relief_workspace = os.path.join(
-            _RELIEF_WORKSPACES, 'relief_%d' % grid_id)
+            _RELIEF_WORKSPACES, 'relief_%d' % grid_fid)
         target_relief_point_path = os.path.join(
-            relief_workspace, _RELIEF_POINT_FILE_PATTERN % grid_id)
+            relief_workspace, _RELIEF_POINT_FILE_PATTERN % grid_fid)
         relief_task = task_graph.add_task(
             func=calculate_relief, args=(
                 grid_point_path,
@@ -329,9 +329,9 @@ def main():
             target_relief_point_path)
 
         surge_workspace = os.path.join(
-            _SURGE_WORKSPACES, 'surge_%d' % grid_id)
+            _SURGE_WORKSPACES, 'surge_%d' % grid_fid)
         target_surge_point_vector_path = os.path.join(
-            surge_workspace, _SURGE_POINT_FILE_PATTERN % grid_id)
+            surge_workspace, _SURGE_POINT_FILE_PATTERN % grid_fid)
         surge_task = task_graph.add_task(
             func=calculate_surge, args=(
                 grid_point_path,
@@ -340,7 +340,7 @@ def main():
                 target_surge_point_vector_path),
             target_path_list=[target_surge_point_vector_path],
             dependent_task_list=[create_shore_points_task],
-            task_name='calculate surge %d' % grid_id)
+            task_name='calculate surge %d' % grid_fid)
         surge_task_list.append(surge_task)
         local_surge_path_list.append(
             target_surge_point_vector_path)
@@ -522,10 +522,8 @@ def aggregate_raster_data(
         geotransform = raster.GetGeoTransform()
         nodata = band.GetNoDataValue()
 
-        for point_feature_id in range(
-                target_result_point_layer.GetFeatureCount()):
-            point_feature = target_result_point_layer.GetFeature(
-                point_feature_id)
+        target_result_point_layer.ResetReading()
+        for point_feature in target_result_point_layer:
             point_geometry = point_feature.GetGeometryRef()
             point_x = point_geometry.GetX()
             point_y = point_geometry.GetY()
@@ -590,10 +588,8 @@ def aggregate_raster_data(
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
-    for point_feature_id in range(
-            target_result_point_layer.GetFeatureCount()):
-        point_feature = target_result_point_layer.GetFeature(
-            point_feature_id)
+    target_result_point_layer.ResetReading()
+    for point_feature in target_result_point_layer:
         point_feature.SetField(
             'SLRrise_c', point_feature.GetField(
                 'SLRrate_c') * 25. / 1000.)
@@ -628,7 +624,6 @@ def aggregate_raster_data(
         #Rt_ssp[1|3|5] = recalculated using Rhab_ssp[1|3|5] and Rslr_ssp[1|3|5]
         #Rt_cur_nh = Rt_cur calculated with Rhab = 5
         #Rt_ssp[1|3|5]_nh = Rt_ssp[1|3|5] calculated with Rhab = 5
-
 
         target_result_point_layer.SetFeature(point_feature)
 
@@ -724,8 +719,8 @@ def summarize_results(
         else:
             # it's already a risk
             target_risk_array = base_risk_values
-        for target_fid in range(len(target_risk_array)):
-            target_feature = target_result_point_layer.GetFeature(target_fid)
+        target_result_point_layer.ResetReading()
+        for target_feature in target_result_point_layer:
             target_feature.SetField(
                 risk_id, float(target_risk_array[target_fid]))
             target_result_point_layer.SetFeature(target_feature)
@@ -733,7 +728,7 @@ def summarize_results(
         target_result_point_layer.SyncToDisk()
 
     target_result_point_layer.ResetReading()
-    r_target_array = numpy.empty(target_result_point_layer.GetFeatureCount())
+    r_target_map = {}
     n_features = target_result_point_layer.GetFeatureCount()
     r_no_hab_target_array = numpy.empty(n_features)
     if n_features > 0:
@@ -746,12 +741,13 @@ def summarize_results(
                 target_feature.GetField(risk_id) for risk_id in risk_id_list
                 if risk_id != 'Rhab_cur'] + [5]
             r_no_hab = numpy.prod(r_no_hab_list)**(1./len(r_no_hab_list))
-            r_target_array[target_feature.GetFID()] = r_tot
+            r_target_map[target_feature.GetFID()] = r_tot
             r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
 
-        for fid in range(r_target_array.size):
-            target_feature = target_result_point_layer.GetFeature(fid)
-            target_feature.SetField('Rt_cur', r_target_array[fid])
+        target_result_point_layer.ResetReading()
+        for target_feature in target_result_point_layer:
+            target_feature.SetField(
+                'Rt_cur', r_target_map[target_feature.GetFID()])
             target_result_point_layer.SetFeature(target_feature)
 
     target_result_point_layer.SyncToDisk()
@@ -1838,7 +1834,7 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
 
 
 def create_shore_points(
-        sample_grid_vector_path, grid_id, landmass_bounding_rtree_path,
+        sample_grid_vector_path, grid_fid, landmass_bounding_rtree_path,
         landmass_vector_path, wwiii_vector_path, wwiii_rtree_path,
         smallest_feature_size,
         workspace_dir, target_shore_point_vector_path):
@@ -1848,7 +1844,7 @@ def create_shore_points(
         sample_grid_vector_path (string): path to vector containing grids
             that are used for discrete global sampling of the landmass
             polygon.
-        grid_id (integer): feature ID in `sample_grid_vector_path`'s layer to
+        grid_fid (integer): feature ID in `sample_grid_vector_path`'s layer to
             operate on.
         landmass_bounding_rtree_path (string): path to an rtree index that has
             bounding box indexes of the polygons in `landmass_vector_path`.
@@ -1870,7 +1866,7 @@ def create_shore_points(
         None.
     """
     logger = logging.getLogger('ipbes-cv.create_shore_points')
-    logger.info("Creating shore points for grid %s", grid_id)
+    logger.info("Creating shore points for grid %s", grid_fid)
     # create the spatial reference from the base vector
     landmass_spatial_reference = osr.SpatialReference()
     landmass_spatial_reference.ImportFromWkt(
@@ -1934,7 +1930,7 @@ def create_shore_points(
 
     grid_vector = ogr.Open(sample_grid_vector_path)
     grid_layer = grid_vector.GetLayer()
-    grid_feature = grid_layer.GetFeature(grid_id)
+    grid_feature = grid_layer.GetFeature(grid_fid)
     grid_geometry_ref = grid_feature.GetGeometryRef()
     grid_shapely = shapely.wkb.loads(grid_geometry_ref.ExportToWkb())
 
@@ -1970,7 +1966,7 @@ def create_shore_points(
 
     # clip global polygon to utm clipping box
     logger.info(
-        "clip global polygon to utm clipping box for grid %s", grid_id)
+        "clip global polygon to utm clipping box for grid %s", grid_fid)
     for feature_id in landmass_vector_rtree.intersection(
             lat_lng_clipping_box):
         base_feature = landmass_layer.GetFeature(feature_id)
@@ -2052,7 +2048,7 @@ def create_shore_points(
 
     logger.info(
         "Interpolating shore points with Wave Watch III data for grid %s",
-        grid_id)
+        grid_fid)
     feature_lookup = {}
     for offset_info, data_block in pygeoprocessing.iterblocks(
             shore_raster_path):
@@ -2121,7 +2117,7 @@ def create_shore_points(
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
     del feature_lookup
-    logger.info("All done with shore points for grid %s", grid_id)
+    logger.info("All done with shore points for grid %s", grid_fid)
 
 
 def grid_edges_of_vector(
