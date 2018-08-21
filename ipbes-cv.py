@@ -236,7 +236,7 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
-    for grid_id in xrange(grid_count):
+    for grid_id in range(grid_count):
         logger.info("Calculating grid %d of %d", grid_id, grid_count)
 
         shore_points_workspace = os.path.join(
@@ -520,7 +520,7 @@ def aggregate_raster_data(
         geotransform = raster.GetGeoTransform()
         nodata = band.GetNoDataValue()
 
-        for point_feature_id in xrange(
+        for point_feature_id in range(
                 target_result_point_layer.GetFeatureCount()):
             point_feature = target_result_point_layer.GetFeature(
                 point_feature_id)
@@ -588,7 +588,7 @@ def aggregate_raster_data(
             point_feature.SetField(simulation_id, float(pixel_value))
             target_result_point_layer.SetFeature(point_feature)
 
-    for point_feature_id in xrange(
+    for point_feature_id in range(
             target_result_point_layer.GetFeatureCount()):
         point_feature = target_result_point_layer.GetFeature(
             point_feature_id)
@@ -722,7 +722,7 @@ def summarize_results(
         else:
             # it's already a risk
             target_risk_array = base_risk_values
-        for target_fid in xrange(len(target_risk_array)):
+        for target_fid in range(len(target_risk_array)):
             target_feature = target_result_point_layer.GetFeature(target_fid)
             target_feature.SetField(
                 risk_id, float(target_risk_array[target_fid]))
@@ -747,7 +747,7 @@ def summarize_results(
             r_target_array[target_feature.GetFID()] = r_tot
             r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
 
-        for fid in xrange(r_target_array.size):
+        for fid in range(r_target_array.size):
             target_feature = target_result_point_layer.GetFeature(fid)
             target_feature.SetField('Rt_cur', r_target_array[fid])
             target_result_point_layer.SetFeature(target_feature)
@@ -1048,7 +1048,7 @@ def calculate_wave_exposure(
                     _N_FETCH_RAYS)
             e_ocean = 0.0
             e_local = 0.0
-            for sample_index in xrange(_N_FETCH_RAYS):
+            for sample_index in range(_N_FETCH_RAYS):
                 compass_degree = int(sample_index * 360 / 16.)
                 fdist = base_fetch_point_feature.GetField(
                     'fdist_%d' % compass_degree)
@@ -1264,7 +1264,7 @@ def calculate_wind_exposure(
         target_shore_point_layer = target_shore_point_vector.GetLayer()
         target_shore_point_layer.CreateField(
             ogr.FieldDefn('REI', ogr.OFTReal))
-        for ray_index in xrange(_N_FETCH_RAYS):
+        for ray_index in range(_N_FETCH_RAYS):
             compass_degree = int(ray_index * 360 / 16.)
             target_shore_point_layer.CreateField(
                 ogr.FieldDefn('fdist_%d' % compass_degree, ogr.OFTReal))
@@ -1278,7 +1278,7 @@ def calculate_wind_exposure(
                 target_shore_point_layer.GetFeatureCount())
             rei_value = 0.0
             # Iterate over every ray direction
-            for sample_index in xrange(_N_FETCH_RAYS):
+            for sample_index in range(_N_FETCH_RAYS):
                 compass_degree = int(sample_index * 360 / 16.)
                 compass_theta = float(sample_index) / _N_FETCH_RAYS * 360
                 rei_pct = shore_point_feature.GetField(
@@ -1789,13 +1789,13 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
     n_row_blocks = int(math.ceil(n_rows / float(rows_per_block)))
 
     integration = 0.0
-    for row_block_index in xrange(n_row_blocks):
+    for row_block_index in range(n_row_blocks):
         row_offset = row_block_index * rows_per_block
         row_block_width = n_rows - row_offset
         if row_block_width > rows_per_block:
             row_block_width = rows_per_block
 
-        for col_block_index in xrange(n_col_blocks):
+        for col_block_index in range(n_col_blocks):
             col_offset = col_block_index * cols_per_block
             col_block_width = n_cols - col_offset
             if col_block_width > cols_per_block:
@@ -1914,7 +1914,7 @@ def create_shore_points(
     wwiii_layer = wwiii_vector.GetLayer()
     wwiii_defn = wwiii_layer.GetLayerDefn()
     field_names = []
-    for field_index in xrange(wwiii_defn.GetFieldCount()):
+    for field_index in range(wwiii_defn.GetFieldCount()):
         field_defn = wwiii_defn.GetFieldDefn(field_index)
         field_name = field_defn.GetName()
         if field_name in ['I', 'J']:
@@ -2182,7 +2182,7 @@ def grid_edges_of_vector(
         'Cell coverage %.2f%% complete', logger)
 
     prepared_geometry = {}
-    for cell_index in xrange(n_rows * n_cols):
+    for cell_index in range(n_rows * n_cols):
         logger_callback(float(cell_index) / (n_rows * n_cols))
         row_index = cell_index / n_cols
         col_index = cell_index % n_cols
