@@ -26,14 +26,15 @@ LOGGER = logging.getLogger('ipbes-cv')
 LOGGER.setLevel(logging.DEBUG)
 
 POSSIBLE_DROPBOX_LOCATIONS = [
-    r'D:\Dropbox',
-    r'C:\Users\Rich\Dropbox',
-    r'C:\Users\rpsharp\Dropbox',
-    r'E:\Dropbox']
+    r'D:\Dropbox\ipbes_old',
+    r'C:\Users\Rich\Dropbox\ipbes_old',
+    r'C:\Users\rpsharp\Dropbox\ipbes_old',
+    r'E:\Dropbox\ipbes_old',
+    r'./Dropbox/ipbes_old']
 
 LOGGER.info("checking dropbox locations")
 for path in POSSIBLE_DROPBOX_LOCATIONS:
-    print path
+    LOGGER.debug(path)
     if os.path.exists(path):
         BASE_DROPBOX_DIR = path
         break
