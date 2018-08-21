@@ -13,6 +13,7 @@ from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
 
+
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
@@ -40,7 +41,11 @@ ROOT_CV_SHAPEFILE_PATH = os.path.join(
 EEZ_PATH = os.path.join(
     BASE_DROPBOX_DIR, 'ipbes stuff', 'summary table shapefile',
     'EEZv8_WVS_DIS_V3_ALL_final_v7disIPBES',
-    'EEZv8_WVS_DIS_V3_ALL_final_v7disIPBES.shp')
+    'EEZv8_WVS_DIS_V3_ALL_final_v7disIPBES_simple.shp')
+
+COUNTRY_VECTOR_PATH = os.path.join(
+    BASE_DROPBOX_DIR, 'ipbes stuff', 'summary table shapefile',
+    'TM_WORLD_BORDERS_SIMPL-0.3 (1)', 'TM_WORLD_BORDERS_SIMPL-0.3.shp')
 
 WORKSPACE_DIR = 'aggregate_nzpop_workspace'
 
@@ -53,6 +58,16 @@ def main():
     except OSError:
         pass
 
+    country_vector = gdal.OpenEx(COUNTRY_VECTOR_PATH, gdal.OF_VECTOR)
+    country_layer = country_vector.GetLayer()
+    country_map = {}
+    while True:
+        feature = country_layer.GetNextFeature()
+        if feature is None:
+            break
+        country_map[feature.GetField('NAME')] = shapely.wkb.loads(
+            feature.GetGeometryRef().ExportToWkb())
+
     eez_vector = gdal.OpenEx(EEZ_PATH, gdal.OF_VECTOR)
     eez_layer = eez_vector.GetLayer()
 
@@ -63,9 +78,10 @@ def main():
         if eez_feature is None:
             break
         eez_geom = eez_feature.GetGeometryRef()
-        shapely_eez_geom_prep = shapely.prepared.prep(shapely.wkb.loads(
-            eez_geom.ExportToWkb()))
+        shapely_eez_geom = shapely.wkb.loads(eez_geom.ExportToWkb())
         eez_geom = None
+        shapely_eez_geom_prep = shapely.prepared.prep(shapely_eez_geom)
+        shapely_eez_geom = None
         prep_poly_region_map[
             (eez_feature.GetField('IPBES_regi'),
              eez_feature.GetField('IPBES_sub'))] = shapely_eez_geom_prep
@@ -102,24 +118,36 @@ def main():
         target_layer.CreateField(ogr.FieldDefn(field_name, ogr.OFTReal))
 
     LOGGER.info('process file')
+    features_left = root_layer.GetFeatureCount()
     nonzero_count = 0
     while True:
+        LOGGER.info("features left %d", features_left)
+        features_left -= 1
         feature = root_layer.GetNextFeature()
         if feature is None:
             break
         if feature.GetField('pdnrc_ssp1') == 0.0:
             nonzero_count += 1
+            continue
         target_feature = ogr.Feature(target_layer.GetLayerDefn())
         geom = feature.GetGeometryRef()
         target_feature.SetGeometry(geom.Clone())
         shapely_point = shapely.wkb.loads(geom.ExportToWkb())
         geom = None
 
-        for (region, subregion), prepped_poly in prep_poly_region_map.iteritems():
-            if prepped_poly.contains(shapely_point):
-                target_feature.SetField('IPBES_regi', region)
-                target_feature.SetField('IPBES_sub', subregion)
-                break
+        nearest_country = min([
+            (country_geom.distance(shapely_point), country_id)
+            for country_id, country_geom in country_map.iteritems()])[1]
+        target_feature.SetField('country', nearest_country)
+
+        try:
+            for (region, subregion), prepped_poly in prep_poly_region_map.iteritems():
+                if prepped_poly.contains(shapely_point):
+                    target_feature.SetField('IPBES_regi', region)
+                    target_feature.SetField('IPBES_sub', subregion)
+                    break
+        except AttributeError:
+            pass
 
         for field_name in [
                 'cRtssp1', 'cRtssp3', 'cRtssp5', 'cSvRt_ssp1', 'cSvRt_ssp3',
