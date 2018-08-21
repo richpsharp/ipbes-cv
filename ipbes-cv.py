@@ -339,7 +339,8 @@ def main():
                 surge_workspace,
                 target_surge_point_vector_path),
             target_path_list=[target_surge_point_vector_path],
-            dependent_task_list=[create_shore_points_task])
+            dependent_task_list=[create_shore_points_task],
+            task_name='calculate surge %d' % grid_id)
         surge_task_list.append(surge_task)
         local_surge_path_list.append(
             target_surge_point_vector_path)
@@ -1749,6 +1750,7 @@ def calculate_surge(
 
     except Exception as e:
         traceback.print_exc()
+        LOGGER.exception('exception in calculating surge')
         raise
 
 def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
