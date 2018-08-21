@@ -6,6 +6,7 @@ import os
 import math
 import logging
 import re
+import multiprocessing
 
 import taskgraph
 import numpy
@@ -40,7 +41,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
-_N_CPUS = -1
+_N_CPUS = max(1, multiprocessing.cpu_count())
 
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
