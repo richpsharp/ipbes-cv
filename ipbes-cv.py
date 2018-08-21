@@ -656,7 +656,6 @@ def summarize_results(
     Returns:
         None
     """
-    logger = logging.getLogger('ipbes-cv.summarize_results')
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
 
@@ -701,6 +700,7 @@ def summarize_results(
     target_result_point_layer.SyncToDisk()
 
     for risk_factor_path, field_id, risk_id in risk_factor_vector_list:
+        LOGGER.debug("processing risk factor %s", risk_factor_path)
         risk_vector = ogr.Open(risk_factor_path)
         risk_layer = risk_vector.GetLayer()
         n_features = target_result_point_layer.GetFeatureCount()
