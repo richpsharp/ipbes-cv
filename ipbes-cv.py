@@ -103,27 +103,27 @@ _MAX_WWIII_DISTANCE = 5.0
 # Choosing just 16 fetch rays to make things run faster
 _N_FETCH_RAYS = 16
 
-_GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.shp'
+_GLOBAL_GRID_VECTOR_FILE_PATTERN = 'global_grid.gpkg'
 _LANDMASS_BOUNDING_RTREE_FILE_PATTERN = 'global_feature_index.dat'
 _GLOBAL_WWIII_RTREE_FILE_PATTERN = 'wwiii_rtree.dat'
-_GRID_POINT_FILE_PATTERN = 'grid_points_%d.shp'
-_WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.shp'
-_WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.shp'
-_HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.shp'
-_RELIEF_POINT_FILE_PATTERN = 'relief_%d.shp'
-_SURGE_POINT_FILE_PATTERN = 'surge_%d.shp'
-_SEA_LEVEL_POINT_FILE_PATTERN = 'sea_level_%d.shp'
-_GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.shp'
-_GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.shp'
-_GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.shp'
+_GRID_POINT_FILE_PATTERN = 'grid_points_%d.gpkg'
+_WIND_EXPOSURE_POINT_FILE_PATTERN = 'rei_points_%d.gpkg'
+_WAVE_EXPOSURE_POINT_FILE_PATTERN = 'wave_points_%d.gpkg'
+_HABITAT_PROTECTION_POINT_FILE_PATTERN = 'habitat_protection_points_%d.gpkg'
+_RELIEF_POINT_FILE_PATTERN = 'relief_%d.gpkg'
+_SURGE_POINT_FILE_PATTERN = 'surge_%d.gpkg'
+_SEA_LEVEL_POINT_FILE_PATTERN = 'sea_level_%d.gpkg'
+_GLOBAL_REI_POINT_FILE_PATTERN = 'global_rei_points.gpkg'
+_GLOBAL_WAVE_POINT_FILE_PATTERN = 'global_wave_points.gpkg'
+_GLOBAL_RELIEF_POINT_FILE_PATTERN = 'global_relief_points.gpkg'
 _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN = (
-    'global_habitat_protection_points.shp')
-_GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.shp'
-_GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.shp'
-_GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.shp'
-_GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.shp'
+    'global_habitat_protection_points.gpkg')
+_GLOBAL_SURGE_POINT_FILE_PATTERN = 'global_surge_points.gpkg'
+_GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.gpkg'
+_GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.gpkg'
+_GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.gpkg'
 _AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_risk_and_aggregate_analysis.shp')
+    'global_cv_risk_and_aggregate_analysis.gpkg')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     _TARGET_WORKSPACE, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -167,7 +167,7 @@ def main():
         task_name='build_wwiii_rtree')
 
     simplified_vector_path = os.path.join(
-        _TARGET_WORKSPACE, 'simplified_geometry.shp')
+        _TARGET_WORKSPACE, 'simplified_geometry.gpkg')
     # make an approximation of smallest feature size in degrees
     smallest_feature_size_degrees = 1. / 111000 * _SMALLEST_FEATURE_SIZE / 2.0
     simplify_geometry_task = task_graph.add_task(
@@ -184,7 +184,7 @@ def main():
             _GLOBAL_HABITAT_LAYER_PATHS.items()):
         smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
         simplified_habitat_vector_lookup[habitat_id] = (
-            os.path.join(_TARGET_WORKSPACE, '%s.shp' % habitat_id),
+            os.path.join(_TARGET_WORKSPACE, '%s.gpkg' % habitat_id),
             habitat_rank, habitat_dist)
         simplify_habitat_task = task_graph.add_task(
             func=simplify_geometry, args=(
@@ -275,7 +275,7 @@ def main():
         local_rei_point_path_list.append(
             target_wind_exposure_point_path)
         local_fetch_ray_path_list.append(
-            os.path.join(wind_exposure_workspace, 'fetch_rays.shp'))
+            os.path.join(wind_exposure_workspace, 'fetch_rays.gpkg'))
 
         wave_exposure_workspace = os.path.join(
             _WAVE_EXPOSURE_WORKSPACES, 'wave_exposure_%d' % grid_id)
@@ -488,7 +488,7 @@ def aggregate_raster_data(
         os.remove(target_result_point_vector_path)
     base_vector = ogr.Open(base_point_vector_path)
     ogr.GetDriverByName(
-        'ESRI Shapefile').CopyDataSource(
+        'GPKG').CopyDataSource(
             base_vector, target_result_point_vector_path)
     target_result_point_vector = ogr.Open(
         target_result_point_vector_path, 1)
@@ -666,8 +666,8 @@ def summarize_results(
     base_spatial_reference = osr.SpatialReference()
     base_spatial_reference.ImportFromWkt(base_ref_wkt)
 
-    esri_driver = ogr.GetDriverByName("ESRI Shapefile")
-    target_result_point_vector = esri_driver.CreateDataSource(
+    gpkg_driver = ogr.GetDriverByName("GPKG")
+    target_result_point_vector = gpkg_driver.CreateDataSource(
         target_result_point_vector_path)
     target_result_point_layer = target_result_point_vector.CreateLayer(
         os.path.splitext(os.path.basename(
@@ -781,9 +781,9 @@ def simplify_geometry(
     if os.path.exists(target_simplified_vector_path):
         os.remove(target_simplified_vector_path)
 
-    esri_driver = ogr.GetDriverByName('ESRI Shapefile')
+    gpkg_driver = ogr.GetDriverByName('GPKG')
 
-    target_simplified_vector = esri_driver.CreateDataSource(
+    target_simplified_vector = gpkg_driver.CreateDataSource(
         target_simplified_vector_path)
     target_simplified_layer = target_simplified_vector.CreateLayer(
         os.path.splitext(os.path.basename(target_simplified_vector_path))[0],
@@ -887,11 +887,11 @@ def calculate_habitat_protection(
             habitat_layer = habitat_vector.GetLayer()
 
             # this will hold the clipped landmass geometry
-            esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+            esri_shapefile_driver = ogr.GetDriverByName("GPKG")
             temp_clipped_vector_path = os.path.join(
-                workspace_dir, 'clipped_habitat_%s.shp' % habitat_id)
+                workspace_dir, 'clipped_habitat_%s.gpkg' % habitat_id)
             utm_clipped_vector_path = os.path.join(
-                workspace_dir, 'utm_clipped_habitat_%s.shp' % habitat_id)
+                workspace_dir, 'utm_clipped_habitat_%s.gpkg' % habitat_id)
             for path in [temp_clipped_vector_path, utm_clipped_vector_path]:
                 if os.path.exists(path):
                     os.remove(path)
@@ -943,7 +943,7 @@ def calculate_habitat_protection(
             habitat_shapely_lookup[habitat_id] = shapely.ops.cascaded_union(
                 clipped_geometry_shapely_list)
 
-        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        esri_shapefile_driver = ogr.GetDriverByName("GPKG")
         os.path.dirname(base_shore_point_vector_path)
         target_habitat_protection_point_vector = ogr.Open(
             target_habitat_protection_point_vector_path, 1)
@@ -1023,7 +1023,7 @@ def calculate_wave_exposure(
         base_spatial_reference = osr.SpatialReference()
         base_spatial_reference.ImportFromWkt(base_ref_wkt)
 
-        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        esri_shapefile_driver = ogr.GetDriverByName("GPKG")
         os.path.dirname(base_fetch_point_vector_path)
         target_wave_exposure_point_vector = (
             esri_shapefile_driver.CreateDataSource(
@@ -1102,9 +1102,9 @@ def calculate_wind_exposure(
         os.makedirs(workspace_dir)
 
         utm_clipped_vector_path = os.path.join(
-            workspace_dir, 'utm_clipped_landmass.shp')
+            workspace_dir, 'utm_clipped_landmass.gpkg')
         temp_fetch_rays_path = os.path.join(
-            workspace_dir, 'fetch_rays.shp')
+            workspace_dir, 'fetch_rays.gpkg')
 
         # reproject base_shore_point_vector_path to utm coordinates
         base_shore_info = pygeoprocessing.get_vector_info(
@@ -1156,9 +1156,9 @@ def calculate_wind_exposure(
         landmass_layer = landmass_vector.GetLayer()
 
         # this will hold the clipped landmass geometry
-        esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+        esri_shapefile_driver = ogr.GetDriverByName("GPKG")
         temp_clipped_vector_path = os.path.join(
-            workspace_dir, 'clipped_geometry_vector.shp')
+            workspace_dir, 'clipped_geometry_vector.gpkg')
         temp_clipped_vector = esri_shapefile_driver.CreateDataSource(
             temp_clipped_vector_path)
         temp_clipped_layer = (
@@ -1216,7 +1216,7 @@ def calculate_wind_exposure(
 
         # explode landmass into lines for easy intersection
         temp_polygon_segements_path = os.path.join(
-            workspace_dir, 'polygon_segments.shp')
+            workspace_dir, 'polygon_segments.gpkg')
         temp_polygon_segments_vector = esri_shapefile_driver.CreateDataSource(
             temp_polygon_segements_path)
         temp_polygon_segments_layer = (
@@ -1881,12 +1881,12 @@ def create_shore_points(
     os.makedirs(workspace_dir)
 
     lat_lng_clipped_vector_path = os.path.join(
-        workspace_dir, 'clipped_geometry_lat_lng.shp')
+        workspace_dir, 'clipped_geometry_lat_lng.gpkg')
     grid_raster_path = os.path.join(workspace_dir, 'grid.tif')
     convolution_raster_path = os.path.join(
         workspace_dir, 'convolution.tif')
     utm_clipped_vector_path = os.path.join(
-        workspace_dir, 'clipped_geometry_utm.shp')
+        workspace_dir, 'clipped_geometry_utm.gpkg')
     shore_kernel_path = os.path.join(
         workspace_dir, 'shore_kernel.tif')
     shore_raster_path = os.path.join(
@@ -1898,7 +1898,7 @@ def create_shore_points(
         if os.path.exists(path):
             os.remove(path)
 
-    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+    esri_shapefile_driver = ogr.GetDriverByName("GPKG")
 
     # this will hold the clipped landmass geometry
     lat_lng_clipped_vector = esri_shapefile_driver.CreateDataSource(
@@ -2159,8 +2159,8 @@ def grid_edges_of_vector(
     if os.path.exists(target_grid_vector_path):
         os.remove(target_grid_vector_path)
 
-    # create the target vector as an ESRI shapefile
-    esri_shapefile_driver = ogr.GetDriverByName("ESRI Shapefile")
+    # create the target vector as an GPKG
+    esri_shapefile_driver = ogr.GetDriverByName("GPKG")
     target_grid_vector = esri_shapefile_driver.CreateDataSource(
         target_grid_vector_path)
 
@@ -2392,14 +2392,14 @@ def merge_vectors(
     target_spatial_reference = osr.SpatialReference()
     target_spatial_reference.ImportFromWkt(target_spatial_reference_wkt)
 
-    esri_driver = ogr.GetDriverByName('ESRI Shapefile')
+    gpkg_driver = ogr.GetDriverByName('GPKG')
     if os.path.exists(target_merged_vector_path):
-        esri_driver.DeleteDataSource(target_merged_vector_path)
+        gpkg_driver.DeleteDataSource(target_merged_vector_path)
     base_vector = ogr.Open(base_vector_path_list[0])
     base_layer = base_vector.GetLayer()
     base_layer_defn = base_layer.GetLayerDefn()
 
-    target_vector = esri_driver.CreateDataSource(target_merged_vector_path)
+    target_vector = gpkg_driver.CreateDataSource(target_merged_vector_path)
     target_layer = target_vector.CreateLayer(
         target_merged_vector_path, srs=target_spatial_reference,
         geom_type=base_layer.GetGeomType())
