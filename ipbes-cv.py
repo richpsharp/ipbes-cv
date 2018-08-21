@@ -45,42 +45,42 @@ _N_CPUS = -1
 _TARGET_WORKSPACE = "ipbes_cv_workspace"
 _TARGET_NODATA = -1
 
-_GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\global_polygon\global_polygon.shp")
+_GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_polygon/global_polygon.shp")
 
-_GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\wave_watch_iii\WaveWatchIII.shp")
+_GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/wave_watch_iii/WaveWatchIII.shp")
 
-_GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\global_dem")
+_GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
 
-_GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif")
+_GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif")
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3\01_Data\14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
-    'saltmarsh': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\Datapack-14_001_WCMC027_Saltmarsh2017_v4\01_Data\14_001_WCMC027_Saltmarsh_py_v4.shp"), 2, 1000.0),
-    'coralreef': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC008_CoralReef2010_v1_3\01_Data\14_001_WCMC008_CoralReef2010_v1_3.shp"), 1, 2000.0),
-    'seagrass': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\cv\habitat\DataPack-14_001_WCMC013_014_SeagrassPtPy_v4\01_Data\WCMC_013_014_SeagrassesPy_v4.shp"), 4, 500.0),
+    'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3/01_Data/14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
+    'saltmarsh': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/Datapack-14_001_WCMC027_Saltmarsh2017_v4/01_Data/14_001_WCMC027_Saltmarsh_py_v4.shp"), 2, 1000.0),
+    'coralreef': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC008_CoralReef2010_v1_3/01_Data/14_001_WCMC008_CoralReef2010_v1_3.shp"), 1, 2000.0),
+    'seagrass': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC013_014_SeagrassPtPy_v4/01_Data/WCMC_013_014_SeagrassesPy_v4.shp"), 4, 500.0),
 }
 
 _AGGREGATION_LAYER_MAP = {
     'pdn_gpw': (
         os.path.join(
             BASE_DROPBOX_DIR,
-            r"ipbes-data\gpw-v4-population-count-2015\gpw-v4-population-count_2015.tif"), True, None, 0),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2050.tif"), True, None, 0),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP3_GeoTIFF\total\GeoTIFF\ssp3_2050.tif"), True, None, 0),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP5_GeoTIFF\total\GeoTIFF\ssp5_2050.tif"), True, None, 0),
-    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\Spatial_population_scenarios_GeoTIFF\SSP1_GeoTIFF\total\GeoTIFF\ssp1_2010.tif"), True, None, 0),
-    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\poverty_pct_1.tif"), False, None, 0),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 0),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 0),
-    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\Current2015\Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP1_RCP26\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP3_RCP70\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data\GLOBIO4_landuse_10sec_tifs_20171207_Idiv\SSP5_RCP85\Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 0),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 0),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 0),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 0),
+    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 0),
+    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/poverty_pct_1.tif"), False, None, 0),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 0),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 0),
+    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
+    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
     'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data\MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
+    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
 }
 
 # The global bounding box to do the entire analysis
