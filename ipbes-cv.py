@@ -156,7 +156,7 @@ def main():
 
     task_graph = taskgraph.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, _N_CPUS, reporting_interval=5.0,
-        delayed_start=_N_CPUS>=0)
+        delayed_start=False)
 
     wwiii_rtree_path = os.path.join(
         _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
