@@ -850,7 +850,7 @@ def calculate_habitat_protection(
 
         pygeoprocessing.reproject_vector(
             base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-            target_habitat_protection_point_vector_path)
+            target_habitat_protection_point_vector_path, driver_name='GPKG')
 
         utm_bounding_box = pygeoprocessing.get_vector_info(
             target_habitat_protection_point_vector_path)['bounding_box']
@@ -926,7 +926,7 @@ def calculate_habitat_protection(
 
             pygeoprocessing.reproject_vector(
                 temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-                utm_clipped_vector_path)
+                utm_clipped_vector_path, driver_name='GPKG')
 
             clipped_geometry_shapely_list = []
             temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
@@ -1118,7 +1118,7 @@ def calculate_wind_exposure(
 
         pygeoprocessing.reproject_vector(
             base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-            target_fetch_point_vector_path)
+            target_fetch_point_vector_path, driver_name='GPKG')
 
         utm_bounding_box = pygeoprocessing.get_vector_info(
             target_fetch_point_vector_path)['bounding_box']
@@ -1193,7 +1193,7 @@ def calculate_wind_exposure(
         logger.info("reprojecting grid %s", base_shore_point_vector_path)
         pygeoprocessing.reproject_vector(
             temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-            utm_clipped_vector_path)
+            utm_clipped_vector_path, driver_name='GPKG')
 
         clipped_geometry_shapely_list = []
         temp_utm_clipped_vector = ogr.Open(utm_clipped_vector_path)
@@ -1426,7 +1426,7 @@ def calculate_relief(
 
         pygeoprocessing.reproject_vector(
             base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-            target_relief_point_vector_path)
+            target_relief_point_vector_path, driver_name='GPKG')
 
         utm_bounding_box = pygeoprocessing.get_vector_info(
             target_relief_point_vector_path)['bounding_box']
@@ -1597,7 +1597,7 @@ def calculate_surge(
 
         pygeoprocessing.reproject_vector(
             base_shore_point_vector_path, utm_spatial_reference.ExportToWkt(),
-            target_surge_point_vector_path)
+            target_surge_point_vector_path, driver_name='GPKG')
 
         utm_bounding_box = pygeoprocessing.get_vector_info(
             target_surge_point_vector_path)['bounding_box']
@@ -1998,7 +1998,7 @@ def create_shore_points(
     # create grid for underlying local utm box
     pygeoprocessing.reproject_vector(
         lat_lng_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
-        utm_clipped_vector_path)
+        utm_clipped_vector_path, driver_name='GPKG')
 
     byte_nodata = 255
 
