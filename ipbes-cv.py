@@ -150,7 +150,6 @@ def main():
     logging.basicConfig(
         format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
         level=logging.WARN, datefmt='%m/%d/%Y %H:%M:%S ')
-    logger = logging.getLogger('ipbes-cv.main')
     if not os.path.exists(_TARGET_WORKSPACE):
         os.makedirs(_TARGET_WORKSPACE)
 
@@ -237,8 +236,8 @@ def main():
     local_relief_path_list = []
     surge_task_list = []
     local_surge_path_list = []
-    for grid_fid in grid_fid_list:
-        logger.info("Calculating grid %d of %d", grid_fid, grid_count)
+    for g_index, grid_fid in enumerate(grid_fid_list):
+        LOGGER.info("Calculating grid %d of %d", g_index, len(grid_fid_list))
 
         shore_points_workspace = os.path.join(
             _GRID_WORKSPACES, 'grid_%d' % grid_fid)
@@ -575,7 +574,7 @@ def aggregate_raster_data(
                     else:
                         pixel_value = 0
                 except Exception:
-                    logger.error(
+                    LOGGER.error(
                         'band size %d %d', band.XSize,
                         band.YSize)
                     raise
@@ -770,7 +769,6 @@ def simplify_geometry(
     Returns:
         None
     """
-    logger = logging.getLogger('ipbes-cv.simplify_geometry')
     base_vector = ogr.Open(base_vector_path)
     base_layer = base_vector.GetLayer()
 
@@ -821,7 +819,6 @@ def calculate_habitat_protection(
         None.
     """
     try:
-        logger = logging.getLogger('ipbes-cv.calculate_habitat_protection')
         if not os.path.exists(os.path.dirname(
                 target_habitat_protection_point_vector_path)):
             os.makedirs(
@@ -913,7 +910,7 @@ def calculate_habitat_protection(
                     temp_clipped_layer.CreateFeature(clipped_feature)
                     clipped_feature = None
                 except Exception:
-                    logger.warn(
+                    LOGGER.warn(
                         "Couldn't process this intersection %s",
                         intersection_shapely)
             temp_clipped_layer.SyncToDisk()
@@ -1092,7 +1089,6 @@ def calculate_wind_exposure(
         None
     """
     try:
-        logger = logging.getLogger('ipbes-cv.calculate_wind_exposure')
         if os.path.exists(workspace_dir):
             shutil.rmtree(workspace_dir)
         os.makedirs(workspace_dir)
@@ -1179,14 +1175,14 @@ def calculate_wind_exposure(
                 temp_clipped_layer.CreateFeature(clipped_feature)
                 clipped_feature = None
             except Exception:
-                logger.warn(
+                LOGGER.warn(
                     "Couldn't process this intersection %s", intersection_shapely)
         temp_clipped_layer.SyncToDisk()
         temp_clipped_layer = None
         temp_clipped_vector = None
 
         # project global clipped polygons to UTM
-        logger.info("reprojecting grid %s", base_shore_point_vector_path)
+        LOGGER.info("reprojecting grid %s", base_shore_point_vector_path)
         pygeoprocessing.reproject_vector(
             temp_clipped_vector_path, utm_spatial_reference.ExportToWkt(),
             utm_clipped_vector_path, driver_name='GPKG')
@@ -1395,7 +1391,6 @@ def calculate_relief(
         None.
     """
     try:
-        logger = logging.getLogger('ipbes-cv.calculate_relief')
         if not os.path.exists(os.path.dirname(
                 target_relief_point_vector_path)):
             os.makedirs(
@@ -1532,7 +1527,7 @@ def calculate_relief(
                     xoff=pixel_x, yoff=pixel_y, win_xsize=1,
                     win_ysize=1)[0, 0]
             except Exception:
-                logger.error(
+                LOGGER.error(
                     'relief_band size %d %d', relief_band.XSize,
                     relief_band.YSize)
                 raise
@@ -1566,7 +1561,6 @@ def calculate_surge(
         None.
     """
     try:
-        logger = logging.getLogger('ipbes-cv.calculate_surge')
         if not os.path.exists(os.path.dirname(
                 target_surge_point_vector_path)):
             os.makedirs(
@@ -1865,8 +1859,7 @@ def create_shore_points(
     Returns:
         None.
     """
-    logger = logging.getLogger('ipbes-cv.create_shore_points')
-    logger.info("Creating shore points for grid %s", grid_fid)
+    LOGGER.info("Creating shore points for grid %s", grid_fid)
     # create the spatial reference from the base vector
     landmass_spatial_reference = osr.SpatialReference()
     landmass_spatial_reference.ImportFromWkt(
@@ -1965,7 +1958,7 @@ def create_shore_points(
     lat_lng_clipping_shapely = shapely.geometry.box(*lat_lng_clipping_box)
 
     # clip global polygon to utm clipping box
-    logger.info(
+    LOGGER.info(
         "clip global polygon to utm clipping box for grid %s", grid_fid)
     for feature_id in landmass_vector_rtree.intersection(
             lat_lng_clipping_box):
@@ -1984,7 +1977,7 @@ def create_shore_points(
             target_feature = None
             target_geometry = None
         except Exception:
-            logger.warn(
+            LOGGER.warn(
                 "Couldn't process this intersection %s",
                 intersection_shapely)
     lat_lng_clipped_layer.SyncToDisk()
@@ -2046,7 +2039,7 @@ def create_shore_points(
     wwiii_rtree = rtree.index.Index(wwiii_rtree_base_path)
     wwiii_field_lookup = {}
 
-    logger.info(
+    LOGGER.info(
         "Interpolating shore points with Wave Watch III data for grid %s",
         grid_fid)
     feature_lookup = {}
@@ -2117,7 +2110,7 @@ def create_shore_points(
                 target_shore_point_layer.CreateFeature(shore_point_feature)
                 shore_point_feature = None
     del feature_lookup
-    logger.info("All done with shore points for grid %s", grid_fid)
+    LOGGER.info("All done with shore points for grid %s", grid_fid)
 
 
 def grid_edges_of_vector(
@@ -2143,8 +2136,7 @@ def grid_edges_of_vector(
         done_token_path (string): path to a file to create when the function
             is complete.
     """
-    logger = logging.getLogger('ipbes-cv.grid_edges_of_vector')
-    logger.info("Building global grid.")
+    LOGGER.info("Building global grid.")
     n_rows = int((
         base_bounding_box[3]-base_bounding_box[1]) / float(
             target_grid_size))
@@ -2274,10 +2266,9 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     # the input path has a .dat extension, but the `rtree` package only uses
     # the basename.  It's a quirk of the library, so we'll deal with it by
     # cutting off the extension.
-    logger = logging.getLogger('ipbes-cv.build_feature_bounding_box_rtree')
     global_feature_index_base = os.path.splitext(
         target_rtree_path)[0]
-    logger.info("Building rtree index at %s", global_feature_index_base)
+    LOGGER.info("Building rtree index at %s", global_feature_index_base)
     if os.path.exists(target_rtree_path):
         for ext in ['.dat', '.idx']:
             os.remove(global_feature_index_base + ext)
@@ -2338,7 +2329,7 @@ def _make_logger_callback(message, logger):
             if ((current_time - logger_callback.last_time) > 5.0 or
                     (proportion_complete == 1.0 and
                      logger_callback.total_time >= 5.0)):
-                logger.info(message, proportion_complete * 100)
+                LOGGER.info(message, proportion_complete * 100)
                 logger_callback.last_time = current_time
                 logger_callback.total_time += current_time
         except AttributeError:
@@ -2384,7 +2375,6 @@ def merge_vectors(
     Returns:
         None
     """
-    logger = logging.getLogger('ipbes-cv.merge_vectors')
     target_spatial_reference = osr.SpatialReference()
     target_spatial_reference.ImportFromWkt(target_spatial_reference_wkt)
 
