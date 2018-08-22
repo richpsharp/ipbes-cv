@@ -515,8 +515,9 @@ def aggregate_raster_data(
 
     for simulation_id, (raster_path, divide_by_area, reclass_ids, extra_pixel) in (
             raster_feature_id_map.items()):
-        LOGGER.debug("processing for aggregation %s", raster_path)
         raster = gdal.Open(raster_path)
+        if not raster:
+            LOGGER.debug("processing for aggregation %s failed", raster_path)
         band = raster.GetRasterBand(1)
         n_rows = band.YSize
         n_cols = band.XSize
