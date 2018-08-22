@@ -1265,7 +1265,7 @@ def calculate_wind_exposure(
                 ogr.FieldDefn('fdist_%d' % compass_degree, ogr.OFTReal))
 
         shore_point_logger = _make_logger_callback(
-            "Wind exposure %.2f%% complete.", logger)
+            "Wind exposure %.2f%% complete.", LOGGER)
         # Iterate over every shore point
         for shore_point_feature in target_shore_point_layer:
             shore_point_logger(
@@ -2174,7 +2174,7 @@ def grid_edges_of_vector(
         os.path.splitext(base_feature_bounding_box_rtree_path)[0])
 
     logger_callback = _make_logger_callback(
-        'Cell coverage %.2f%% complete', logger)
+        'Cell coverage %.2f%% complete', LOGGER)
 
     prepared_geometry = {}
     for cell_index in range(n_rows * n_cols):
@@ -2280,7 +2280,7 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
     n_features = global_layer.GetFeatureCount()
 
     logger_callback = _make_logger_callback(
-        'rTree construction %.2f%% complete', logger)
+        'rTree construction %.2f%% complete', LOGGER)
 
     for feature_index, global_feature in enumerate(global_layer):
         feature_geometry = global_feature.GetGeometryRef()
