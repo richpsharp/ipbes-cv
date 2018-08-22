@@ -730,7 +730,7 @@ def summarize_results(
     target_result_point_layer.ResetReading()
     r_target_map = {}
     n_features = target_result_point_layer.GetFeatureCount()
-    r_no_hab_target_array = numpy.empty(n_features)
+    r_no_hab_target_array = {}
     if n_features > 0:
         for target_feature in target_result_point_layer:
             r_list = [
