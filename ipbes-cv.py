@@ -1730,10 +1730,10 @@ def calculate_surge(
             if len(nearest_point) > 0:
                 distance = nearest_point[0].distance(point_shapely)
                 point_feature.SetField('surge', float(distance))
-                target_relief_point_layer.SetFeature(point_feature)
             else:
                 # so far away it's essentially not an issue
                 point_feature.SetField('surge', 0.0)
+            target_relief_point_layer.SetFeature(point_feature)
 
         target_relief_point_layer.SyncToDisk()
         target_relief_point_layer = None
