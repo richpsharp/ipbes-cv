@@ -439,7 +439,7 @@ def main():
         target_path_list=[target_result_point_vector_path],
         dependent_task_list=merge_vectors_task_list)
 
-    ##### aggregate raster data
+    # aggregate raster data
 
     target_raster_aggregate_point_vector_path = os.path.join(
         _TARGET_WORKSPACE, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
@@ -482,6 +482,7 @@ def aggregate_raster_data(
 
     Returns:
         None.
+
     """
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
