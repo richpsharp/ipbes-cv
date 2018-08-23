@@ -632,8 +632,10 @@ def aggregate_raster_data(
 
         mem_result_point_layer.SetFeature(point_feature)
     mem_result_point_layer.CommitTransaction()
+    mem_result_point_layer.SyncToDisk()
+    mem_result_point_layer = None
     gdal.GetDriverByName('GPKG').CreateCopy(
-        target_result_point_vector_path, mem_result_point_layer)
+        target_result_point_vector_path, mem_result_point_vector)
 
         # convert SLRrate_1|3|5 = slr_rcp[26|60|85] * 1000 / 95.
         # SLRrise_c = SLRrate_c * 25 / 1000
