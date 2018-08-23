@@ -706,8 +706,11 @@ def summarize_results(
     target_result_point_layer.CommitTransaction()
     target_result_point_layer.SyncToDisk()
 
-    for risk_factor_path, field_id, risk_id in risk_factor_vector_list:
-        LOGGER.debug("processing risk factor %s", risk_factor_path)
+    for risk_count, (risk_factor_path, field_id, risk_id) in enumerate(
+            risk_factor_vector_list):
+        LOGGER.debug(
+            "processing risk factor %d of %d %s", risk_count+1,
+            target_result_point_layer.GetFeatureCount(), risk_factor_path)
         risk_vector = ogr.Open(risk_factor_path)
         risk_layer = risk_vector.GetLayer()
         n_features = target_result_point_layer.GetFeatureCount()
@@ -734,7 +737,7 @@ def summarize_results(
             target_risk_array = base_risk_values
         target_result_point_layer.ResetReading()
         target_result_point_layer.StartTransaction()
-        for target_index in range(fid_index_map):
+        for target_index in range(len(fid_index_map)):
             target_fid = fid_index_map[target_index]
             target_feature = target_result_point_layer.GetFeature(
                 target_fid)
