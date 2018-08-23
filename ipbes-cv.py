@@ -437,7 +437,8 @@ def main():
         func=summarize_results, args=(
             risk_factor_vector_list, target_result_point_vector_path),
         target_path_list=[target_result_point_vector_path],
-        dependent_task_list=merge_vectors_task_list)
+        dependent_task_list=merge_vectors_task_list,
+        task_name='summarize results')
 
     # aggregate raster data
 
@@ -486,36 +487,35 @@ def aggregate_raster_data(
     """
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
-    base_vector = ogr.Open(base_point_vector_path)
-    ogr.GetDriverByName(
-        'GPKG').CopyDataSource(
-            base_vector, target_result_point_vector_path)
-    target_result_point_vector = ogr.Open(
-        target_result_point_vector_path, 1)
+    base_vector = gdal.OpenEx(base_point_vector_path, gdal.OF_VECTOR)
+    mem_result_point_vector = ogr.GetDriverByName('MEMORY').CopyDataSource(
+        '', base_vector)
 
-    target_result_point_layer = target_result_point_vector.GetLayer()
+    mem_result_point_layer = mem_result_point_vector.GetLayer()
     for simulation_id in raster_feature_id_map:
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn(simulation_id, ogr.OFTReal))
 
     # this is for sea level rise
-    target_result_point_layer.CreateField(
+    mem_result_point_layer.CreateField(
         ogr.FieldDefn('SLRrise_c', ogr.OFTReal))
     for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn('SLRrate_%d' % ssp_id, ogr.OFTReal))
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn('SLRrise_%d' % ssp_id, ogr.OFTReal))
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn('Rhab_ssp%d' % ssp_id, ogr.OFTReal))
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn('curpb_ssp%d' % ssp_id, ogr.OFTReal))
-        target_result_point_layer.CreateField(
+        mem_result_point_layer.CreateField(
             ogr.FieldDefn('cpdn_ssp%d' % ssp_id, ogr.OFTReal))
 
-    for simulation_id, (raster_path, divide_by_area, reclass_ids, extra_pixel) in (
+    for simulation_id, (
+                raster_path, divide_by_area, reclass_ids, extra_pixel) in (
             raster_feature_id_map.items()):
         raster = gdal.Open(raster_path)
+        LOGGER.debug("processing aggregation %s", simulation_id)
         if not raster:
             LOGGER.debug("processing for aggregation %s failed", raster_path)
         band = raster.GetRasterBand(1)
@@ -524,8 +524,9 @@ def aggregate_raster_data(
         geotransform = raster.GetGeoTransform()
         nodata = band.GetNoDataValue()
 
-        target_result_point_layer.ResetReading()
-        for point_feature in target_result_point_layer:
+        mem_result_point_layer.ResetReading()
+        mem_result_point_layer.StartTransaction()
+        for point_feature in mem_result_point_layer:
             point_geometry = point_feature.GetGeometryRef()
             point_x = point_geometry.GetX()
             point_y = point_geometry.GetY()
@@ -588,10 +589,12 @@ def aggregate_raster_data(
                     (lat_m * geotransform[5])) / 1e6
                 pixel_value /= pixel_area_km
             point_feature.SetField(simulation_id, float(pixel_value))
-            target_result_point_layer.SetFeature(point_feature)
+            mem_result_point_layer.SetFeature(point_feature)
+        mem_result_point_layer.CommitTransaction()
 
-    target_result_point_layer.ResetReading()
-    for point_feature in target_result_point_layer:
+    mem_result_point_layer.ResetReading()
+    mem_result_point_layer.StartTransaction()
+    for point_feature in mem_result_point_layer:
         point_feature.SetField(
             'SLRrise_c', point_feature.GetField(
                 'SLRrate_c') * 25. / 1000.)
@@ -627,12 +630,15 @@ def aggregate_raster_data(
         #Rt_cur_nh = Rt_cur calculated with Rhab = 5
         #Rt_ssp[1|3|5]_nh = Rt_ssp[1|3|5] calculated with Rhab = 5
 
-        target_result_point_layer.SetFeature(point_feature)
-
+        mem_result_point_layer.SetFeature(point_feature)
+    mem_result_point_layer.CommitTransaction()
+    gdal.GetDriverByName('GPKG').CreateCopy(
+        target_result_point_vector_path, mem_result_point_layer)
 
         # convert SLRrate_1|3|5 = slr_rcp[26|60|85] * 1000 / 95.
         # SLRrise_c = SLRrate_c * 25 / 1000
         # SLRrise_|1|3|5] = slr_rcp[26|60|85]
+
 
 def summarize_results(
         risk_factor_vector_list, target_result_point_vector_path):
@@ -685,6 +691,8 @@ def summarize_results(
     risk_factor_vector = ogr.Open(risk_factor_vector_list[0][0])
     risk_factor_layer = risk_factor_vector.GetLayer()
     target_fid = 0
+    target_result_point_layer.StartTransaction()
+    LOGGER.debug("copying layer")
     for base_point_feature in risk_factor_layer:
         grid_id = base_point_feature.GetField('grid_id')
         point_id = base_point_feature.GetField('point_id')
@@ -695,6 +703,7 @@ def summarize_results(
             base_point_feature.GetGeometryRef().Clone())
         target_result_point_layer.CreateFeature(target_feature)
 
+    target_result_point_layer.CommitTransaction()
     target_result_point_layer.SyncToDisk()
 
     for risk_factor_path, field_id, risk_id in risk_factor_vector_list:
@@ -705,13 +714,15 @@ def summarize_results(
         if n_features == 0:
             continue
         base_risk_values = numpy.empty(n_features)
+        fid_index_map = {}
         risk_feature = None
-        for risk_feature in risk_layer:
+        for feature_index, risk_feature in enumerate(risk_layer):
             risk_value = risk_feature.GetField(field_id)
             point_id = risk_feature.GetField('point_id')
             grid_id = risk_feature.GetField('grid_id')
             target_fid = fid_lookup[(grid_id, point_id)]
-            base_risk_values[target_fid] = float(risk_value)
+            fid_index_map[feature_index] = target_fid
+            base_risk_values[feature_index] = float(risk_value)
         # use the last feature to get the grid_id
         if field_id != risk_id:
             # convert to risk
@@ -722,11 +733,16 @@ def summarize_results(
             # it's already a risk
             target_risk_array = base_risk_values
         target_result_point_layer.ResetReading()
-        for target_feature in target_result_point_layer:
+        target_result_point_layer.StartTransaction()
+        for target_index in range(fid_index_map):
+            target_fid = fid_index_map[target_index]
+            target_feature = target_result_point_layer.GetFeature(
+                target_fid)
             target_feature.SetField(
-                risk_id, float(target_risk_array[target_fid]))
+                risk_id, float(target_risk_array[target_index]))
             target_result_point_layer.SetFeature(target_feature)
             target_feature = None
+        target_result_point_layer.CommitTransaction()
         target_result_point_layer.SyncToDisk()
 
     target_result_point_layer.ResetReading()
@@ -734,6 +750,7 @@ def summarize_results(
     n_features = target_result_point_layer.GetFeatureCount()
     r_no_hab_target_array = {}
     if n_features > 0:
+        LOGGER.debug("calculating final risks")
         for target_feature in target_result_point_layer:
             r_list = [
                 target_feature.GetField(risk_id) for risk_id in risk_id_list]
@@ -747,10 +764,12 @@ def summarize_results(
             r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
 
         target_result_point_layer.ResetReading()
+        target_result_point_layer.StartTransaction()
         for target_feature in target_result_point_layer:
             target_feature.SetField(
                 'Rt_cur', r_target_map[target_feature.GetFID()])
             target_result_point_layer.SetFeature(target_feature)
+        target_result_point_layer.CommitTransaction()
 
     target_result_point_layer.SyncToDisk()
     target_result_point_vector.SyncToDisk()
