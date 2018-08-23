@@ -690,14 +690,12 @@ def summarize_results(
     fid_lookup = {}
     risk_factor_vector = ogr.Open(risk_factor_vector_list[0][0])
     risk_factor_layer = risk_factor_vector.GetLayer()
-    target_fid = 0
     target_result_point_layer.StartTransaction()
     LOGGER.debug("copying layer")
     for base_point_feature in risk_factor_layer:
         grid_id = base_point_feature.GetField('grid_id')
         point_id = base_point_feature.GetField('point_id')
-        fid_lookup[(grid_id, point_id)] = target_fid
-        target_fid += 1
+        fid_lookup[(grid_id, point_id)] = base_point_feature.GetFID()
         target_feature = ogr.Feature(target_result_point_layer_defn)
         target_feature.SetGeometry(
             base_point_feature.GetGeometryRef().Clone())
@@ -710,7 +708,7 @@ def summarize_results(
             risk_factor_vector_list):
         LOGGER.debug(
             "processing risk factor %d of %d %s", risk_count+1,
-            target_result_point_layer.GetFeatureCount(), risk_factor_path)
+            target_result_point_vector.GetLayerCount(), risk_factor_path)
         risk_vector = ogr.Open(risk_factor_path)
         risk_layer = risk_vector.GetLayer()
         n_features = target_result_point_layer.GetFeatureCount()
