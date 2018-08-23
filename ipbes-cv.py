@@ -488,7 +488,7 @@ def aggregate_raster_data(
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
     base_vector = gdal.OpenEx(base_point_vector_path, gdal.OF_VECTOR)
-    mem_result_point_vector = ogr.GetDriverByName('MEMORY').CopyDataSource(
+    mem_result_point_vector = gdal.GetDriverByName('MEMORY').CreateCopy(
         '', base_vector)
 
     mem_result_point_layer = mem_result_point_vector.GetLayer()
