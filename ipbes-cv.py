@@ -712,6 +712,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
                 r_tot = numpy.prod(r_list)**(1./len(r_list))
             # calculate risk with no habitat
             target_feature.SetField(risk_id, float(r_tot))
+            target_result_point_layer.SetFeature(target_feature)
         target_result_point_layer.CommitTransaction()
 
 
