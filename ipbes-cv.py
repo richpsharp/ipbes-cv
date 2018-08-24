@@ -704,7 +704,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
                 r_list = numpy.array([
                     target_feature.GetField(risk_id)
                     if isinstance(risk_id, str) else risk_id
-                    for risk_id in risk_id_list])
+                    for risk_id in risk_list])
                 r_tot = numpy.prod(r_list)**(1./len(r_list))
             # calculate risk with no habitat
             target_feature.SetField(risk_id, float(r_tot))
