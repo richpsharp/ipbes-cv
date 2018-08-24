@@ -697,7 +697,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
     for risk_id, _ in risk_id_list:
         target_result_point_layer.CreateField(ogr.FieldDefn(
             risk_id, ogr.OFTReal))
-    target_result_point_layer.FlushCache()
+    target_result_point_layer.SyncToDisk()
     target_result_point_layer.ResetReading()
     n_features = target_result_point_layer.GetFeatureCount()
     if n_features > 0:
