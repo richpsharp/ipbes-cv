@@ -649,13 +649,13 @@ def aggregate_raster_data(
     for point_index in range(n_points):
         point_feature = mem_result_point_layer.GetFeature(
             fid_index_map[point_index])
-        point_feature.SetField('Rslr_cur', slr_risk_array[point_index])
+        point_feature.SetField('Rslr_cur', float(slr_risk_array[point_index]))
         point_feature.SetField(
-            'Rslr_ssp1', slr_risk_array[point_index+n_points])
+            'Rslr_ssp1', float(slr_risk_array[point_index+n_points]))
         point_feature.SetField(
-            'Rslr_ssp3', slr_risk_array[point_index+n_points*2])
+            'Rslr_ssp3', float(slr_risk_array[point_index+n_points*2]))
         point_feature.SetField(
-            'Rslr_ssp5', slr_risk_array[point_index+n_points*3])
+            'Rslr_ssp5', float(slr_risk_array[point_index+n_points*3]))
         mem_result_point_layer.SetFeature(point_feature)
     mem_result_point_layer.CommitTransaction()
     mem_result_point_layer.SyncToDisk()
@@ -1021,9 +1021,10 @@ def calculate_habitat_protection(
 
             # Equation 4
             target_feature.SetField(
-                'Rhab_cur', 4.8 - 0.5 * (
-                    (1.5 * (5-min_rank))**2 +
-                    sum_sq_rank - (5-min_rank)**2)**0.5)
+                'Rhab_cur', max(
+                    1.0, 4.8 - 0.5 * (
+                        (1.5 * (5-min_rank))**2 +
+                        sum_sq_rank - (5-min_rank)**2)**0.5))
             target_feature.SetGeometry(target_feature_geometry)
             target_habitat_protection_point_layer.SetFeature(
                 target_feature)
