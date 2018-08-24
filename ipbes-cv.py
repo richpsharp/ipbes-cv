@@ -81,7 +81,7 @@ _AGGREGATION_LAYER_MAP = {
     'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
     'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'SLRrate_c': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
+    'SLRrate_cur': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
 }
 
 # The global bounding box to do the entire analysis
@@ -498,16 +498,20 @@ def aggregate_raster_data(
 
     # this is for sea level rise
     mem_result_point_layer.CreateField(
-        ogr.FieldDefn('SLRrise_c', ogr.OFTReal))
+        ogr.FieldDefn('SLRrise_cur', ogr.OFTReal))
+    mem_result_point_layer.CreateField(
+        ogr.FieldDefn('Rslr_cur', ogr.OFTReal))
     for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
         mem_result_point_layer.CreateField(
-            ogr.FieldDefn('SLRrise_%d' % ssp_id, ogr.OFTReal))
+            ogr.FieldDefn('SLRrise_ssp%d' % ssp_id, ogr.OFTReal))
         mem_result_point_layer.CreateField(
             ogr.FieldDefn('Rhab_ssp%d' % ssp_id, ogr.OFTReal))
         mem_result_point_layer.CreateField(
             ogr.FieldDefn('curpb_ssp%d' % ssp_id, ogr.OFTReal))
         mem_result_point_layer.CreateField(
             ogr.FieldDefn('cpdn_ssp%d' % ssp_id, ogr.OFTReal))
+        mem_result_point_layer.CreateField(
+            ogr.FieldDefn('Rslr_ssp%d' % ssp_id, ogr.OFTReal))
 
     for simulation_id, (
                 raster_path, divide_by_area, reclass_ids, extra_pixel) in (
@@ -592,14 +596,27 @@ def aggregate_raster_data(
 
     mem_result_point_layer.ResetReading()
     mem_result_point_layer.StartTransaction()
-    for point_feature in mem_result_point_layer:
-        point_feature.SetField(
-            'SLRrise_c', point_feature.GetField(
-                'SLRrate_c') * 25. / 1000.)
-        for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
-            point_feature.SetField(
-                'SLRrise_%d' % ssp_id, point_feature.GetField(
-                    'slr_rcp%d' % rcp_id))
+    # use this list to calculate risks
+
+    # this list is used to hold all the sea level rise values for cur, ssp1,
+    # 3, and 5, hence the length of *4 for the list. it so we can calculate
+    # a constant rank for all of them.
+    n_points = mem_result_point_layer.GetFeatureCount()
+    slr_rise_value_list = numpy.empty(n_points*4)
+    fid_index_map = {}
+    LOGGER.debug('gathering all the sea level rise data')
+    for point_index, point_feature in enumerate(mem_result_point_layer):
+        slrrise_val = point_feature.GetField('SLRrate_cur') * 25. / 1000.
+        point_feature.SetField('SLRrise_cur', slrrise_val)
+        slr_rise_value_list[point_index] = slrrise_val
+        fid_index_map[point_index] = point_feature.GetFID()
+        for ssp_offset, (ssp_id, rcp_id) in enumerate(
+                [(1, 26), (3, 60), (5, 85)]):
+            slrrise_val = point_feature.GetField('slr_rcp%d' % rcp_id)
+            # this offsets the index by n_points * whatever ssp it is in order
+            slr_rise_value_list[point_index + (ssp_offset+1)*n_points] = (
+                slrrise_val)
+            point_feature.SetField('SLRrise_ssp%d' % ssp_id, slrrise_val)
 
             point_feature.SetField(
                 'Rhab_ssp%d' % ssp_id, (
@@ -624,7 +641,21 @@ def aggregate_raster_data(
         #Rt_ssp[1|3|5] = recalculated using Rhab_ssp[1|3|5] and Rslr_ssp[1|3|5]
         #Rt_cur_nh = Rt_cur calculated with Rhab = 5
         #Rt_ssp[1|3|5]_nh = Rt_ssp[1|3|5] calculated with Rhab = 5
-
+        mem_result_point_layer.SetFeature(point_feature)
+    LOGGER.debug('calculating Rslr')
+    slr_risk_array = numpy.searchsorted(
+        numpy.percentile(slr_rise_value_list, [20, 40, 60, 80, 100]),
+        slr_rise_value_list) + 1
+    for point_index in range(n_points):
+        point_feature = mem_result_point_layer.GetFeature(
+            fid_index_map[point_index])
+        point_feature.SetField('Rslr_cur', slr_risk_array[point_index])
+        point_feature.SetField(
+            'Rslr_ssp1', slr_risk_array[point_index+n_points])
+        point_feature.SetField(
+            'Rslr_ssp3', slr_risk_array[point_index+n_points*2])
+        point_feature.SetField(
+            'Rslr_ssp5', slr_risk_array[point_index+n_points*3])
         mem_result_point_layer.SetFeature(point_feature)
     mem_result_point_layer.CommitTransaction()
     mem_result_point_layer.SyncToDisk()
