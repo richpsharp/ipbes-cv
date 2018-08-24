@@ -663,9 +663,52 @@ def aggregate_raster_data(
     gdal.GetDriverByName('GPKG').CreateCopy(
         target_result_point_vector_path, mem_result_point_vector)
 
-        # convert SLRrate_1|3|5 = slr_rcp[26|60|85] * 1000 / 95.
-        # SLRrise_c = SLRrate_c * 25 / 1000
-        # SLRrise_|1|3|5] = slr_rcp[26|60|85]
+    final_risk_list = [
+        (('Rt_cur'), ('Rhab_cur', 'Rslr_cur', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rt_ssp1'), ('Rhab_ssp1', 'Rslr_ssp1', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rt_ssp3'), ('Rhab_ssp3', 'Rslr_ssp3', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rt_ssp5'), ('Rhab_ssp5', 'Rslr_ssp5', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rtnohab_cur'), (5, 'Rslr_cur', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rtnohab_ssp1'), (5, 'Rslr_ssp1', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rtnohab_ssp3'), (5, 'Rslr_ssp3', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge')),
+        (('Rtnohab_ssp5'), (5, 'Rslr_ssp5', 'Rwind', 'Rwave', 'Rrelief', 'Rsurge'))]
+    calculate_final_risk(final_risk_list, target_result_point_vector_path)
+
+
+def calculate_final_risk(risk_id_list, target_point_vector_path):
+    """Calculate the final Rt and Rtnohabs for cur, ssp1, 3, and 5.
+
+    Parameters:
+        base_risk_field_id_list (list): a list of tuples of the form
+        (Rt_[cur|ssp{1,3,5}], (list of risk feature ids or constants))
+        target_point_vector_path (string): path to vector to modify. Will contain
+            at least the fields defined in
+
+            Rt_cur, Rt_ssp1, Rt_ssp3, Rt_ssp5
+            Rtnohab_cur, Rtnohab_ssp1, Rtnohab_ssp3, Rtnohab_ssp5
+
+    Returns:
+        None.
+
+    """
+    target_point_vector = gdal.OpenEx(
+        target_point_vector_path, gdal.OF_VECTOR | gdal.GA_Update)
+    target_result_point_layer = target_point_vector.GetLayer()
+    target_result_point_layer.ResetReading()
+    n_features = target_result_point_layer.GetFeatureCount()
+    if n_features > 0:
+        LOGGER.debug("calculating final risks")
+        target_result_point_layer.StartTransaction()
+        for target_feature in target_result_point_layer:
+            for risk_id, risk_list in risk_id_list:
+                r_list = [
+                    target_feature.GetField(risk_id)
+                    if isinstance(risk_id, str) else risk_id
+                    for risk_id in risk_id_list]
+                r_tot = numpy.prod(r_list)**(1./len(r_list))
+            # calculate risk with no habitat
+            target_feature.SetField(risk_id, float(r_tot))
+        target_result_point_layer.CommitTransaction()
 
 
 def summarize_results(
@@ -687,6 +730,7 @@ def summarize_results(
 
     Returns:
         None
+
     """
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
@@ -773,35 +817,6 @@ def summarize_results(
             target_feature = None
         target_result_point_layer.CommitTransaction()
         target_result_point_layer.SyncToDisk()
-
-    target_result_point_layer.ResetReading()
-    r_target_map = {}
-    n_features = target_result_point_layer.GetFeatureCount()
-    r_no_hab_target_array = {}
-    if n_features > 0:
-        LOGGER.debug("calculating final risks")
-        for target_feature in target_result_point_layer:
-            r_list = [
-                target_feature.GetField(risk_id) for risk_id in risk_id_list]
-            r_tot = numpy.prod(r_list)**(1./len(r_list))
-            # calculate risk with no habitat
-            r_no_hab_list = [
-                target_feature.GetField(risk_id) for risk_id in risk_id_list
-                if risk_id != 'Rhab_cur'] + [5]
-            r_no_hab = numpy.prod(r_no_hab_list)**(1./len(r_no_hab_list))
-            r_target_map[target_feature.GetFID()] = r_tot
-            r_no_hab_target_array[target_feature.GetFID()] = r_no_hab
-
-        target_result_point_layer.ResetReading()
-        target_result_point_layer.StartTransaction()
-        for target_feature in target_result_point_layer:
-            target_feature.SetField(
-                'Rt_cur', r_target_map[target_feature.GetFID()])
-            target_result_point_layer.SetFeature(target_feature)
-        target_result_point_layer.CommitTransaction()
-
-    target_result_point_layer.SyncToDisk()
-    target_result_point_vector.SyncToDisk()
     target_result_point_layer = None
     target_result_point_vector = None
 
