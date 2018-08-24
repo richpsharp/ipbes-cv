@@ -501,8 +501,6 @@ def aggregate_raster_data(
         ogr.FieldDefn('SLRrise_c', ogr.OFTReal))
     for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
         mem_result_point_layer.CreateField(
-            ogr.FieldDefn('SLRrate_%d' % ssp_id, ogr.OFTReal))
-        mem_result_point_layer.CreateField(
             ogr.FieldDefn('SLRrise_%d' % ssp_id, ogr.OFTReal))
         mem_result_point_layer.CreateField(
             ogr.FieldDefn('Rhab_ssp%d' % ssp_id, ogr.OFTReal))
@@ -599,9 +597,6 @@ def aggregate_raster_data(
             'SLRrise_c', point_feature.GetField(
                 'SLRrate_c') * 25. / 1000.)
         for ssp_id, rcp_id in [(1, 26), (3, 60), (5, 85)]:
-            point_feature.SetField(
-                'SLRrate_%d' % ssp_id, point_feature.GetField(
-                    'slr_rcp%d' % rcp_id) * 1000. / 95.)
             point_feature.SetField(
                 'SLRrise_%d' % ssp_id, point_feature.GetField(
                     'slr_rcp%d' % rcp_id))
