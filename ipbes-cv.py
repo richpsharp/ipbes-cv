@@ -694,6 +694,10 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
     target_point_vector = gdal.OpenEx(
         target_point_vector_path, gdal.OF_VECTOR | gdal.GA_Update)
     target_result_point_layer = target_point_vector.GetLayer()
+    for risk_id, _ in risk_id_list:
+        target_result_point_layer.CreateField(ogr.FieldDefn(
+            risk_id, ogr.OFTReal))
+    target_result_point_layer.FlushCache()
     target_result_point_layer.ResetReading()
     n_features = target_result_point_layer.GetFeatureCount()
     if n_features > 0:
@@ -753,9 +757,6 @@ def summarize_results(
         target_result_point_layer.CreateField(ogr.FieldDefn(
             risk_id, ogr.OFTReal))
         risk_id_list.append(risk_id)
-    target_result_point_layer.CreateField(ogr.FieldDefn(
-        'Rt_cur', ogr.OFTReal))
-
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
     # define initial geometry and fid lookup
