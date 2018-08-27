@@ -786,7 +786,7 @@ def summarize_results(
     tm_world_borders_path = os.path.join(
         ECOSHARD_DIR, 'TM_WORLD_BORDERS-0.3.shp')
     LOGGER.debug("build country spatial index")
-    country_rtree, country_geom_list = build_spatial_index(
+    country_rtree, country_geom_fid_map = build_spatial_index(
         tm_world_borders_path)
     country_vector = gdal.OpenEx(tm_world_borders_path, gdal.OF_VECTOR)
     country_layer = country_vector.GetLayer()
@@ -834,10 +834,11 @@ def summarize_results(
             target_geom.GetX(), target_geom.GetY()]
         # picking 4 because that seems pretty reasonable for nearest countries
         intersection_list = list(country_rtree.nearest(bounds, 4))
-        min_feature_index = intersection_list[0][0]
-        min_dist = intersection_list[0][1].Distance(target_geom)
-        for feature_index, feature_geom in intersection_list[1::]:
-            dist = feature_geom.Distance(target_geom)
+        min_feature_index = intersection_list[0]
+        min_dist = country_geom_fid_map[min_feature_index].Distance(
+            target_geom)
+        for feature_index in intersection_list[1::]:
+            dist = country_geom_fid_map[feature_index].Distance(target_geom)
             if dist < min_dist:
                 min_dist = dist
                 min_feature_index = feature_index
@@ -2689,14 +2690,13 @@ def build_spatial_index(vector_path):
     vector = gdal.OpenEx(vector_path)
     layer = vector.GetLayer()
     geom_index = rtree.index.Index()
-    geom_list = []
-    for index in range(layer.GetFeatureCount()):
-        feature = layer.GetFeature(index)
+    geom_fid_dict = {}
+    for feature in layer:
         geom = feature.GetGeometryRef()
         shapely_geom = shapely.wkb.loads(geom.ExportToWkb())
-        geom_list.append(shapely_geom)
-        geom_index.insert(index, shapely_geom.bounds)
-    return geom_index, geom_list
+        geom_fid_dict[feature.GetFID()] = shapely_geom
+        geom_index.insert(feature.GetFID(), shapely_geom.bounds)
+    return geom_index, geom_fid_dict
 
 
 if __name__ == '__main__':
