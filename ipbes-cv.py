@@ -828,17 +828,15 @@ def summarize_results(
         target_feature = ogr.Feature(target_result_point_layer_defn)
         target_feature.SetGeometry(
             base_point_feature.GetGeometryRef().Clone())
-        target_geom = target_feature.GetGeometryRef()
-        bounds = [
-            target_geom.GetX(), target_geom.GetY(),
-            target_geom.GetX(), target_geom.GetY()]
+        point_geom = shapely.wkb.ImportFromWkb(
+            target_feature.GetGeometryRef().ExportToWkb())
         # picking 4 because that seems pretty reasonable for nearest countries
-        intersection_list = list(country_rtree.nearest(bounds, 4))
+        intersection_list = list(country_rtree.nearest(point_geom.bounds, 4))
         min_feature_index = intersection_list[0]
         min_dist = country_geom_fid_map[min_feature_index].distance(
-            target_geom)
+            point_geom)
         for feature_index in intersection_list[1::]:
-            dist = country_geom_fid_map[feature_index].distance(target_geom)
+            dist = country_geom_fid_map[feature_index].distance(point_geom)
             if dist < min_dist:
                 min_dist = dist
                 min_feature_index = feature_index
