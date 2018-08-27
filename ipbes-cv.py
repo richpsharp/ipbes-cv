@@ -835,10 +835,10 @@ def summarize_results(
         # picking 4 because that seems pretty reasonable for nearest countries
         intersection_list = list(country_rtree.nearest(bounds, 4))
         min_feature_index = intersection_list[0]
-        min_dist = country_geom_fid_map[min_feature_index].Distance(
+        min_dist = country_geom_fid_map[min_feature_index].distance(
             target_geom)
         for feature_index in intersection_list[1::]:
-            dist = country_geom_fid_map[feature_index].Distance(target_geom)
+            dist = country_geom_fid_map[feature_index].distance(target_geom)
             if dist < min_dist:
                 min_dist = dist
                 min_feature_index = feature_index
