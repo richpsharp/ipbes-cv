@@ -11,6 +11,8 @@ import re
 import multiprocessing
 import zipfile
 
+import google.cloud.client
+import google.cloud.storage
 import reproduce
 import taskgraph
 import numpy
