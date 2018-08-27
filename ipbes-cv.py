@@ -1,4 +1,6 @@
 """IPBES global coastal vulnerability calculation."""
+import pandas
+import sys
 import traceback
 import shutil
 import time
@@ -7,7 +9,9 @@ import math
 import logging
 import re
 import multiprocessing
+import zipfile
 
+import reproduce
 import taskgraph
 import numpy
 from osgeo import gdal
@@ -41,9 +45,16 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
         break
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
+try:
+    GOOGLE_BUCKET_KEY_PATH = os.path.normpath(sys.argv[1])
+except IndexError:
+    raise RuntimeError("Expected command line argument of path to bucket key")
+
 _N_CPUS = max(1, multiprocessing.cpu_count())
 
-_TARGET_WORKSPACE = "ipbes_cv_workspace"
+WORKING_DIR = "ipbes_cv_workspace"
+ECOSHARD_DIR = os.path.join(WORKING_DIR, 'ecoshard_dir')
+
 _TARGET_NODATA = -1
 
 _GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_polygon/global_polygon.shp")
@@ -125,21 +136,21 @@ _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.gpkg'
 _AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
     'global_cv_risk_and_aggregate_analysis.gpkg')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
-    _TARGET_WORKSPACE, 'work_tokens')
+    WORKING_DIR, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'wind_exposure_workspaces')
+    WORKING_DIR, 'wind_exposure_workspaces')
 _WAVE_EXPOSURE_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'wave_exposure_workspaces')
+    WORKING_DIR, 'wave_exposure_workspaces')
 _HABITAT_PROTECTION_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'habitat_protection_workspaces')
+    WORKING_DIR, 'habitat_protection_workspaces')
 _RELIEF_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'relief_workspaces')
+    WORKING_DIR, 'relief_workspaces')
 _GRID_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'grid_workspaces')
+    WORKING_DIR, 'grid_workspaces')
 _SURGE_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'surge_workspaces')
+    WORKING_DIR, 'surge_workspaces')
 _SEA_LEVEL_WORKSPACES = os.path.join(
-    _TARGET_WORKSPACE, 'sea_level_workspaces')
+    WORKING_DIR, 'sea_level_workspaces')
 
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
@@ -150,15 +161,40 @@ def main():
     logging.basicConfig(
         format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
         level=logging.WARN, datefmt='%m/%d/%Y %H:%M:%S ')
-    if not os.path.exists(_TARGET_WORKSPACE):
-        os.makedirs(_TARGET_WORKSPACE)
+    if not os.path.exists(WORKING_DIR):
+        os.makedirs(WORKING_DIR)
 
     task_graph = taskgraph.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, _N_CPUS, reporting_interval=5.0,
         delayed_start=False)
 
+    tm_world_borders_basedata_url = (
+        'https://storage.cloud.google.com/ecoshard-root/ipbes/'
+        'TM_WORLD_BORDERS_SIMPL-0.3_md5_15057f7b17752048f9bd2e2e607fe99c.zip')
+    tm_world_borders_zipfile_path = os.path.join(
+        ECOSHARD_DIR, os.path.basename(tm_world_borders_basedata_url))
+    tm_world_borders_basedata_fetch_task = task_graph.add_task(
+        func=google_bucket_fetch_and_validate,
+        args=(
+            tm_world_borders_basedata_url, GOOGLE_BUCKET_KEY_PATH,
+            tm_world_borders_zipfile_path),
+        target_path_list=[tm_world_borders_zipfile_path],
+        task_name=f'fetch {os.path.basename(tm_world_borders_zipfile_path)}')
+    zip_touch_file_path = os.path.join(
+        os.path.dirname(tm_world_borders_zipfile_path),
+        'tm_world_borders_basedata_zip.txt')
+    __ = task_graph.add_task(
+        func=unzip_file,
+        args=(
+            tm_world_borders_zipfile_path, os.path.dirname(
+                tm_world_borders_zipfile_path),
+            zip_touch_file_path),
+        target_path_list=[zip_touch_file_path],
+        dependent_task_list=[tm_world_borders_basedata_fetch_task],
+        task_name=f'unzip tm_world_borders_basedata_zip')
+
     wwiii_rtree_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
 
     build_wwiii_task = task_graph.add_task(
         func=build_wwiii_rtree,
@@ -166,7 +202,7 @@ def main():
         task_name='build_wwiii_rtree')
 
     simplified_vector_path = os.path.join(
-        _TARGET_WORKSPACE, 'simplified_geometry.gpkg')
+        WORKING_DIR, 'simplified_geometry.gpkg')
     # make an approximation of smallest feature size in degrees
     smallest_feature_size_degrees = 1. / 111000 * _SMALLEST_FEATURE_SIZE / 2.0
     simplify_geometry_task = task_graph.add_task(
@@ -183,7 +219,7 @@ def main():
             _GLOBAL_HABITAT_LAYER_PATHS.items()):
         smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
         simplified_habitat_vector_lookup[habitat_id] = (
-            os.path.join(_TARGET_WORKSPACE, '%s.gpkg' % habitat_id),
+            os.path.join(WORKING_DIR, '%s.gpkg' % habitat_id),
             habitat_rank, habitat_dist)
         simplify_habitat_task = task_graph.add_task(
             func=simplify_geometry, args=(
@@ -195,7 +231,7 @@ def main():
         simplify_habitat_task_list.append(simplify_habitat_task)
 
     landmass_bounding_rtree_path = os.path.join(
-        _TARGET_WORKSPACE, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
+        WORKING_DIR, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
 
     build_rtree_task = task_graph.add_task(
         func=build_feature_bounding_box_rtree,
@@ -205,7 +241,7 @@ def main():
         task_name='simplify_geometry_landmass')
 
     global_grid_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_GRID_VECTOR_FILE_PATTERN)
 
     grid_edges_of_vector_task = task_graph.add_task(
         func=grid_edges_of_vector, args=(
@@ -349,7 +385,7 @@ def main():
     merge_vectors_task_list = []
     risk_factor_vector_list = []
     target_habitat_protection_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_HABITAT_PROTECTION_FILE_PATTERN)
     merge_habitat_protection_point_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_habitat_protection_path_list,
@@ -363,7 +399,7 @@ def main():
     merge_vectors_task_list.append(merge_habitat_protection_point_task)
 
     target_merged_rei_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_REI_POINT_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_REI_POINT_FILE_PATTERN)
     merge_rei_point_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_rei_point_path_list,
@@ -377,7 +413,7 @@ def main():
         (target_merged_rei_points_path, 'REI', 'Rwind'))
 
     target_merged_wave_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_WAVE_POINT_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_WAVE_POINT_FILE_PATTERN)
     merge_wave_point_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_wave_point_path_list,
@@ -391,7 +427,7 @@ def main():
     merge_vectors_task_list.append(merge_wave_point_task)
 
     target_merged_relief_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_RELIEF_POINT_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_RELIEF_POINT_FILE_PATTERN)
     merge_relief_point_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_relief_path_list,
@@ -405,7 +441,7 @@ def main():
     merge_vectors_task_list.append(merge_relief_point_task)
 
     target_merged_surge_points_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_SURGE_POINT_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_SURGE_POINT_FILE_PATTERN)
     merge_surge_task = task_graph.add_task(
         func=merge_vectors, args=(
             local_surge_path_list,
@@ -419,7 +455,7 @@ def main():
     merge_vectors_task_list.append(merge_surge_task)
 
     target_merged_fetch_rays_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_FETCH_RAY_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_FETCH_RAY_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
         _GLOBAL_POLYGON_PATH)['projection']
     _ = task_graph.add_task(
@@ -432,7 +468,7 @@ def main():
         dependent_task_list=wind_exposure_task_list)
 
     target_result_point_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN)
+        WORKING_DIR, _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN)
     summarize_results_task = task_graph.add_task(
         func=summarize_results, args=(
             risk_factor_vector_list, target_result_point_vector_path),
@@ -443,7 +479,7 @@ def main():
     # aggregate raster data
 
     target_raster_aggregate_point_vector_path = os.path.join(
-        _TARGET_WORKSPACE, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
+        WORKING_DIR, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
 
     # the 5000 means sample out 5km around a given point
     aggregate_data_task = task_graph.add_task(
@@ -739,6 +775,20 @@ def summarize_results(
     if os.path.exists(target_result_point_vector_path):
         os.remove(target_result_point_vector_path)
 
+    countries_myregions_df = pandas.read_csv(
+        'countries_myregions_final_md5_7e35a0775335f9aaf9a28adbac0b8895.csv',
+        usecols=['country', 'myregions'], sep=',')
+    country_to_region_dict = {
+        row[1][1]: row[1][0] for row in countries_myregions_df.iterrows()}
+
+    tm_world_borders_path = os.path.join(
+        ECOSHARD_DIR, 'TM_WORLD_BORDERS-0.3.shp')
+    LOGGER.debug("build country spatial index")
+    country_rtree, country_geom_list = build_spatial_index(
+        tm_world_borders_path)
+    country_vector = gdal.OpenEx(tm_world_borders_path, gdal.OF_VECTOR)
+    country_layer = country_vector.GetLayer()
+
     base_point_vector_path = risk_factor_vector_list[0][0]
     base_ref_wkt = pygeoprocessing.get_vector_info(
         base_point_vector_path)['projection']
@@ -757,6 +807,10 @@ def summarize_results(
         target_result_point_layer.CreateField(ogr.FieldDefn(
             risk_id, ogr.OFTReal))
         risk_id_list.append(risk_id)
+    target_result_point_layer.CreateField(
+        ogr.FieldDefn('country', ogr.OFTString))
+    target_result_point_layer.CreateField(
+        ogr.FieldDefn('region', ogr.OFTString))
     target_result_point_layer_defn = target_result_point_layer.GetLayerDefn()
 
     # define initial geometry and fid lookup
@@ -772,6 +826,27 @@ def summarize_results(
         target_feature = ogr.Feature(target_result_point_layer_defn)
         target_feature.SetGeometry(
             base_point_feature.GetGeometryRef().Clone())
+        target_geom = target_feature.GetGeometryRef()
+        bounds = [
+            target_geom.GetX(), target_geom.GetY(),
+            target_geom.GetX(), target_geom.GetY()]
+        # picking 4 because that seems pretty reasonable for nearest countries
+        intersection_list = list(country_rtree.nearest(bounds, 4))
+        min_feature_index = intersection_list[0][0]
+        min_dist = intersection_list[0][1].Distance(target_geom)
+        for feature_index, feature_geom in intersection_list[1::]:
+            dist = feature_geom.Distance(target_geom)
+            if dist < min_dist:
+                min_dist = dist
+                min_feature_index = feature_index
+        country_name = country_layer.GetFeature(
+            min_feature_index).GetField('name')
+        target_feature.SetField('country', country_name)
+        try:
+            target_feature.SetField(
+                'region', country_to_region_dict[country_name])
+        except KeyError:
+            target_feature.SetField('region', 'UNKNOWN')
         target_result_point_layer.CreateFeature(target_feature)
 
     target_result_point_layer.CommitTransaction()
@@ -2548,6 +2623,78 @@ def lat_to_meters(lat):
         (p1 * math.cos(lat)) + (p2 * math.cos(3 * lat)) + (p3 * math.cos(5 * lat)))
 
     return (longlen, latlen)
+
+
+def unzip_file(zipfile_path, target_dir, touchfile_path):
+    """Unzip contents of `zipfile_path`.
+
+    Parameters:
+        zipfile_path (string): path to a zipped file.
+        target_dir (string): path to extract zip file to.
+        touchfile_path (string): path to a file to create if unzipping is
+            successful.
+
+    Returns:
+        None.
+
+    """
+    with zipfile.ZipFile(zipfile_path, 'r') as zip_ref:
+        zip_ref.extractall(target_dir)
+
+    with open(touchfile_path, 'w') as touchfile:
+        touchfile.write(f'unzipped {zipfile_path}')
+
+
+def google_bucket_fetch_and_validate(url, json_key_path, target_path):
+    """Create a function to download a Google Blob to a given path.
+
+    Parameters:
+        url (string): url to blob, matches the form
+            '^https://storage.cloud.google.com/([^/]*)/(.*)$'
+        json_key_path (string): path to Google Cloud private key generated by
+        https://cloud.google.com/iam/docs/creating-managing-service-account-keys
+        target_path (string): path to target file.
+
+    Returns:
+        a function with a single `path` argument to the target file. Invoking
+            this function will download the Blob to `path`.
+
+    """
+    url_matcher = re.match(
+        r'^https://[^/]*\.com/([^/]*)/(.*)$', url)
+    LOGGER.debug(url)
+    client = google.cloud.storage.client.Client.from_service_account_json(
+        json_key_path)
+    bucket_id = url_matcher.group(1)
+    LOGGER.debug(f'parsing bucket {bucket_id} from {url}')
+    bucket = client.get_bucket(bucket_id)
+    blob_id = url_matcher.group(2)
+    LOGGER.debug(f'loading blob {blob_id} from {url}')
+    blob = google.cloud.storage.Blob(
+        blob_id, bucket, chunk_size=2**24)
+    LOGGER.info(f'downloading blob {target_path} from {url}')
+    try:
+        os.makedirs(os.path.dirname(target_path))
+    except os.error:
+        pass
+    blob.download_to_filename(target_path)
+    if not reproduce.valid_hash(target_path, 'embedded'):
+        raise ValueError(f"{target_path}' does not match its expected hash")
+
+
+def build_spatial_index(vector_path):
+    """Build an rtree/geom list tuple from ``vector_path``."""
+    vector = gdal.OpenEx(vector_path)
+    layer = vector.GetLayer()
+    geom_index = rtree.index.Index()
+    geom_list = []
+    for index in range(layer.GetFeatureCount()):
+        feature = layer.GetFeature(index)
+        geom = feature.GetGeometryRef()
+        shapely_geom = shapely.wkb.loads(geom.ExportToWkb())
+        geom_list.append(shapely_geom)
+        geom_index.insert(index, shapely_geom.bounds)
+    return geom_index, geom_list
 
 
 if __name__ == '__main__':
