@@ -136,7 +136,7 @@ _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.gpkg'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.gpkg'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.gpkg'
 _AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_risk_and_aggregate_analysis.gpkg')
+    'global_cv_risk_and_aggregate_analysis.sqlite')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     WORKING_DIR, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -551,6 +551,21 @@ def aggregate_raster_data(
         mem_result_point_layer.CreateField(
             ogr.FieldDefn('Rslr_ssp%d' % ssp_id, ogr.OFTReal))
 
+    # recalibrated population fields for each ssp
+    for ssp_id in (1, 3, 5):
+        mem_result_point_layer.CreateField(
+            ogr.FieldDefn('pdnrc_ssp%d' % ssp_id))
+
+    for scenario_id in ['cur', 'ssp1', 'ssp3', 'ssp5']:
+        mem_result_point_layer.CreateField(
+            ogr.FieldDefn('Service_%s' % scenario_id))
+        mem_result_point_layer.CreateField(
+            ogr.FieldDefn('NCP_%s' % scenario_id))
+
+    #UPDATE cv_table SET pdnrc_ssp1 = pdn_gpw * cpdn_ssp1;
+    #UPDATE cv_table SET Service_cur = Rtnohab_cur - Rt_cur;
+    #UPDATE cv_table SET NCP_cur = Service_cur / Rtnohab_cur;
+
     for simulation_id, (
                 raster_path, divide_by_area, reclass_ids, extra_pixel) in (
             raster_feature_id_map.items()):
@@ -698,7 +713,7 @@ def aggregate_raster_data(
     mem_result_point_layer.CommitTransaction()
     mem_result_point_layer.SyncToDisk()
     mem_result_point_layer = None
-    gdal.GetDriverByName('GPKG').CreateCopy(
+    gdal.GetDriverByName('sqlite').CreateCopy(
         target_result_point_vector_path, mem_result_point_vector)
 
     final_risk_list = [
@@ -749,6 +764,27 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
                     for risk_id in risk_list])
                 r_tot = numpy.prod(r_list)**(1./len(r_list))
                 target_feature.SetField(risk_id, float(r_tot))
+
+            pdn_gpw = target_feature.GetField('pdn_gpw')
+            #UPDATE cv_table SET pdnrc_ssp1 = pdn_gpw * cpdn_ssp1;
+            for ssp_id in (1, 3, 5):
+                cpdn_ssp = target_feature.GetField('cpdn_ssp%d' % ssp_id)
+                if pdn_gpw and cpdn_ssp:
+                    target_feature.SetField(
+                        'pdnrc_ssp%d' % ssp_id, pdn_gpw*cpdn_ssp)
+
+            #UPDATE cv_table SET Service_cur = Rtnohab_cur - Rt_cur;
+            #UPDATE cv_table SET NCP_cur = Service_cur / Rtnohab_cur;
+            for scenario_id in ('cur', 'ssp1', 'ssp3', 'ssp5'):
+                rtnohab = target_feature.GetField('Rtnohab_%s' % scenario_id)
+                rt = target_feature.GetField('Rt_%s' % scenario_id)
+                if rtnohab and rt:
+                    service = rtnohab - rt
+                    target_feature.SetField(
+                        'Serivce_%s' % scenario_id, service)
+                    target_feature.SetField(
+                        'NCP_%s' % scenario_id, service / rtnohab)
+
             target_result_point_layer.SetFeature(target_feature)
         target_result_point_layer.CommitTransaction()
 
@@ -911,6 +947,7 @@ def simplify_geometry(
 
     Returns:
         None
+
     """
     base_vector = ogr.Open(base_vector_path)
     base_layer = base_vector.GetLayer()
@@ -958,8 +995,10 @@ def calculate_habitat_protection(
             output vector.  after completion will have a rank for each
             habitat ID, and a field called Rhab with a value from 1-5
             indicating relative level of protection of that point.
+
     Returns:
         None.
+
     """
     try:
         if not os.path.exists(os.path.dirname(
@@ -1123,9 +1162,10 @@ def calculate_habitat_protection(
         target_habitat_protection_point_layer.SyncToDisk()
         target_habitat_protection_point_layer = None
         target_habitat_protection_point_vector = None
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise
+
 
 def calculate_wave_exposure(
         base_fetch_point_vector_path, max_fetch_distance, workspace_dir,
@@ -1145,6 +1185,7 @@ def calculate_wave_exposure(
 
     Returns:
         None
+
     """
     # this will hold the clipped landmass geometry
     try:
@@ -1201,9 +1242,10 @@ def calculate_wave_exposure(
                     e_local += e_local_wedge
             target_feature.SetField('Ew', max(e_ocean, e_local))
             target_wave_exposure_point_layer.CreateFeature(target_feature)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise
+
 
 def calculate_wind_exposure(
         base_shore_point_vector_path,
@@ -1231,6 +1273,7 @@ def calculate_wind_exposure(
 
     Returns:
         None
+
     """
     try:
         if os.path.exists(workspace_dir):
@@ -1511,7 +1554,7 @@ def calculate_wind_exposure(
         temp_fetch_rays_layer.SyncToDisk()
         temp_fetch_rays_layer = None
         temp_fetch_rays_vector = None
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise
 
@@ -1533,6 +1576,7 @@ def calculate_relief(
 
     Returns:
         None.
+
     """
     try:
         if not os.path.exists(os.path.dirname(
@@ -1682,9 +1726,10 @@ def calculate_relief(
         target_relief_point_layer = None
         target_relief_point_vector = None
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise
+
 
 def calculate_surge(
         base_shore_point_vector_path, global_dem_path, workspace_dir,
@@ -1703,6 +1748,7 @@ def calculate_surge(
 
     Returns:
         None.
+
     """
     try:
         if not os.path.exists(os.path.dirname(
@@ -1788,6 +1834,7 @@ def calculate_surge(
             clipped_utm_dem_path)['nodata'][0]
 
         shelf_nodata = 2
+
         def mask_shelf(depth_array):
             valid_mask = depth_array != nodata
             result_array = numpy.empty(
@@ -1882,10 +1929,11 @@ def calculate_surge(
         target_relief_point_layer = None
         target_relief_point_vector = None
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         LOGGER.exception('exception in calculating surge')
         raise
+
 
 def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
     """Create a raster kernel with a radius given.
@@ -1900,6 +1948,7 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
 
     Returns:
         None
+
     """
     driver = gdal.GetDriverByName('GTiff')
     kernel_dataset = driver.Create(
@@ -2002,6 +2051,7 @@ def create_shore_points(
 
     Returns:
         None.
+
     """
     LOGGER.info("Creating shore points for grid %s", grid_fid)
     # create the spatial reference from the base vector
@@ -2154,6 +2204,7 @@ def create_shore_points(
 
     temp_grid_nodata = pygeoprocessing.get_raster_info(
         grid_raster_path)['nodata'][0]
+
     def _shore_mask_op(shore_convolution):
         """Mask values on land that border water."""
         result = numpy.empty(shore_convolution.shape, dtype=numpy.uint8)
@@ -2279,6 +2330,10 @@ def grid_edges_of_vector(
             created in the target_grid_vector.
         done_token_path (string): path to a file to create when the function
             is complete.
+
+    Returns:
+        None
+
     """
     LOGGER.info("Building global grid.")
     n_rows = int((
@@ -2370,6 +2425,7 @@ def grid_edges_of_vector(
     target_grid_layer = None
     target_grid_vector = None
 
+
 def get_utm_spatial_reference(bounding_box):
     """Determine UTM spatial reference given lat/lng bounding box.
 
@@ -2380,6 +2436,7 @@ def get_utm_spatial_reference(bounding_box):
     Returns:
         An osr.SpatialReference that corresponds to the UTM zone in the
             median point of the bounding box.
+
     """
     # project lulc_map to UTM zone median
     mean_long = (bounding_box[0] + bounding_box[2]) / 2
@@ -2396,8 +2453,9 @@ def get_utm_spatial_reference(bounding_box):
     utm_sr.ImportFromEPSG(epsg_code)
     return utm_sr
 
+
 def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
-    """Builds an r-tree index of the global feature envelopes.
+    """Build an r-tree index of the global feature envelopes.
 
     Parameter:
         vector_path (string): path to vector to build bounding box index for
@@ -2406,6 +2464,7 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
 
     Returns:
         None.
+
     """
     # the input path has a .dat extension, but the `rtree` package only uses
     # the basename.  It's a quirk of the library, so we'll deal with it by
@@ -2437,6 +2496,7 @@ def build_feature_bounding_box_rtree(vector_path, target_rtree_path):
         logger_callback(float(feature_index) / n_features)
     global_feature_index.close()
 
+
 def make_shore_kernel(kernel_path):
     """Make a 3x3 raster with a 9 in the middle and 1s on the outside."""
     driver = gdal.GetDriverByName('GTiff')
@@ -2455,6 +2515,7 @@ def make_shore_kernel(kernel_path):
     kernel_band.SetNoDataValue(127)
     kernel_band.WriteArray(numpy.array([[1, 1, 1], [1, 9, 1], [1, 1, 1]]))
 
+
 def _make_logger_callback(message, logger):
     """Build a timed logger callback that prints `message` replaced.
 
@@ -2465,9 +2526,10 @@ def _make_logger_callback(message, logger):
     Returns:
         Function with signature:
             logger_callback(proportion_complete, psz_message, p_progress_arg)
-    @profile"""
+
+    """
     def logger_callback(proportion_complete):
-        """The argument names come from the GDAL API for callbacks."""
+        """Argument names come from the GDAL API for callbacks."""
         try:
             current_time = time.time()
             if ((current_time - logger_callback.last_time) > 5.0 or
@@ -2481,6 +2543,7 @@ def _make_logger_callback(message, logger):
             logger_callback.total_time = 0.0
 
     return logger_callback
+
 
 def build_wwiii_rtree(wwiii_vector_path, wwiii_rtree_path):
     """Build RTree indexed by FID for points in `wwwiii_vector_path`."""
@@ -2518,6 +2581,7 @@ def merge_vectors(
 
     Returns:
         None
+
     """
     target_spatial_reference = osr.SpatialReference()
     target_spatial_reference.ImportFromWkt(target_spatial_reference_wkt)
@@ -2571,7 +2635,7 @@ def merge_vectors(
 
 
 def geometry_to_lines(geometry):
-    """Converts a geometry object to a list of lines."""
+    """Convert a geometry object to a list of lines."""
     if geometry.type == 'Polygon':
         return polygon_to_lines(geometry)
     elif geometry.type == 'MultiPolygon':
