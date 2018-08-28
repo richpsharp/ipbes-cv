@@ -781,7 +781,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
                 if rtnohab and rt:
                     service = rtnohab - rt
                     target_feature.SetField(
-                        'Serivce_%s' % scenario_id, service)
+                        'Service_%s' % scenario_id, service)
                     target_feature.SetField(
                         'NCP_%s' % scenario_id, service / rtnohab)
 
