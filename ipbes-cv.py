@@ -136,7 +136,7 @@ _GLOBAL_SEA_LEVEL_POINT_FILE_PATTERN = 'global_sea_level_points.gpkg'
 _GLOBAL_FETCH_RAY_FILE_PATTERN = 'global_fetch_rays.gpkg'
 _GLOBAL_RISK_RESULT_POINT_VECTOR_FILE_PATTERN = 'CV_outputs.gpkg'
 _AGGREGATE_POINT_VECTOR_FILE_PATTERN = (
-    'global_cv_risk_and_aggregate_analysis.sqlite')
+    'global_cv_risk_and_aggregate_analysis.gpkg')
 _WORK_COMPLETE_TOKEN_PATH = os.path.join(
     WORKING_DIR, 'work_tokens')
 _WIND_EXPOSURE_WORKSPACES = os.path.join(
@@ -713,7 +713,7 @@ def aggregate_raster_data(
     mem_result_point_layer.CommitTransaction()
     mem_result_point_layer.SyncToDisk()
     mem_result_point_layer = None
-    gdal.GetDriverByName('sqlite').CreateCopy(
+    gdal.GetDriverByName('GPKG').CreateCopy(
         target_result_point_vector_path, mem_result_point_vector)
 
     final_risk_list = [
