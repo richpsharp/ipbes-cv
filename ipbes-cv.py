@@ -769,7 +769,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
             #UPDATE cv_table SET pdnrc_ssp1 = pdn_gpw * cpdn_ssp1;
             for ssp_id in (1, 3, 5):
                 cpdn_ssp = target_feature.GetField('cpdn_ssp%d' % ssp_id)
-                if pdn_gpw and cpdn_ssp:
+                if pdn_gpw is not None and cpdn_ssp is not None:
                     target_feature.SetField(
                         'pdnrc_ssp%d' % ssp_id, pdn_gpw*cpdn_ssp)
 
@@ -778,7 +778,7 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
             for scenario_id in ('cur', 'ssp1', 'ssp3', 'ssp5'):
                 rtnohab = target_feature.GetField('Rtnohab_%s' % scenario_id)
                 rt = target_feature.GetField('Rt_%s' % scenario_id)
-                if rtnohab and rt:
+                if rtnohab is not None and rt is not None:
                     service = rtnohab - rt
                     target_feature.SetField(
                         'Serivce_%s' % scenario_id, service)
