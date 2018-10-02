@@ -676,7 +676,7 @@ def aggregate_raster_data(
                     5. - point_feature.GetField('Rhab_cur')) * (
                         point_feature.GetField('urbp_ssp%d' % ssp_id) -
                         point_feature.GetField('urbp_2015')) +
-                    point_feature.GetField('Rhab_cur'))
+                point_feature.GetField('Rhab_cur'))
 
             point_feature.SetField(
                 'curpb_ssp%d' % ssp_id, (
