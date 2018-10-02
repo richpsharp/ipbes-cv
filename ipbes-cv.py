@@ -1141,21 +1141,22 @@ def calculate_habitat_protection(
             for habitat_id, (_, rank, protection_distance) in (
                     habitat_layer_lookup.items()):
                 if (target_feature_shapely.distance(
-                        habitat_shapely_lookup[habitat_id]) >
+                        habitat_shapely_lookup[habitat_id]) <=
                         protection_distance):
-                    # 5 is the worst rank
-                    rank = 5
-                if rank < min_rank:
-                    min_rank = rank
-                target_feature.SetField(habitat_id, rank)
-                sum_sq_rank += (5 - rank) ** 2
+                    if rank < min_rank:
+                        min_rank = rank
+                    sum_sq_rank += (5 - rank) ** 2
 
             # Equation 4
-            target_feature.SetField(
-                'Rhab_cur', max(
-                    1.0, 4.8 - 0.5 * (
-                        (1.5 * (5-min_rank))**2 +
-                        sum_sq_rank - (5-min_rank)**2)**0.5))
+            if sum_sq_rank > 0:
+                target_feature.SetField(
+                    'Rhab_cur', max(
+                        1.0, 4.8 - 0.5 * (
+                            (1.5 * (5-min_rank))**2 +
+                            sum_sq_rank - (5-min_rank)**2)**0.5))
+            else:
+                target_feature.SetField('Rhab_cur', 5.0)
+
             target_feature.SetGeometry(target_feature_geometry)
             target_habitat_protection_point_layer.SetFeature(
                 target_feature)
