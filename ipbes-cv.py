@@ -1146,6 +1146,8 @@ def calculate_habitat_protection(
             sum_sq_rank = 0.0
             for habitat_id, (_, rank, protection_distance) in (
                     habitat_layer_lookup.items()):
+                if habitat_shapely_lookup[habitat_id].is_empty:
+                    continue
                 point_distance_to_feature = target_feature_shapely.distance(
                     habitat_shapely_lookup[habitat_id])
                 LOGGER.debug(
