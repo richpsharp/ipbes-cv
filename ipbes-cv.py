@@ -1085,6 +1085,8 @@ def calculate_habitat_protection(
                     habitat_feature.GetGeometryRef().ExportToWkb())
                 intersection_shapely = lat_lng_clipping_shapely.intersection(
                     habitat_shapely)
+                LOGGER.debug(
+                    f'intersection area: {intersection_shapely.area}')
                 try:
                     clipped_geometry = ogr.CreateGeometryFromWkt(
                         intersection_shapely.wkt)
