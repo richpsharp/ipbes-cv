@@ -1139,7 +1139,7 @@ def calculate_habitat_protection(
                 target_feature.GetGeometryRef().Clone())
             LOGGER.debug(
                 f"processing point id {target_feature.GetFID()}")
-
+            LOGGER.debug(habitat_layer_lookup)
             target_feature_shapely = shapely.wkb.loads(
                 target_feature_geometry.ExportToWkb())
             min_rank = 5
