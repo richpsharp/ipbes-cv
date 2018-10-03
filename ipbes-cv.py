@@ -1135,8 +1135,7 @@ def calculate_habitat_protection(
             target_feature_geometry = (
                 target_feature.GetGeometryRef().Clone())
             LOGGER.debug(
-                f"processing point id {target_feature.GetField('point_id')} "
-                f"grid id {target_feature.GetField('grid_id')}")
+                f"processing point id {target_feature.GetFID()}")
 
             target_feature_shapely = shapely.wkb.loads(
                 target_feature_geometry.ExportToWkb())
