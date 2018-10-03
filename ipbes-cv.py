@@ -276,8 +276,6 @@ def main():
     surge_task_list = []
     local_surge_path_list = []
     for g_index, grid_fid in enumerate(grid_fid_list):
-        if grid_fid != 137:
-            continue
         LOGGER.info("Calculating grid %d of %d", g_index, len(grid_fid_list))
         shore_points_workspace = os.path.join(
             _GRID_WORKSPACES, 'grid_%d' % grid_fid)
