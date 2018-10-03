@@ -28,7 +28,8 @@ import pygeoprocessing
 
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
-    level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ')
+    level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ',
+    stream=sys.stdout)
 LOGGER = logging.getLogger('ipbes-cv')
 LOGGER.setLevel(logging.DEBUG)
 
@@ -1086,7 +1087,8 @@ def calculate_habitat_protection(
                 intersection_shapely = lat_lng_clipping_shapely.intersection(
                     habitat_shapely)
                 LOGGER.debug(
-                    f'intersection area: {intersection_shapely.area}')
+                    f'intersection area: {intersection_shapely.area} '
+                    f'is empty: {intersection_shapely.is_empty}')
                 try:
                     clipped_geometry = ogr.CreateGeometryFromWkt(
                         intersection_shapely.wkt)
