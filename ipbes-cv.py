@@ -275,8 +275,9 @@ def main():
     surge_task_list = []
     local_surge_path_list = []
     for g_index, grid_fid in enumerate(grid_fid_list):
+        if grid_fid != 137:
+            continue
         LOGGER.info("Calculating grid %d of %d", g_index, len(grid_fid_list))
-
         shore_points_workspace = os.path.join(
             _GRID_WORKSPACES, 'grid_%d' % grid_fid)
         grid_point_path = os.path.join(
@@ -1133,6 +1134,9 @@ def calculate_habitat_protection(
         for target_feature in target_habitat_protection_point_layer:
             target_feature_geometry = (
                 target_feature.GetGeometryRef().Clone())
+            LOGGER.debug(
+                f"processing point id {target_feature.GetField('point_id')} "
+                f"grid id {target_feature.GetField('grid_id')}")
 
             target_feature_shapely = shapely.wkb.loads(
                 target_feature_geometry.ExportToWkb())
@@ -1140,22 +1144,25 @@ def calculate_habitat_protection(
             sum_sq_rank = 0.0
             for habitat_id, (_, rank, protection_distance) in (
                     habitat_layer_lookup.items()):
-                if (target_feature_shapely.distance(
-                        habitat_shapely_lookup[habitat_id]) <=
-                        protection_distance):
+                point_distance_to_feature = target_feature_shapely.distance(
+                    habitat_shapely_lookup[habitat_id])
+                LOGGER.debug(
+                    f'{habitat_id} distance {point_distance_to_feature}')
+                if point_distance_to_feature <= protection_distance:
                     if rank < min_rank:
                         min_rank = rank
                     sum_sq_rank += (5 - rank) ** 2
 
             # Equation 4
             if sum_sq_rank > 0:
-                target_feature.SetField(
-                    'Rhab_cur', max(
-                        1.0, 4.8 - 0.5 * (
-                            (1.5 * (5-min_rank))**2 +
-                            sum_sq_rank - (5-min_rank)**2)**0.5))
+                r_hab_val = max(
+                    1.0, 4.8 - 0.5 * (
+                        (1.5 * (5-min_rank))**2 + sum_sq_rank -
+                        (5-min_rank)**2)**0.5)
             else:
-                target_feature.SetField('Rhab_cur', 5.0)
+                r_hab_val = 5.0
+            LOGGER.debug(f'setting Rhab to {r_hab_val}')
+            target_feature.SetField('Rhab_cur', r_hab_val)
 
             target_feature.SetGeometry(target_feature_geometry)
             target_habitat_protection_point_layer.SetFeature(
