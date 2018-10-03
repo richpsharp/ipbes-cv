@@ -980,6 +980,7 @@ def simplify_geometry(
     target_simplified_vector.SyncToDisk()
     target_simplified_vector = None
 
+
 def calculate_habitat_protection(
         base_shore_point_vector_path,
         habitat_layer_lookup, workspace_dir,
@@ -1137,9 +1138,6 @@ def calculate_habitat_protection(
         for target_feature in target_habitat_protection_point_layer:
             target_feature_geometry = (
                 target_feature.GetGeometryRef().Clone())
-            LOGGER.debug(
-                f"processing point id {target_feature.GetFID()}")
-            LOGGER.debug(habitat_layer_lookup)
             target_feature_shapely = shapely.wkb.loads(
                 target_feature_geometry.ExportToWkb())
             min_rank = 5
@@ -1150,8 +1148,6 @@ def calculate_habitat_protection(
                     continue
                 point_distance_to_feature = target_feature_shapely.distance(
                     habitat_shapely_lookup[habitat_id])
-                LOGGER.debug(
-                    f'{habitat_id} distance {point_distance_to_feature}')
                 if point_distance_to_feature <= protection_distance:
                     if rank < min_rank:
                         min_rank = rank
@@ -1165,7 +1161,6 @@ def calculate_habitat_protection(
                         (5-min_rank)**2)**0.5)
             else:
                 r_hab_val = 5.0
-            LOGGER.debug(f'setting Rhab to {r_hab_val}')
             target_feature.SetField('Rhab_cur', r_hab_val)
 
             target_feature.SetGeometry(target_feature_geometry)
