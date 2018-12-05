@@ -85,7 +85,6 @@ _AGGREGATION_LAYER_MAP = {
     'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 0),
     'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 0),
     'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 0),
-    'poverty_p': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/poverty_pct_1.tif"), False, None, 0),
     '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 0),
     '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 0),
     'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 0),
