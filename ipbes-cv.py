@@ -66,8 +66,6 @@ _GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/wave_watch_i
 
 _GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
 
-_GLOBAL_GPW_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif")
-
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
     'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3/01_Data/14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
@@ -254,6 +252,13 @@ def main():
         ignore_path_list=[landmass_bounding_rtree_path],
         target_path_list=[global_grid_vector_path],
         task_name='grid_global_edges')
+
+    dem_10m_mask_path = os.path.join(WORKING_DIR, 'dem_10m_mask.tif')
+    threshold_dem_task = task_graph.add_task(
+        func=threshold_raster_op,
+        args=(_GLOBAL_DEM_PATH, 0, 10.0, dem_10m_mask_path),
+        target_path_list=[dem_10m_mask_path],
+        task_name='threshold DEM to 10m')
 
     grid_edges_of_vector_task.join()
 
@@ -2763,6 +2768,18 @@ def build_spatial_index(vector_path):
         geom_fid_dict[feature.GetFID()] = shapely_geom
         geom_index.insert(feature.GetFID(), shapely_geom.bounds)
     return geom_index, geom_fid_dict
+
+
+def threshold_raster_op(
+        base_raster_path, min_val, max_val, target_raster_path):
+    """Threshold base raster to 1.0 if between min & max val."""
+
+    def threshold_op(val):
+        return (val >= min_val & val <= max_val)
+
+    pygeoprocessing.raster_calculator(
+        (base_raster_path, 1), threshold_op, target_raster_path,
+        gdal.GDT_Byte, 2)
 
 
 if __name__ == '__main__':
