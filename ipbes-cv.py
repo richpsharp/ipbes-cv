@@ -2775,7 +2775,7 @@ def threshold_raster_op(
     """Threshold base raster to 1.0 if between min & max val."""
 
     def threshold_op(val):
-        return (val >= min_val & val <= max_val)
+        return (val >= min_val) & (val <= max_val)
 
     pygeoprocessing.raster_calculator(
         ((base_raster_path, 1),), threshold_op, target_raster_path,
