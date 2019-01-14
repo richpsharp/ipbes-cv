@@ -2778,7 +2778,7 @@ def threshold_raster_op(
         return (val >= min_val & val <= max_val)
 
     pygeoprocessing.raster_calculator(
-        (base_raster_path, 1), threshold_op, target_raster_path,
+        ((base_raster_path, 1)), threshold_op, target_raster_path,
         gdal.GDT_Byte, 2)
 
 
