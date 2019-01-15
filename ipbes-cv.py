@@ -151,7 +151,7 @@ _SURGE_WORKSPACES = os.path.join(
     WORKING_DIR, 'surge_workspaces')
 _SEA_LEVEL_WORKSPACES = os.path.join(
     WORKING_DIR, 'sea_level_workspaces')
-
+_POPULATION_MASK_WORKSPACE = os.path.join(WORKING_DIR, 'population_masks')
 _SMALLEST_FEATURE_SIZE = 2000
 _MAX_FETCH_DISTANCE = 60000
 
@@ -487,13 +487,59 @@ def main():
     target_raster_aggregate_point_vector_path = os.path.join(
         WORKING_DIR, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
 
+    # masking population by only that that's below <= 10m.
+    dem_10m_mask_path
+    threshold_dem_task
+
+    modified_aggregation_layer_map = _AGGREGATION_LAYER_MAP.copy()
+    mask_pop_task_list = []
+    for population_id in (
+            'pdn_gpw', 'pdn_ssp1', 'pdn_ssp3', 'pdn_ssp5', 'pdn_2010',
+            '14bt_pop', '65plus_pop'):
+        base_pop_raster_path = _AGGREGATION_LAYER_MAP[population_id]
+        base_pop_raster_info = pygeoprocessing.get_raster_info(
+            base_pop_raster_path)
+        base_filename = os.path.splitext(os.path.basename(
+            base_pop_raster_path))[0]
+
+        masked_pop_raster_path = os.path.join(
+            _POPULATION_MASK_WORKSPACE, f'''{base_filename}_below_10m.tif''')
+        dem_10m_mask_aligned_path = os.path.join(
+            _POPULATION_MASK_WORKSPACE,
+            f'dem_10m_aligned_to_{population_id}.tif')
+
+        warp_task = task_graph.add_task(
+            func=pygeoprocessing.warp_raster,
+            args=(
+                dem_10m_mask_path, base_pop_raster_info['pixel_size'],
+                dem_10m_mask_aligned_path, 'near'),
+            kwargs={'target_bb': base_pop_raster_path['bounding_box']},
+            target_path_list=[dem_10m_mask_aligned_path],
+            dependent_task_list=[threshold_dem_task],
+            task_name=f'mask 10m population {population_id}')
+
+        mask_pop_task = task_graph.add_task(
+            func=pygeoprocessing.raster_calculator,
+            args=(
+                ((dem_10m_mask_aligned_path, 1),
+                 (base_pop_raster_path, 1)), mult2_op, masked_pop_raster_path,
+                gdal.GDT_Float32, base_pop_raster_info['nodata'][0]),
+            target_path_list=[masked_pop_raster_path],
+            dependent_task_list=[warp_task],
+            task_name=f'mask pop by 10m dem {population_id}')
+
+        mask_pop_task_list.append(mask_pop_task)
+
+        modified_aggregation_layer_map[population_id][0] = (
+            masked_pop_raster_path)
+
     # the 5000 means sample out 5km around a given point
     aggregate_data_task = task_graph.add_task(
         func=aggregate_raster_data, args=(
-            _AGGREGATION_LAYER_MAP, target_result_point_vector_path, 5000,
-            target_raster_aggregate_point_vector_path),
+            modified_aggregation_layer_map, target_result_point_vector_path,
+            5000, target_raster_aggregate_point_vector_path),
         target_path_list=[target_raster_aggregate_point_vector_path],
-        dependent_task_list=[summarize_results_task],
+        dependent_task_list=[summarize_results_task] + mask_pop_task_list,
         task_name='aggregate_raster_data')
 
     task_graph.close()
@@ -512,7 +558,7 @@ def aggregate_raster_data(
             `base_point_vector_path
             * boolean indicating whether that value should be divided by the
               pixel area.
-            * if not None, a list of rasrer ids that should be masked to 1
+            * if not None, a list of raster ids that should be masked to 1
               and everything else to 0. If so result is proportion of 1s in
               sampled area within `sample_distance`
         base_point_vector_path (path): a global point vector path
@@ -2781,6 +2827,10 @@ def threshold_raster_op(
         ((base_raster_path, 1),), threshold_op, target_raster_path,
         gdal.GDT_Byte, 2)
 
+
+def mult2_op(array_a, array_b):
+    """Multiply two arrays together blindly."""
+    return array_a * array_b
 
 if __name__ == '__main__':
     main()
