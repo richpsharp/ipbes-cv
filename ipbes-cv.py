@@ -609,13 +609,13 @@ def aggregate_raster_data(
     # recalibrated population fields for each ssp
     for ssp_id in (1, 3, 5):
         mem_result_point_layer.CreateField(
-            ogr.FieldDefn('pdnrc_ssp%d' % ssp_id))
+            ogr.FieldDefn('pdnrc_ssp%d' % ssp_id, ogr.OFTReal))
 
     for scenario_id in ['cur', 'ssp1', 'ssp3', 'ssp5']:
         mem_result_point_layer.CreateField(
-            ogr.FieldDefn('Service_%s' % scenario_id))
+            ogr.FieldDefn('Service_%s' % scenario_id, ogr.OFTReal))
         mem_result_point_layer.CreateField(
-            ogr.FieldDefn('NCP_%s' % scenario_id))
+            ogr.FieldDefn('NCP_%s' % scenario_id, ogr.OFTReal))
 
     #UPDATE cv_table SET pdnrc_ssp1 = pdn_gpw * cpdn_ssp1;
     #UPDATE cv_table SET Service_cur = Rtnohab_cur - Rt_cur;
