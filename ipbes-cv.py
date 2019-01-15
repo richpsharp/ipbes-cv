@@ -78,21 +78,21 @@ _AGGREGATION_LAYER_MAP = {
     'pdn_gpw': (
         os.path.join(
             BASE_DROPBOX_DIR,
-            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 0),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 0),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 0),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 0),
-    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 0),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 0),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 0),
-    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
-    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 0),
-    'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 2),
-    'SLRrate_cur': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 1)
+            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 5e4, 0),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 5e4, 0),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 5e4, 0),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 5e4, 0),
+    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 5e4, 0),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 5e4, 0),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 5e4, 0),
+    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
+    'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
+    'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
+    'SLRrate_cur': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 5e3, 1)
 }
 
 # The global bounding box to do the entire analysis
@@ -536,13 +536,13 @@ def main():
 
         modified_aggregation_layer_map[population_id] = (
             masked_pop_raster_path,) + (
-                _AGGREGATION_LAYER_MAP[population_id][1:4])
+                _AGGREGATION_LAYER_MAP[population_id][1::])
 
     # the 5000 means sample out 5km around a given point
     aggregate_data_task = task_graph.add_task(
         func=aggregate_raster_data, args=(
             modified_aggregation_layer_map, target_result_point_vector_path,
-            5000, target_raster_aggregate_point_vector_path),
+            target_raster_aggregate_point_vector_path),
         target_path_list=[target_raster_aggregate_point_vector_path],
         dependent_task_list=[summarize_results_task] + mask_pop_task_list,
         task_name='aggregate_raster_data')
@@ -553,7 +553,7 @@ def main():
 
 def aggregate_raster_data(
         raster_feature_id_map,
-        base_point_vector_path, sample_distance,
+        base_point_vector_path,
         target_result_point_vector_path):
     """Add population scenarios and aggregate under each point.
 
@@ -622,7 +622,8 @@ def aggregate_raster_data(
     #UPDATE cv_table SET NCP_cur = Service_cur / Rtnohab_cur;
 
     for simulation_id, (
-                raster_path, divide_by_area, reclass_ids, extra_pixel) in (
+                raster_path, divide_by_area, reclass_ids, sample_distance,
+                extra_pixel) in (
             raster_feature_id_map.items()):
         raster = gdal.Open(raster_path)
         LOGGER.debug("processing aggregation %s", simulation_id)
