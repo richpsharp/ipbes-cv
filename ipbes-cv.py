@@ -491,6 +491,10 @@ def main():
     dem_10m_mask_path
     threshold_dem_task
 
+    try:
+        os.makedirs(_POPULATION_MASK_WORKSPACE)
+    except OSError:
+        pass
     modified_aggregation_layer_map = _AGGREGATION_LAYER_MAP.copy()
     mask_pop_task_list = []
     for population_id in (
@@ -530,8 +534,9 @@ def main():
 
         mask_pop_task_list.append(mask_pop_task)
 
-        modified_aggregation_layer_map[population_id][0] = (
-            masked_pop_raster_path)
+        modified_aggregation_layer_map[population_id] = (
+            masked_pop_raster_path,) + (
+                _AGGREGATION_LAYER_MAP[population_id][1:4])
 
     # the 5000 means sample out 5km around a given point
     aggregate_data_task = task_graph.add_task(
