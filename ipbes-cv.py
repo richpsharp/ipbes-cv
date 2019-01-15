@@ -496,7 +496,7 @@ def main():
     for population_id in (
             'pdn_gpw', 'pdn_ssp1', 'pdn_ssp3', 'pdn_ssp5', 'pdn_2010',
             '14bt_pop', '65plus_pop'):
-        base_pop_raster_path = _AGGREGATION_LAYER_MAP[population_id]
+        base_pop_raster_path = _AGGREGATION_LAYER_MAP[population_id][0]
         base_pop_raster_info = pygeoprocessing.get_raster_info(
             base_pop_raster_path)
         base_filename = os.path.splitext(os.path.basename(
@@ -513,7 +513,7 @@ def main():
             args=(
                 dem_10m_mask_path, base_pop_raster_info['pixel_size'],
                 dem_10m_mask_aligned_path, 'near'),
-            kwargs={'target_bb': base_pop_raster_path['bounding_box']},
+            kwargs={'target_bb': base_pop_raster_info['bounding_box']},
             target_path_list=[dem_10m_mask_aligned_path],
             dependent_task_list=[threshold_dem_task],
             task_name=f'mask 10m population {population_id}')
