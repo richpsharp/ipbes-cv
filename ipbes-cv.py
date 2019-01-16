@@ -79,13 +79,13 @@ _AGGREGATION_LAYER_MAP = {
     'pdn_gpw': (
         os.path.join(
             BASE_DROPBOX_DIR,
-            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), False, None, 1e3, 0),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), False, None, 1e3, 0),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), False, None, 1e3, 0),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), False, None, 1e3, 0),
-    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), False, None, 1e3, 0),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), False, None, 1e3, 0),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), False, None, 1e3, 0),
+            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 1e3, 0),
+    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 1e3, 0),
+    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 1e3, 0),
+    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 1e3, 0),
+    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 1e3, 0),
+    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
+    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
     'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 5e3, 0),
     'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
     'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
@@ -488,64 +488,12 @@ def main():
     target_raster_aggregate_point_vector_path = os.path.join(
         WORKING_DIR, _AGGREGATE_POINT_VECTOR_FILE_PATTERN)
 
-    # masking population by only that that's below <= 10m.
-    dem_10m_mask_path
-    threshold_dem_task
-
-    try:
-        os.makedirs(_POPULATION_MASK_WORKSPACE)
-    except OSError:
-        pass
-    modified_aggregation_layer_map = _AGGREGATION_LAYER_MAP.copy()
-    mask_pop_task_list = []
-    for population_id in (
-            'pdn_gpw', 'pdn_ssp1', 'pdn_ssp3', 'pdn_ssp5', 'pdn_2010',
-            '14bt_pop', '65plus_pop'):
-        base_pop_raster_path = _AGGREGATION_LAYER_MAP[population_id][0]
-        base_pop_raster_info = pygeoprocessing.get_raster_info(
-            base_pop_raster_path)
-        base_filename = os.path.splitext(os.path.basename(
-            base_pop_raster_path))[0]
-
-        masked_pop_raster_path = os.path.join(
-            _POPULATION_MASK_WORKSPACE, f'''{base_filename}_below_10m.tif''')
-        dem_10m_mask_aligned_path = os.path.join(
-            _POPULATION_MASK_WORKSPACE,
-            f'dem_10m_aligned_to_{population_id}.tif')
-
-        warp_task = task_graph.add_task(
-            func=pygeoprocessing.warp_raster,
-            args=(
-                dem_10m_mask_path, base_pop_raster_info['pixel_size'],
-                dem_10m_mask_aligned_path, 'near'),
-            kwargs={'target_bb': base_pop_raster_info['bounding_box']},
-            target_path_list=[dem_10m_mask_aligned_path],
-            dependent_task_list=[threshold_dem_task],
-            task_name=f'mask 10m population {population_id}')
-
-        mask_pop_task = task_graph.add_task(
-            func=pygeoprocessing.raster_calculator,
-            args=(
-                ((dem_10m_mask_aligned_path, 1),
-                 (base_pop_raster_path, 1)), mult2_op, masked_pop_raster_path,
-                gdal.GDT_Float32, base_pop_raster_info['nodata'][0]),
-            target_path_list=[masked_pop_raster_path],
-            dependent_task_list=[warp_task],
-            task_name=f'mask pop by 10m dem {population_id}')
-
-        mask_pop_task_list.append(mask_pop_task)
-
-        modified_aggregation_layer_map[population_id] = (
-            masked_pop_raster_path,) + (
-                _AGGREGATION_LAYER_MAP[population_id][1::])
-
-    # the 5000 means sample out 5km around a given point
     aggregate_data_task = task_graph.add_task(
         func=aggregate_raster_data, args=(
-            modified_aggregation_layer_map, target_result_point_vector_path,
+            _AGGREGATION_LAYER_MAP, target_result_point_vector_path,
             target_raster_aggregate_point_vector_path),
         target_path_list=[target_raster_aggregate_point_vector_path],
-        dependent_task_list=[summarize_results_task] + mask_pop_task_list,
+        dependent_task_list=[summarize_results_task],
         task_name='aggregate_raster_data')
 
     task_graph.close()
