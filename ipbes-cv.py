@@ -254,13 +254,6 @@ def main():
         target_path_list=[global_grid_vector_path],
         task_name='grid_global_edges')
 
-    dem_10m_mask_path = os.path.join(WORKING_DIR, 'dem_10m_mask.tif')
-    threshold_dem_task = task_graph.add_task(
-        func=threshold_raster_op,
-        args=(_GLOBAL_DEM_PATH, 0, 10.0, dem_10m_mask_path),
-        target_path_list=[dem_10m_mask_path],
-        task_name='threshold DEM to 10m')
-
     grid_edges_of_vector_task.join()
 
     global_grid_vector = ogr.Open(global_grid_vector_path)
@@ -971,7 +964,8 @@ def simplify_geometry(
     for feature in base_layer:
         target_feature = ogr.Feature(target_simplified_layer.GetLayerDefn())
         feature_geometry = feature.GetGeometryRef()
-        simplified_geometry = feature_geometry.Simplify(tolerance)
+        simplified_geometry = feature_geometry.SimplifyPreserveTopology(
+            tolerance)
         feature_geometry = None
         if (simplified_geometry is not None and
                 simplified_geometry.GetArea() > 0):
