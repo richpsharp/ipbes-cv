@@ -26,6 +26,9 @@ import shapely.ops
 import shapely.speedups
 import pygeoprocessing
 
+# set a 1GB limit for the cache
+gdal.SetCacheMax(2**30)
+
 logging.basicConfig(
     format='%(asctime)s %(name)-10s %(levelname)-8s %(message)s',
     level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S ',
