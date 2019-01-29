@@ -966,13 +966,14 @@ def simplify_geometry(
     for feature in base_layer:
         target_feature = ogr.Feature(target_simplified_layer.GetLayerDefn())
         feature_geometry = feature.GetGeometryRef()
-        simplified_geometry = feature_geometry.SimplifyPreserveTopology(
-            tolerance)
+        simplified_geometry = feature_geometry.Simplify(tolerance)
+        if simplified_geometry is None or numpy.isclose(
+                simplified_geometry.Area(), 0):
+            # just in case we lost it:
+            simplified_geometry = feature_geometry.Clone()
         feature_geometry = None
-        if (simplified_geometry is not None and
-                simplified_geometry.GetArea() > 0):
-            target_feature.SetGeometry(simplified_geometry)
-            target_simplified_layer.CreateFeature(target_feature)
+        target_feature.SetGeometry(simplified_geometry)
+        target_simplified_layer.CreateFeature(target_feature)
 
     target_simplified_layer.SyncToDisk()
     target_simplified_layer = None
