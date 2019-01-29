@@ -169,8 +169,7 @@ def main():
         os.makedirs(WORKING_DIR)
 
     task_graph = taskgraph.TaskGraph(
-        _WORK_COMPLETE_TOKEN_PATH, _N_CPUS, reporting_interval=5.0,
-        delayed_start=False)
+        _WORK_COMPLETE_TOKEN_PATH, _N_CPUS, reporting_interval=5.0)
 
     tm_world_borders_basedata_url = (
         'https://storage.cloud.google.com/ecoshard-root/ipbes/'
