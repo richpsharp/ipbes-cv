@@ -2163,13 +2163,13 @@ def create_shore_points(
         "clip global polygon to utm clipping box for grid %s", grid_fid)
     for feature_id in landmass_vector_rtree.intersection(
             lat_lng_clipping_box):
-        base_feature = landmass_layer.GetFeature(feature_id)
-        base_geometry = base_feature.GetGeometryRef()
-        base_shapely = shapely.wkb.loads(base_geometry.ExportToWkb())
-        base_geometry = None
-        intersection_shapely = lat_lng_clipping_shapely.intersection(
-            base_shapely)
         try:
+            base_feature = landmass_layer.GetFeature(feature_id)
+            base_geometry = base_feature.GetGeometryRef()
+            base_shapely = shapely.wkb.loads(base_geometry.ExportToWkb())
+            base_geometry = None
+            intersection_shapely = lat_lng_clipping_shapely.intersection(
+                base_shapely)
             target_geometry = ogr.CreateGeometryFromWkt(
                 intersection_shapely.wkt)
             target_feature = ogr.Feature(lat_lng_clipped_defn)
@@ -2177,6 +2177,8 @@ def create_shore_points(
             lat_lng_clipped_layer.CreateFeature(target_feature)
             target_feature = None
             target_geometry = None
+        except shapely.errors.WKBReadingError:
+            LOGGER.error("couldn't read fid %d for some reason.", feature_id)
         except Exception:
             LOGGER.warn(
                 "Couldn't process this intersection %s",
