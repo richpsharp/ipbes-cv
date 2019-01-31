@@ -1356,12 +1356,12 @@ def calculate_wind_exposure(
         # clip global polygon to global clipping box
         for feature_id in landmass_vector_rtree.intersection(
                 lat_lng_clipping_box):
-            landmass_feature = landmass_layer.GetFeature(feature_id)
-            landmass_shapely = shapely.wkb.loads(
-                landmass_feature.GetGeometryRef().ExportToWkb())
-            intersection_shapely = lat_lng_clipping_shapely.intersection(
-                landmass_shapely)
             try:
+                landmass_feature = landmass_layer.GetFeature(feature_id)
+                landmass_shapely = shapely.wkb.loads(
+                    landmass_feature.GetGeometryRef().ExportToWkb())
+                intersection_shapely = lat_lng_clipping_shapely.intersection(
+                    landmass_shapely)
                 clipped_geometry = ogr.CreateGeometryFromWkt(
                     intersection_shapely.wkt)
                 clipped_feature = ogr.Feature(temp_clipped_defn)
@@ -1369,8 +1369,10 @@ def calculate_wind_exposure(
                 temp_clipped_layer.CreateFeature(clipped_feature)
                 clipped_feature = None
             except Exception:
+                clipped_feature = None
                 LOGGER.warn(
-                    "Couldn't process this intersection %s", intersection_shapely)
+                    "Couldn't process this intersection %s",
+                    intersection_shapely)
         temp_clipped_layer.SyncToDisk()
         temp_clipped_layer = None
         temp_clipped_vector = None
