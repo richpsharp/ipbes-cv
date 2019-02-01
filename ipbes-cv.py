@@ -70,16 +70,16 @@ _GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
 _GLOBAL_HABITAT_LAYER_PATHS = {
     'mangrove': (
         ('ecoshard-root',
-         'ipbes-cv/mangrove_simplified_md5_624c0b7212fb7738321a521a46236420.gpkg'), 1, 1000.0),
+         'ipbes-cv/mangrove_valid_md5_8f54e3ed5eb3b4d183ce2cd6ebbe480d.gpkg'), 1, 1000.0),
     'saltmarsh': (
         ('ecoshard-root',
-         'ipbes-cv/saltmarsh_simplified_md5_8a24f1a8cc30a8046c7506c00285369b.gpkg'), 2, 1000.0),
+         'ipbes-cv/saltmarsh_valid_md5_56364edc15ab96d79b9fa08b12ec56ab.gpkg'), 2, 1000.0),
     'coralreef': (
         ('ecoshard-root',
-         'ipbes-cv/coralreef_simplified_md5_81ad5d11cff4c98912504ba83e4eb8e5.gpkg'), 1, 2000.0),
+         'ipbes-cv/coralreef_valid_md5_ddc0b3f7923f1ed53b3e174659158cfc.gpkg'), 1, 2000.0),
     'seagrass': (
         ('ecoshard-root',
-         'ipbes-cv/seagrass_simplified_md5_12fd1d7af3542a81bc945abcbdbe7fdc.gpkg'), 4, 500.0),
+         'ipbes-cv/seagrass_valid_e206dde7cc9b95ba9846efa12b63d333.gpkg'), 4, 500.0),
 }
 
 _TM_WORLD_BORDERS_BUCKET_TUPLE = (
