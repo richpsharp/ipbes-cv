@@ -14,6 +14,7 @@ import zipfile
 import google.cloud.client
 import google.cloud.storage
 import reproduce
+import reproduce.utils
 import taskgraph
 import numpy
 from osgeo import gdal
@@ -52,7 +53,7 @@ for path in POSSIBLE_DROPBOX_LOCATIONS:
 LOGGER.info("found %s", BASE_DROPBOX_DIR)
 
 try:
-    GOOGLE_BUCKET_KEY_PATH = os.path.normpath(sys.argv[1])
+    IAM_TOKEN_PATH = os.path.normpath(sys.argv[1])
 except IndexError:
     raise RuntimeError("Expected command line argument of path to bucket key")
 
@@ -60,22 +61,30 @@ _N_CPUS = max(1, multiprocessing.cpu_count())
 
 WORKING_DIR = "ipbes_cv_workspace"
 ECOSHARD_DIR = os.path.join(WORKING_DIR, 'ecoshard_dir')
-
 _TARGET_NODATA = -1
-
 _GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_polygon/global_polygon.shp")
-
 _GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/wave_watch_iii/WaveWatchIII.shp")
-
 _GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC010_MangrovesUSGS2011_v1_3/01_Data/14_001_WCMC010_MangroveUSGS2011_v1_3.shp"), 1, 1000.0),
-    'saltmarsh': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/Datapack-14_001_WCMC027_Saltmarsh2017_v4/01_Data/14_001_WCMC027_Saltmarsh_py_v4.shp"), 2, 1000.0),
-    'coralreef': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC008_CoralReef2010_v1_3/01_Data/14_001_WCMC008_CoralReef2010_v1_3.shp"), 1, 2000.0),
-    'seagrass': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/habitat/DataPack-14_001_WCMC013_014_SeagrassPtPy_v4/01_Data/WCMC_013_014_SeagrassesPy_v4.shp"), 4, 500.0),
+    'mangrove': (
+        ('ecoshard-root',
+         'ipbes-cv/mangrove_simplified_md5_624c0b7212fb7738321a521a46236420.gpkg'), 1, 1000.0),
+    'saltmarsh': (
+        ('ecoshard-root',
+         'ipbes-cv/saltmarsh_simplified_md5_8a24f1a8cc30a8046c7506c00285369b.gpkg'), 2, 1000.0),
+    'coralreef': (
+        ('ecoshard-root',
+         'ipbes-cv/coralreef_simplified_md5_81ad5d11cff4c98912504ba83e4eb8e5.gpkg'), 1, 2000.0),
+    'seagrass': (
+        ('ecoshard-root',
+         'ipbes-cv/seagrass_simplified_md5_12fd1d7af3542a81bc945abcbdbe7fdc.gpkg'), 4, 500.0),
 }
+
+_TM_WORLD_BORDERS_BUCKET_TUPLE = (
+    'ecoshard-root', 'ipbes/'
+    'TM_WORLD_BORDERS_SIMPL-0.3_md5_15057f7b17752048f9bd2e2e607fe99c.zip')
 
 # tuple form is (path, divide by area?, area to search, extra pixels to add)
 _AGGREGATION_LAYER_MAP = {
@@ -179,7 +188,7 @@ def main():
     tm_world_borders_basedata_fetch_task = task_graph.add_task(
         func=google_bucket_fetch_and_validate,
         args=(
-            tm_world_borders_basedata_url, GOOGLE_BUCKET_KEY_PATH,
+            tm_world_borders_basedata_url, IAM_TOKEN_PATH,
             tm_world_borders_zipfile_path),
         target_path_list=[tm_world_borders_zipfile_path],
         task_name=f'fetch {os.path.basename(tm_world_borders_zipfile_path)}')
@@ -216,22 +225,27 @@ def main():
         target_path_list=[simplified_vector_path],
         task_name="simplify_geometry")
 
-    simplify_habitat_task_list = []
-    simplified_habitat_vector_lookup = {}
-    for habitat_id, (habitat_path, habitat_rank, habitat_dist) in (
-            _GLOBAL_HABITAT_LAYER_PATHS.items()):
+    fetch_habitat_task_list = []
+    habitat_vector_lookup = {}
+    for habitat_id, (
+            (habitat_bucket, habitat_blob_path),
+            habitat_rank, habitat_dist) in (
+                _GLOBAL_HABITAT_LAYER_PATHS.items()):
         smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
-        simplified_habitat_vector_lookup[habitat_id] = (
-            os.path.join(WORKING_DIR, '%s.gpkg' % habitat_id),
-            habitat_rank, habitat_dist)
-        simplify_habitat_task = task_graph.add_task(
-            func=simplify_geometry, args=(
-                habitat_path, smallest_feature_size_degrees,
-                simplified_habitat_vector_lookup[habitat_id][0]),
-            target_path_list=[
-                simplified_habitat_vector_lookup[habitat_id][0]],
-            task_name='simplify_geometry_%s' % habitat_id)
-        simplify_habitat_task_list.append(simplify_habitat_task)
+        habitat_path = os.path.join(
+            ECOSHARD_DIR, os.path.basename(habitat_blob_path))
+
+        habitat_vector_lookup[habitat_id] = (
+            habitat_path, habitat_rank, habitat_dist)
+
+        # download habitat path
+        fetch_habitat_blob_task = task_graph.add_task(
+            func=reproduce.utils.google_bucket_fetch,
+            args=(habitat_bucket, habitat_blob_path, IAM_TOKEN_PATH,
+                  habitat_path),
+            target_path_list=[habitat_path],
+            task_name=f'fetch {habitat_blob_path}')
+        fetch_habitat_task_list.append(fetch_habitat_blob_task)
 
     landmass_bounding_rtree_path = os.path.join(
         WORKING_DIR, _LANDMASS_BOUNDING_RTREE_FILE_PATTERN)
@@ -339,12 +353,12 @@ def main():
         habitat_protection_task = task_graph.add_task(
             func=calculate_habitat_protection, args=(
                 grid_point_path,
-                simplified_habitat_vector_lookup,
+                habitat_vector_lookup,
                 habitat_protection_workspace,
                 target_habitat_protection_point_path),
             target_path_list=[target_habitat_protection_point_path],
             dependent_task_list=[
-                create_shore_points_task] + simplify_habitat_task_list)
+                create_shore_points_task] + fetch_habitat_task_list)
         habitat_protection_task_list.append(habitat_protection_task)
         local_habitat_protection_path_list.append(
             target_habitat_protection_point_path)
