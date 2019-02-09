@@ -24,7 +24,6 @@ POSSIBLE_DROPBOX_LOCATIONS = [
 
 LOGGER.info("checking dropbox locations")
 for path in POSSIBLE_DROPBOX_LOCATIONS:
-    print path
     if os.path.exists(path):
         BASE_DROPBOX_DIR = path
         break

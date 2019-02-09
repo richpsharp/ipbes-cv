@@ -59,10 +59,9 @@ except IndexError:
 
 _N_CPUS = max(1, multiprocessing.cpu_count())
 
-WORKING_DIR = "ipbes_cv_workspace"
+WORKING_DIR = "ipbes_cv_workspace_fixed_global_geom"
 ECOSHARD_DIR = os.path.join(WORKING_DIR, 'ecoshard_dir')
 _TARGET_NODATA = -1
-_GLOBAL_POLYGON_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_polygon/global_polygon.shp")
 _GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/wave_watch_iii/WaveWatchIII.shp")
 _GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
 
@@ -205,6 +204,18 @@ def main():
         dependent_task_list=[tm_world_borders_basedata_fetch_task],
         task_name=f'unzip tm_world_borders_basedata_zip')
 
+    global_polygon_url = (
+        'https://storage.cloud.google.com/ecoshard-root/ipbes-cv/global_polygon_fixed_geometries_md5_212aa810c31bf13523212036ed26498b.gpkg')
+    global_polygon_path = os.path.join(
+        ECOSHARD_DIR, os.path.basename(global_polygon_url))
+    global_polygon_fetch_task = task_graph.add_task(
+        func=google_bucket_fetch_and_validate,
+        args=(
+            global_polygon_url, IAM_TOKEN_PATH,
+            global_polygon_path),
+        target_path_list=[global_polygon_path],
+        task_name=f'fetch {os.path.basename(global_polygon_path)}')
+
     wwiii_rtree_path = os.path.join(
         WORKING_DIR, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
 
@@ -220,9 +231,10 @@ def main():
     simplify_geometry_task = task_graph.add_task(
         func=simplify_geometry,
         args=(
-            _GLOBAL_POLYGON_PATH, smallest_feature_size_degrees,
+            global_polygon_path, smallest_feature_size_degrees,
             simplified_vector_path),
         target_path_list=[simplified_vector_path],
+        dependent_task_list=[global_polygon_fetch_task],
         task_name="simplify_geometry")
 
     fetch_habitat_task_list = []
@@ -397,7 +409,7 @@ def main():
             target_surge_point_vector_path)
 
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
-        _GLOBAL_POLYGON_PATH)['projection']
+        global_polygon_path)['projection']
     merge_vectors_task_list = []
     risk_factor_vector_list = []
     target_habitat_protection_points_path = os.path.join(
@@ -473,7 +485,7 @@ def main():
     target_merged_fetch_rays_path = os.path.join(
         WORKING_DIR, _GLOBAL_FETCH_RAY_FILE_PATTERN)
     target_spatial_reference_wkt = pygeoprocessing.get_vector_info(
-        _GLOBAL_POLYGON_PATH)['projection']
+        global_polygon_path)['projection']
     _ = task_graph.add_task(
         func=merge_vectors, args=(
             local_fetch_ray_path_list,
@@ -980,7 +992,8 @@ def simplify_geometry(
     for feature in base_layer:
         target_feature = ogr.Feature(target_simplified_layer.GetLayerDefn())
         feature_geometry = feature.GetGeometryRef()
-        simplified_geometry = feature_geometry.Simplify(tolerance)
+        simplified_geometry = feature_geometry.SimplifyPreserveTopology(
+            tolerance)
         if simplified_geometry is None or numpy.isclose(
                 simplified_geometry.Area(), 0):
             # just in case we lost it:
