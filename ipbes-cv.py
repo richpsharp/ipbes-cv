@@ -205,7 +205,7 @@ def main():
         task_name=f'unzip tm_world_borders_basedata_zip')
 
     global_polygon_url = (
-        'https://storage.cloud.google.com/ecoshard-root/ipbes-cv/global_polygon_fixed_geometries_md5_212aa810c31bf13523212036ed26498b.gpkg')
+        'https://storage.cloud.google.com/ecoshard-root/ipbes-cv/global_polygon_simplified_geometries_md5_653118dde775057e24de52542b01eaee.gpkg')
     global_polygon_path = os.path.join(
         ECOSHARD_DIR, os.path.basename(global_polygon_url))
     global_polygon_fetch_task = task_graph.add_task(
@@ -224,26 +224,12 @@ def main():
         args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path),
         task_name='build_wwiii_rtree')
 
-    simplified_vector_path = os.path.join(
-        WORKING_DIR, 'simplified_geometry.gpkg')
-    # make an approximation of smallest feature size in degrees
-    smallest_feature_size_degrees = 1. / 111000 * _SMALLEST_FEATURE_SIZE / 2.0
-    simplify_geometry_task = task_graph.add_task(
-        func=simplify_geometry,
-        args=(
-            global_polygon_path, smallest_feature_size_degrees,
-            simplified_vector_path),
-        target_path_list=[simplified_vector_path],
-        dependent_task_list=[global_polygon_fetch_task],
-        task_name="simplify_geometry")
-
     fetch_habitat_task_list = []
     habitat_vector_lookup = {}
     for habitat_id, (
             (habitat_bucket, habitat_blob_path),
             habitat_rank, habitat_dist) in (
                 _GLOBAL_HABITAT_LAYER_PATHS.items()):
-        smallest_feature_size_degrees = 1. / 111000 * habitat_dist / 2.0
         habitat_path = os.path.join(
             ECOSHARD_DIR, os.path.basename(habitat_blob_path))
 
@@ -264,8 +250,8 @@ def main():
 
     build_rtree_task = task_graph.add_task(
         func=build_feature_bounding_box_rtree,
-        args=(simplified_vector_path, landmass_bounding_rtree_path),
-        dependent_task_list=[simplify_geometry_task],
+        args=(global_polygon_path, landmass_bounding_rtree_path),
+        dependent_task_list=[global_polygon_fetch_task],
         target_path_list=[landmass_bounding_rtree_path],
         task_name='simplify_geometry_landmass')
 
@@ -274,7 +260,7 @@ def main():
 
     grid_edges_of_vector_task = task_graph.add_task(
         func=grid_edges_of_vector, args=(
-            _GLOBAL_BOUNDING_BOX_WGS84, simplified_vector_path,
+            _GLOBAL_BOUNDING_BOX_WGS84, global_polygon_path,
             landmass_bounding_rtree_path, global_grid_vector_path,
             _WGS84_GRID_SIZE),
         dependent_task_list=[build_rtree_task],
@@ -311,7 +297,7 @@ def main():
         create_shore_points_task = task_graph.add_task(
             func=create_shore_points, args=(
                 global_grid_vector_path, grid_fid, landmass_bounding_rtree_path,
-                simplified_vector_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
+                global_polygon_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
             target_path_list=[grid_point_path],
@@ -327,7 +313,7 @@ def main():
         wind_exposure_task = task_graph.add_task(
             func=calculate_wind_exposure, args=(
                 grid_point_path, landmass_bounding_rtree_path,
-                simplified_vector_path, wind_exposure_workspace,
+                global_polygon_path, wind_exposure_workspace,
                 _SMALLEST_FEATURE_SIZE, _MAX_FETCH_DISTANCE,
                 target_wind_exposure_point_path),
             target_path_list=[target_wind_exposure_point_path],
@@ -958,54 +944,6 @@ def summarize_results(
         target_result_point_layer.SyncToDisk()
     target_result_point_layer = None
     target_result_point_vector = None
-
-
-def simplify_geometry(
-        base_vector_path, tolerance, target_simplified_vector_path):
-    """Simplify all the geometry in the vector.
-
-    Parameters:
-        base_vector_path (string): path to base vector.
-        tolerance (float): all new vertices in the geometry will be within
-            this distance (in units of the vector's projection).
-        target_simplified_vector_path (string): path to desired simplified
-            vector.
-
-    Returns:
-        None
-
-    """
-    base_vector = ogr.Open(base_vector_path)
-    base_layer = base_vector.GetLayer()
-
-    if os.path.exists(target_simplified_vector_path):
-        os.remove(target_simplified_vector_path)
-
-    gpkg_driver = ogr.GetDriverByName('GPKG')
-
-    target_simplified_vector = gpkg_driver.CreateDataSource(
-        target_simplified_vector_path)
-    target_simplified_layer = target_simplified_vector.CreateLayer(
-        os.path.splitext(os.path.basename(target_simplified_vector_path))[0],
-        base_layer.GetSpatialRef(), ogr.wkbPolygon)
-
-    for feature in base_layer:
-        target_feature = ogr.Feature(target_simplified_layer.GetLayerDefn())
-        feature_geometry = feature.GetGeometryRef()
-        simplified_geometry = feature_geometry.SimplifyPreserveTopology(
-            tolerance)
-        if simplified_geometry is None or numpy.isclose(
-                simplified_geometry.Area(), 0):
-            # just in case we lost it:
-            simplified_geometry = feature_geometry.Clone()
-        feature_geometry = None
-        target_feature.SetGeometry(simplified_geometry)
-        target_simplified_layer.CreateFeature(target_feature)
-
-    target_simplified_layer.SyncToDisk()
-    target_simplified_layer = None
-    target_simplified_vector.SyncToDisk()
-    target_simplified_vector = None
 
 
 def calculate_habitat_protection(
