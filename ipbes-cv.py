@@ -62,49 +62,35 @@ _N_CPUS = max(1, multiprocessing.cpu_count())
 WORKING_DIR = "ipbes_cv_workspace_fixed_global_geom"
 ECOSHARD_DIR = os.path.join(WORKING_DIR, 'ecoshard_dir')
 _TARGET_NODATA = -1
-_GLOBAL_WWIII_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/wave_watch_iii/WaveWatchIII.shp")
-_GLOBAL_DEM_PATH = os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/cv/global_dem")
+_GLOBAL_WWIII_GS_PATH = 'gs://wave_watch_iii_md5_c8bb1ce4739e0a27ee608303c217ab5b.gpkg.gz'
+_GLOBAL_DEM_GS_PATH = 'gs://global_dem_md5_22c5c09ac4c4c722c844ab331b34996c.tif'
+_TM_WORLD_BORDERS_GS_PATH = 'gs://ipbes-natcap-ecoshard-data-for-publication/TM_WORLD_BORDERS_SIMPL-0.3_md5_c0d1b65f6986609031e4d26c6c257f07.gpkg'
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
-    'mangrove': (
-        ('ecoshard-root',
-         'ipbes-cv/mangrove_valid_md5_8f54e3ed5eb3b4d183ce2cd6ebbe480d.gpkg'), 1, 1000.0),
-    'saltmarsh': (
-        ('ecoshard-root',
-         'ipbes-cv/saltmarsh_valid_md5_56364edc15ab96d79b9fa08b12ec56ab.gpkg'), 2, 1000.0),
-    'coralreef': (
-        ('ecoshard-root',
-         'ipbes-cv/coralreef_valid_md5_ddc0b3f7923f1ed53b3e174659158cfc.gpkg'), 1, 2000.0),
-    'seagrass': (
-        ('ecoshard-root',
-         'ipbes-cv/seagrass_valid_e206dde7cc9b95ba9846efa12b63d333.gpkg'), 4, 500.0),
+    'mangrove': (('gs://ipbes-natcap-ecoshard-data-for-publication/mangrove_valid_md5_8f54e3ed5eb3b4d183ce2cd6ebbe480d.gpkg'), 1, 1000.0),
+    'saltmarsh': (('gs://ipbes-natcap-ecoshard-data-for-publication/saltmarsh_valid_md5_56364edc15ab96d79b9fa08b12ec56ab.gpkg'), 2, 1000.0),
+    'coralreef': (('gs://ipbes-natcap-ecoshard-data-for-publication/coralreef_valid_md5_ddc0b3f7923f1ed53b3e174659158cfc.gpkg'), 1, 2000.0),
+    'seagrass': (('gs://ipbes-natcap-ecoshard-data-for-publication/seagrass_valid_e206dde7cc9b95ba9846efa12b63d333.gpkg'), 4, 500.0),
 }
-
-_TM_WORLD_BORDERS_BUCKET_TUPLE = (
-    'ecoshard-root', 'ipbes/'
-    'TM_WORLD_BORDERS_SIMPL-0.3_md5_15057f7b17752048f9bd2e2e607fe99c.zip')
 
 # tuple form is (path, divide by area?, area to search, extra pixels to add)
 _AGGREGATION_LAYER_MAP = {
-    'pdn_gpw': (
-        os.path.join(
-            BASE_DROPBOX_DIR,
-            r"ipbes-data/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 1e3, 0),
-    'pdn_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 1e3, 0),
-    'pdn_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 1e3, 0),
-    'pdn_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 1e3, 0),
-    'pdn_2010': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 1e3, 0),
-    '14bt_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
-    '65plus_pop': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
-    'urbp_2015': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 5e3, 0),
-    'urbp_ssp1': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
-    'urbp_ssp3': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
-    'urbp_ssp5': (os.path.join(BASE_DROPBOX_DIR, r"ipbes-data/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
-    'slr_rcp26': ('NETCDF:%s:panelA' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
-    'slr_rcp60': ('NETCDF:%s:panelC' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
-    'slr_rcp85': ('NETCDF:%s:panelD' % (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/cv/ar5_wg1_ch13sm_datafiles/WG1AR5_Ch13SM_datafiles/13.SM.2/fig13.20.nc')), False, None, 5e3, 2),
-    'SLRrate_cur': (os.path.join(BASE_DROPBOX_DIR, r'ipbes-data/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif'), False, None, 5e3, 1)
+    'pdn_gpw': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/gpw-v4-population-count-2015/gpw-v4-population-count_2015.tif"), True, None, 1e3, 0),
+    'pdn_ssp1': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2050.tif"), True, None, 1e3, 0),
+    'pdn_ssp3': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/Spatial_population_scenarios_GeoTIFF/SSP3_GeoTIFF/total/GeoTIFF/ssp3_2050.tif"), True, None, 1e3, 0),
+    'pdn_ssp5': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/Spatial_population_scenarios_GeoTIFF/SSP5_GeoTIFF/total/GeoTIFF/ssp5_2050.tif"), True, None, 1e3, 0),
+    'pdn_2010': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/Spatial_population_scenarios_GeoTIFF/SSP1_GeoTIFF/total/GeoTIFF/ssp1_2010.tif"), True, None, 1e3, 0),
+    '14bt_pop': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/gpw_v4_e_a000_014bt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
+    '65plus_pop': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/gpw_v4_e_a065plusbt_2010_cntm_30_sec.tif"), True, None, 1e3, 0),
+    'urbp_2015': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/Current2015/Globio4_landuse_10sec_2015_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp1': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp3': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'urbp_ssp5': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
+    'SLRrate_cur': (("gs://ipbes-natcap-ecoshard-data-for-publication/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif"), False, None, 5e3, 1),
+    'slr_rcp26': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp26_md5_7c73cf8a1bf8851878deaeee0152dcb6.tif"), False, None, 5e3, 2),
+    'slr_rcp60': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp60_md5_99ccaf1319d665b107a9227f2bbbd8b6.tif"), False, None, 5e3, 2),
+    'slr_rcp85': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp85_md5_3db20b7e891a71e23602826179a57e4a.tif"), False, None, 5e3, 2),
 }
 
 # The global bounding box to do the entire analysis
@@ -227,22 +213,20 @@ def main():
     fetch_habitat_task_list = []
     habitat_vector_lookup = {}
     for habitat_id, (
-            (habitat_bucket, habitat_blob_path),
-            habitat_rank, habitat_dist) in (
+            habitat_gs_url, habitat_rank, habitat_dist) in (
                 _GLOBAL_HABITAT_LAYER_PATHS.items()):
         habitat_path = os.path.join(
-            ECOSHARD_DIR, os.path.basename(habitat_blob_path))
+            ECOSHARD_DIR, os.path.basename(habitat_gs_url))
 
         habitat_vector_lookup[habitat_id] = (
             habitat_path, habitat_rank, habitat_dist)
 
         # download habitat path
         fetch_habitat_blob_task = task_graph.add_task(
-            func=reproduce.utils.google_bucket_fetch,
-            args=(habitat_bucket, habitat_blob_path, IAM_TOKEN_PATH,
-                  habitat_path),
+            func=reproduce.utils.google_bucket_fetch_and_validate,
+            args=(habitat_gs_url, IAM_TOKEN_PATH, habitat_path),
             target_path_list=[habitat_path],
-            task_name=f'fetch {habitat_blob_path}')
+            task_name=f'fetch {habitat_gs_url}')
         fetch_habitat_task_list.append(fetch_habitat_blob_task)
 
     landmass_bounding_rtree_path = os.path.join(
@@ -802,10 +786,12 @@ def calculate_final_risk(risk_id_list, target_point_vector_path):
 
 
 def summarize_results(
-        risk_factor_vector_list, target_result_point_vector_path):
+        risk_factor_vector_list, tm_world_borders_path,
+        target_result_point_vector_path):
     """Aggregate the sub factors into a global one.
 
     This includes sub risk factors into risk factors by percentile.
+
 
         risk_factor_vector_list (list): a list of (path, field_id, risk_id)
             global vectors that have at least the fields 'grid_id',
@@ -814,7 +800,8 @@ def summarize_results(
             a risk value between 1 and 5 calculated in most cases from
             the total histogram of the base `field_id` values in the
             point shapefile.
-
+        tm_world_borders_path (str): path to a vector defining country
+            borders, has a field called 'name' representing country name.
         target_result_point_vector_path (string): path to target point vector
             with risks and other things I'll write soon.
 
@@ -831,8 +818,7 @@ def summarize_results(
     country_to_region_dict = {
         row[1][1]: row[1][0] for row in countries_myregions_df.iterrows()}
 
-    tm_world_borders_path = os.path.join(
-        ECOSHARD_DIR, 'TM_WORLD_BORDERS-0.3.shp')
+
     LOGGER.debug("build country spatial index")
     country_rtree, country_geom_fid_map = build_spatial_index(
         tm_world_borders_path)
