@@ -278,13 +278,14 @@ def main():
         create_shore_points_task = task_graph.add_task(
             func=create_shore_points, args=(
                 global_grid_vector_path, grid_fid, landmass_bounding_rtree_path,
-                global_polygon_path, _GLOBAL_WWIII_PATH, wwiii_rtree_path,
+                global_polygon_path, global_wwiii_path, wwiii_rtree_path,
                 _SMALLEST_FEATURE_SIZE, shore_points_workspace,
                 grid_point_path),
             target_path_list=[grid_point_path],
             ignore_path_list=[
                 landmass_bounding_rtree_path, wwiii_rtree_path],
-            dependent_task_list=[grid_edges_of_vector_task, build_wwiii_task])
+            dependent_task_list=[
+                grid_edges_of_vector_task, build_wwiii_task])
 
         wind_exposure_workspace = os.path.join(
             _WIND_EXPOSURE_WORKSPACES, 'wind_exposure_%d' % grid_fid)
@@ -1846,7 +1847,7 @@ def calculate_surge(
         shelf_rtree = rtree.index.Index()
 
         for offset_info, data_block in pygeoprocessing.iterblocks(
-                shelf_edge_raster_path):
+                (shelf_edge_raster_path, 1)):
             row_indexes, col_indexes = numpy.mgrid[
                 offset_info['yoff']:offset_info['yoff']+offset_info['win_ysize'],
                 offset_info['xoff']:offset_info['xoff']+offset_info['win_xsize']]
@@ -1971,7 +1972,7 @@ def create_averaging_kernel_raster(radius_in_pixels, kernel_filepath):
     kernel_dataset.FlushCache()
 
     for block_data, kernel_block in pygeoprocessing.iterblocks(
-            kernel_filepath):
+            (kernel_filepath, 1)):
         kernel_block /= integration
         kernel_band.WriteArray(kernel_block, xoff=block_data['xoff'],
                                yoff=block_data['yoff'])
@@ -2198,7 +2199,7 @@ def create_shore_points(
         grid_fid)
     feature_lookup = {}
     for offset_info, data_block in pygeoprocessing.iterblocks(
-            shore_raster_path):
+            (shore_raster_path, 1)):
         row_indexes, col_indexes = numpy.mgrid[
             offset_info['yoff']:offset_info['yoff']+offset_info['win_ysize'],
             offset_info['xoff']:offset_info['xoff']+offset_info['win_xsize']]
