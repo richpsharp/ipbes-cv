@@ -7,7 +7,6 @@ google-cloud-storage
 pandas>=0.22.0
 numpy>=1.11.0
 scipy>=0.16.1
-hg+https://bitbucket.org/richsharp/taskgraph@ba1079830dd5#egg=taskgraph
 # psutil is used, but not required, by taskgraph to lower process priority
 psutil>=5.2.2
 reproduce>=0.0.8
