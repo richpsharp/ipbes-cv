@@ -1,4 +1,5 @@
 """IPBES global coastal vulnerability calculation."""
+import gzip
 import pandas
 import sys
 import traceback
@@ -62,9 +63,10 @@ _N_CPUS = max(1, multiprocessing.cpu_count())
 WORKING_DIR = "ipbes_cv_workspace_fixed_global_geom"
 ECOSHARD_DIR = os.path.join(WORKING_DIR, 'ecoshard_dir')
 _TARGET_NODATA = -1
-_GLOBAL_WWIII_GS_PATH = 'gs://wave_watch_iii_md5_c8bb1ce4739e0a27ee608303c217ab5b.gpkg.gz'
-_GLOBAL_DEM_GS_PATH = 'gs://global_dem_md5_22c5c09ac4c4c722c844ab331b34996c.tif'
+_GLOBAL_WWIII_GS_PATH = 'gs://ipbes-natcap-ecoshard-data-for-publication/wave_watch_iii_md5_c8bb1ce4739e0a27ee608303c217ab5b.gpkg.gz'
+_GLOBAL_DEM_GS_PATH = 'gs://ipbes-natcap-ecoshard-data-for-publication/global_dem_md5_22c5c09ac4c4c722c844ab331b34996c.tif'
 _TM_WORLD_BORDERS_GS_PATH = 'gs://ipbes-natcap-ecoshard-data-for-publication/TM_WORLD_BORDERS_SIMPL-0.3_md5_c0d1b65f6986609031e4d26c6c257f07.gpkg'
+_GLOBAL_POLYGON_GS_PATH = 'gs://ipbes-natcap-ecoshard-data-for-publication/pbes-cv_global_polygon_simplified_geometries_md5_653118dde775057e24de52542b01eaee.gpkg
 
 # layer name, (layer path, layer rank, protection distance)
 _GLOBAL_HABITAT_LAYER_PATHS = {
@@ -190,24 +192,32 @@ def main():
         dependent_task_list=[tm_world_borders_basedata_fetch_task],
         task_name=f'unzip tm_world_borders_basedata_zip')
 
-    global_polygon_url = (
-        'https://storage.cloud.google.com/ecoshard-root/ipbes-cv/global_polygon_simplified_geometries_md5_653118dde775057e24de52542b01eaee.gpkg')
     global_polygon_path = os.path.join(
-        ECOSHARD_DIR, os.path.basename(global_polygon_url))
+        ECOSHARD_DIR, os.path.basename(_GLOBAL_POLYGON_GS_PATH))
     global_polygon_fetch_task = task_graph.add_task(
-        func=google_bucket_fetch_and_validate,
+        func=reproduce.google_bucket_fetch_and_validate,
         args=(
-            global_polygon_url, IAM_TOKEN_PATH,
+            _GLOBAL_POLYGON_GS_PATH, IAM_TOKEN_PATH,
             global_polygon_path),
         target_path_list=[global_polygon_path],
         task_name=f'fetch {os.path.basename(global_polygon_path)}')
 
+    global_wwiii_path = os.path.join(
+        ECOSHARD_DIR, os.path.splitext(os.path.basename(
+            _GLOBAL_WWIII_GS_PATH)[0]))
+    wwiii_fetch_task = task_graph.add_task(
+        func=fetch_validate_and_unzip,
+        args=(
+            _GLOBAL_WWIII_GS_PATH, IAM_TOKEN_PATH, global_wwiii_path),
+        target_path_list=[global_wwiii_path],
+        task_name=f'fetch {os.path.basename(global_wwiii_path)}')
+
     wwiii_rtree_path = os.path.join(
         WORKING_DIR, _GLOBAL_WWIII_RTREE_FILE_PATTERN)
-
     build_wwiii_task = task_graph.add_task(
         func=build_wwiii_rtree,
-        args=(_GLOBAL_WWIII_PATH, wwiii_rtree_path),
+        args=(global_wwiii_path, wwiii_rtree_path),
+        dependent_task_list=[wwiii_fetch_task],
         task_name='build_wwiii_rtree')
 
     fetch_habitat_task_list = []
@@ -2738,6 +2748,19 @@ def threshold_raster_op(
 def mult2_op(array_a, array_b):
     """Multiply two arrays together blindly."""
     return array_a * array_b
+
+
+def fetch_validate_and_unzip(
+        gs_path, iam_token_path, download_dir, target_path):
+    """Fetch a gzipped file, validate it, and unzip to `target_path`."""
+    target_gz_path = os.path.join(download_dir, os.path.basename(gs_path))
+    reproduce.google_bucket_fetch_and_validate(
+        gs_path, iam_token_path, target_gz_path)
+
+    with gzip.open(target_gz_path, 'rb') as gzip_file:
+        with open(target_path, 'wb') as target_file:
+            shutil.copyfileobj(gzip_file, target_file)
+
 
 if __name__ == '__main__':
     main()
