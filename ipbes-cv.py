@@ -167,30 +167,15 @@ def main():
     task_graph = taskgraph.TaskGraph(
         _WORK_COMPLETE_TOKEN_PATH, _N_CPUS, reporting_interval=5.0)
 
-    tm_world_borders_basedata_url = (
-        'https://storage.cloud.google.com/ecoshard-root/ipbes/'
-        'TM_WORLD_BORDERS_SIMPL-0.3_md5_15057f7b17752048f9bd2e2e607fe99c.zip')
-    tm_world_borders_zipfile_path = os.path.join(
-        ECOSHARD_DIR, os.path.basename(tm_world_borders_basedata_url))
+    tm_world_borders_path = os.path.join(
+        ECOSHARD_DIR, os.path.basename(_TM_WORLD_BORDERS_GS_PATH))
     tm_world_borders_basedata_fetch_task = task_graph.add_task(
-        func=google_bucket_fetch_and_validate,
+        func=reproduce.google_bucket_fetch_and_validate,
         args=(
-            tm_world_borders_basedata_url, IAM_TOKEN_PATH,
-            tm_world_borders_zipfile_path),
-        target_path_list=[tm_world_borders_zipfile_path],
-        task_name=f'fetch {os.path.basename(tm_world_borders_zipfile_path)}')
-    zip_touch_file_path = os.path.join(
-        os.path.dirname(tm_world_borders_zipfile_path),
-        'tm_world_borders_basedata_zip.txt')
-    __ = task_graph.add_task(
-        func=unzip_file,
-        args=(
-            tm_world_borders_zipfile_path, os.path.dirname(
-                tm_world_borders_zipfile_path),
-            zip_touch_file_path),
-        target_path_list=[zip_touch_file_path],
-        dependent_task_list=[tm_world_borders_basedata_fetch_task],
-        task_name=f'unzip tm_world_borders_basedata_zip')
+            _TM_WORLD_BORDERS_GS_PATH, IAM_TOKEN_PATH,
+            tm_world_borders_path),
+        target_path_list=[tm_world_borders_path],
+        task_name=f'fetch {os.path.basename(tm_world_borders_path)}')
 
     global_polygon_path = os.path.join(
         ECOSHARD_DIR, os.path.basename(_GLOBAL_POLYGON_GS_PATH))
