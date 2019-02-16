@@ -90,7 +90,7 @@ _AGGREGATION_LAYER_MAP = {
     'urbp_ssp1': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP1_RCP26/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
     'urbp_ssp3': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP3_RCP70/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
     'urbp_ssp5': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/GLOBIO4_landuse_10sec_tifs_20171207_Idiv/SSP5_RCP85/Globio4_landuse_10sec_2050_cropint.tif"), False, [1, 190], 5e3, 0),
-    'SLRrate_cur': (("gs://ipbes-natcap-ecoshard-data-for-publication/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust.tif"), False, None, 5e3, 1),
+    'SLRrate_cur': (("gs://ipbes-natcap-ecoshard-data-for-publication/MSL_Map_MERGED_Global_AVISO_NoGIA_Adjust_md5_3072845759841d0b2523d00fe9518fee.tif"), False, None, 5e3, 1),
     'slr_rcp26': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp26_md5_7c73cf8a1bf8851878deaeee0152dcb6.tif"), False, None, 5e3, 2),
     'slr_rcp60': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp60_md5_99ccaf1319d665b107a9227f2bbbd8b6.tif"), False, None, 5e3, 2),
     'slr_rcp85': ((r"gs://ipbes-natcap-ecoshard-data-for-publication/slr_rcp85_md5_3db20b7e891a71e23602826179a57e4a.tif"), False, None, 5e3, 2),
@@ -187,6 +187,16 @@ def main():
             global_polygon_path),
         target_path_list=[global_polygon_path],
         task_name=f'fetch {os.path.basename(global_polygon_path)}')
+
+    global_dem_path = os.path.join(
+        ECOSHARD_DIR, os.path.basename(_GLOBAL_DEM_GS_PATH))
+    global_dem_fetch_task = task_graph.add_task(
+        func=reproduce.utils.google_bucket_fetch_and_validate,
+        args=(
+            _GLOBAL_DEM_GS_PATH, IAM_TOKEN_PATH,
+            global_dem_path),
+        target_path_list=[global_dem_path],
+        task_name=f'fetch {os.path.basename(global_dem_path)}')
 
     global_wwiii_path = os.path.join(
         ECOSHARD_DIR, os.path.splitext(os.path.basename(
@@ -350,11 +360,12 @@ def main():
         relief_task = task_graph.add_task(
             func=calculate_relief, args=(
                 grid_point_path,
-                _GLOBAL_DEM_PATH,
+                global_dem_path,
                 relief_workspace,
                 target_relief_point_path),
             target_path_list=[target_relief_point_path],
-            dependent_task_list=[create_shore_points_task])
+            dependent_task_list=[
+                global_dem_fetch_task, create_shore_points_task])
         relief_task_list.append(relief_task)
         local_relief_path_list.append(
             target_relief_point_path)
@@ -366,11 +377,12 @@ def main():
         surge_task = task_graph.add_task(
             func=calculate_surge, args=(
                 grid_point_path,
-                _GLOBAL_DEM_PATH,
+                global_dem_path,
                 surge_workspace,
                 target_surge_point_vector_path),
             target_path_list=[target_surge_point_vector_path],
-            dependent_task_list=[create_shore_points_task],
+            dependent_task_list=[
+                global_dem_fetch_task, create_shore_points_task],
             task_name='calculate surge %d' % grid_fid)
         surge_task_list.append(surge_task)
         local_surge_path_list.append(
