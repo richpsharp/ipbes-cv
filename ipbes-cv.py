@@ -1689,7 +1689,9 @@ def calculate_relief(
                     'relief_band size %d %d', relief_band.XSize,
                     relief_band.YSize)
                 raise
-            point_feature.SetField('relief', float(pixel_value))
+            # Make relief "negative" so when we histogram it for risk a
+            # "higher" value will show a lower risk.
+            point_feature.SetField('relief', -float(pixel_value))
             target_relief_point_layer.SetFeature(point_feature)
 
         target_relief_point_layer.SyncToDisk()
